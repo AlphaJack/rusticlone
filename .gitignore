@@ -1,0 +1,7 @@
+.venv
+dist
+*egg-info
+**/**.pyc
+tests/coverage
+**/.mypy_cache
+**/.coverage

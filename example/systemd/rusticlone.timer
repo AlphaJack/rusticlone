@@ -1,0 +1,9 @@
+[Unit]
+Description=Rusticlone Backup - timer
+
+[Timer]
+# every day at midnight
+OnCalendar=*-*-* 00:00:00
+
+[Install]
+WantedBy=timers.target

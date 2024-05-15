@@ -1,0 +1,26 @@
+[global]
+log-level = "debug"
+log-file = "/home/jack/Desktop/rusticlone/rusticlone.log"
+
+[global.env]
+RCLONE_CONFIG="/home/jack/Documents/git/rusticlone/example/rclone.conf"
+
+[repository]
+cache-dir = "/home/jack/Desktop/rusticlone/cache"
+password = "XXXXXX"
+
+[backup]
+label = "rusticlone"
+ignore-inode = true
+git-ignore = true
+init = true
+one-file-system = true
+
+[forget]
+prune = true
+keep-last = 1
+keep-daily = 7
+keep-weekly = 4
+keep-monthly = 3
+keep-quarter-yearly = 4
+keep-yearly = 1
