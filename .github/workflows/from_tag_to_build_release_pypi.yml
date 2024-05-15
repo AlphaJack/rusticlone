@@ -15,7 +15,8 @@ name: Create GitHub release and deploy to PyPI from a new tag
 
 # requirements:
 # - GitHub has an environment called "release"
-# - PyPI has a trusted publisher set (no need for secret token)
+# - PyPI has a trusted publisher set from https://pypi.org/manage/account/publishing/
+# - no need for secret PyPI token
 
 
 # debug:
