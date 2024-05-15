@@ -246,10 +246,10 @@ Description=Rusticlone service
 
 [Service]
 Type=oneshot
-ExecStart=rusticlone --ignore-pattern "common" --remote "gdrive:/PC" backup
+ExecStart=rusticlone --ignore "common" --remote "gdrive:/PC" backup
 ```
 
-Adjust your `--ignore-pattern` and `--remote` as needed.
+Adjust your `--ignore` and `--remote` as needed.
 
 Apply your changes and enable the timer:
 
