@@ -1,0 +1,104 @@
+# ┌───────────────────────────────────────────────────────────────┐
+# │ Contents of pyproject.toml                                    │
+# ├───────────────────────────────────────────────────────────────┘
+# │
+# ├── Build system
+# ├── Project
+# ├──┐Tools
+# │  └── Git-Cliff
+# │
+# └───────────────────────────────────────────────────────────────
+
+# ################################################################ Build system
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["rusticlone", "rusticlone.helpers", "rusticlone.processing"]
+
+# ################################################################ Project
+
+[project]
+name = "rusticlone"
+version = "1.0.0"
+authors = [
+  { name="AlphaJack" },
+]
+description = "3-2-1 backups using Rustic and RClone"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: System :: Archiving :: Backup",
+    "Environment :: Console",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3"
+]
+dependencies = [
+    "importlib_metadata"
+]
+
+[project.scripts]
+rusticlone = "rusticlone.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/AlphaJack/rusticlone"
+Issues = "https://github.com/AlphaJack/rusticlone/issues"
+Repository = "https://github.com/AlphaJack/rusticlone"
+Changelog = "https://github.com/AlphaJack/rusticlone/blob/master/CHANGELOG.md"
+
+# ################################################################ Tools
+
+# ################################ Git-Cliff
+
+[tool.git-cliff.git]
+conventional_commits = false
+filter_unconventional = false
+protect_breaking_commits = true
+filter_commits = false
+split_commits = true
+tag_pattern = "v[0-9].*"
+skip_tags = "beta|alpha"
+ignore_tags = "rc"
+sort_commits = "newest"
+commit_parsers = [
+    { message = "^(feat|[Aa]dd)", group = "Added" },
+    { message = "^perf", group = "Performance" },
+    { message = "^change", group = "Changed" },
+    { message = "^[Dd]oc", group = "Documentation" },
+    { message = "^deprecat", group = "Deprecated" },
+    { message = "^fix", group = "Fixed" },
+    { message = "^remove", group = "Removed" },
+    { body = ".*security", group = "Security" },
+    { message = "^test", group = "Testing" },
+    { message = "^(auto|ci|chore|minor|skip)", skip = true },
+    { body = ".*", group = "Various" },
+]
+
+[tool.git-cliff.changelog]
+trim = true
+header = """# Changelog - toc
+
+"""
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}\
+
+{% else %}\
+    ## Work in progress\
+
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | upper_first }}
+
+    {% for commit in commits %}\
+        - {{ commit.message | split(pat=':') | last | trim | upper_first }}
+    {% endfor %}\
+
+{% endfor %}\n
+"""
+

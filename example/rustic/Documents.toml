@@ -1,0 +1,9 @@
+[global]
+use-profile = ["common"]
+
+[repository]
+repository = "/home/jack/Desktop/rusticlone/backup/Documents"
+
+[[backup.sources]]
+# to be created with files
+source = "/home/jack/Desktop/rusticlone/source/docs"
