@@ -11,7 +11,7 @@
     <br/>
     <img alt="restore process divided in download and extract" src="https://github.com/AlphaJack/rusticlone/raw/master/images/process-restore.png" style="width: 43%; vertical-align: top;"/>
     <img alt="output of rusticlone restore parallel" src="https://github.com/AlphaJack/rusticlone/raw/master/images/parallel-restore.png" style="width: 40%; vertical-align: top;"/>
-    <img alt="output of rusticlone restore sequential" src="https://github.com/AlphaJack/rusticlone/raw/master/images/sequential-backup.png" style="width: 14%; vertical-align: top;"/>
+    <img alt="output of rusticlone restore sequential" src="https://github.com/AlphaJack/rusticlone/raw/master/images/sequential-restore.png" style="width: 14%; vertical-align: top;"/>
 </div>
 
 ## Motivation
