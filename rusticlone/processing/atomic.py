@@ -110,6 +110,7 @@ def profile_extract(
     profile.set_log_file(log_file)
     profile.check_local_repo_exists()
     profile.latest()
+    profile.check_source_type()
     profile.restore()
     timer.stop()
     # print_stats("", "")

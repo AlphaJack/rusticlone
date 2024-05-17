@@ -115,10 +115,11 @@ def list_profiles(
     Scan profiles from directories if none have been provided explicitely
     Don't scan from /etc/rustic if ~/.config/rustic has some profiles'
     """
+    action = Action("Reading profiles")
     if not profiles:
         for profiles_dir in profiles_dirs:
             if len(profiles) == 0 and profiles_dir.exists() and profiles_dir.is_dir():
-                action = Action(f'Scanning "{profiles_dir}"')
+                action.stop(f'Scanning "{profiles_dir}"', "")
                 files = sorted(list(profiles_dir.glob("*.toml")))
                 for file in files:
                     if (
