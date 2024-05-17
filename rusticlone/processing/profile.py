@@ -402,7 +402,9 @@ class Profile:
             if self.rclone_config != "" and self.local_repo_exists:
                 rclone_log_file = str(self.log_file)
                 rclone_origin = self.repo.replace("\\", "/").replace("//", "/")
-                rclone_destination = remote_prefix + "/" + self.profile_name
+                #rclone_destination = remote_prefix + "/" + self.profile_name
+                repo_stem = str(Path(self.repo).stem)
+                rclone_destination = remote_prefix + "/" + repo_stem
                 # print(rclone_destination)
                 Rclone(
                     config=self.rclone_config,
@@ -429,7 +431,9 @@ class Profile:
                     if self.rclone_config is not None:
                         if self.remote_repo_exists:
                             rclone_log_file = str(self.log_file)
-                            rclone_origin = remote_prefix + "/" + self.profile_name
+                            #rclone_origin = remote_prefix + "/" + self.profile_name
+                            repo_stem = str(Path(self.repo).stem)
+                            rclone_origin = remote_prefix + "/" + repo_stem
                             rclone_destination = self.repo
                             Rclone(
                                 config=self.rclone_config,

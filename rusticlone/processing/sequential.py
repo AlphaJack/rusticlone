@@ -75,6 +75,7 @@ def system_archive_sequential(profiles: list, log_file: Path) -> dict:
             print_stats("", "")
         else:
             print_stats(f"Error archiving {name}", "")
+            print(" ")
     return archive_results
 
 

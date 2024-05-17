@@ -59,13 +59,23 @@ password = "XXXXXX"
 source = "$RUSTICLONE_TEST_DIR/source/pics"
 CONTENT
 
+mapfile -d '' profile3Content << CONTENT
+[repository]
+repository = "$RUSTICLONE_TEST_DIR/local/Passwords"
+cache-dir = "$RUSTICLONE_TEST_DIR/cache"
+password = "XXXXXX"
+
+[[backup.sources]]
+source = "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
+CONTENT
+
 mapfile -d '' profileCommonContent << CONTENT
 [global]
 log-level = "debug"
 log-file = "$RUSTICLONE_TEST_DIR/rusticlone.log"
 
 [global.env]
-RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone.conf"
+RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone-test.conf"
 CONTENT
 
 mapfile -d '' rcloneConfContent << CONTENT
@@ -106,13 +116,16 @@ create_dirs(){
 
 create_confs(){
  echo "[OK] Creating configurations"
- profile1Conf="$RUSTIC_PROFILES_DIR/Documents.toml"
- profile2Conf="$RUSTIC_PROFILES_DIR/Pictures.toml"
- rcloneConf="$RUSTIC_PROFILES_DIR/rclone.conf"
+ profile1Conf="$RUSTIC_PROFILES_DIR/Documents-test.toml"
+ profile2Conf="$RUSTIC_PROFILES_DIR/Pictures-test.toml"
+ profile3Conf="$RUSTIC_PROFILES_DIR/Passwords-test.toml"
+ rcloneConf="$RUSTIC_PROFILES_DIR/rclone-test.conf"
  echo "${profile1Content[0]}" > "$profile1Conf"
  echo "${profile2Content[0]}" > "$profile2Conf"
+ echo "${profile3Content[0]}" > "$profile3Conf"
  echo "${profileCommonContent[0]}" >> "$profile1Conf"
  echo "${profileCommonContent[0]}" >> "$profile2Conf"
+ echo "${profileCommonContent[0]}" >> "$profile3Conf"
  echo "${rcloneConfContent[0]}" > "$rcloneConf"
 }
 
@@ -126,6 +139,7 @@ create_files(){
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/photo.jpeg"
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/opengraph.webp"
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/funny.gif"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
 }
 
 create_sums(){
@@ -179,6 +193,11 @@ destroy_source1(){
 destroy_source2(){
  echo "[OK] Destroying pictures"
  rm -rf "$RUSTICLONE_TEST_DIR/source/pics"
+}
+
+destroy_source3(){
+ echo "[OK] Destroying passwords"
+ rm -rf "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
 }
 
 destroy_source12(){
@@ -311,6 +330,7 @@ main(){
  rusticlone_archive_parallel
  rusticlone_upload
  destroy_source12
+ destroy_source3
  destroy_local2
  # restore
  rusticlone_restore_parallel

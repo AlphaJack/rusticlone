@@ -24,7 +24,7 @@ import platform
 import sys
 
 # rusticlone
-from rusticlone.helpers.formatting import print_stats
+from rusticlone.helpers.action import Action
 from rusticlone.processing.parallel import (
     system_backup_parallel,
     system_archive_parallel,
@@ -93,7 +93,7 @@ class Custom:
         """
         Create log file parent folders if missing, delete old log file
         """
-        print_stats("Checking log file", "")
+        action = Action("Checking log file")
         if self.log_file != self.default_log_file:
             used_log = self.log_file
             self.log_file.parents[0].mkdir(parents=True, exist_ok=True)
@@ -102,7 +102,7 @@ class Custom:
         else:
             # if not defined in Rustic profiles, "./rusticlone.log" is used
             used_log = "defined in Rustic profiles"
-        print_stats(f"Log file: {used_log}", "")
+        action.stop(f"Log file: {used_log}", "")
 
 
 # ################################################################ FUNCTIONS
@@ -113,10 +113,12 @@ def list_profiles(
 ) -> list:
     """
     Scan profiles from directories if none have been provided explicitely
+    Don't scan from /etc/rustic if ~/.config/rustic has some profiles'
     """
     if not profiles:
         for profiles_dir in profiles_dirs:
-            if profiles_dir.exists() and profiles_dir.is_dir():
+            if len(profiles) == 0 and profiles_dir.exists() and profiles_dir.is_dir():
+                action = Action(f'Scanning "{profiles_dir}"')
                 files = sorted(list(profiles_dir.glob("*.toml")))
                 for file in files:
                     if (
@@ -126,10 +128,10 @@ def list_profiles(
                     ):
                         profiles.append(file.stem)
     if len(profiles) == 0:
-        print("Could not find any rustic profile, aborting")
+        action.abort("Could not find any rustic profile")
         sys.exit(1)
     else:
-        print("Profiles:", profiles)
+        action.stop(f"Profiles: {str(profiles)}", "")
         return profiles
 
 
