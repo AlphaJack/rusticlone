@@ -6,6 +6,9 @@
 #	git push --delete origin v1.0.0
 # and repeat the steps below
 
+tests:
+	bash tests/tests.sh
+
 release:
 	bash tests/tests.sh
 	mypy .

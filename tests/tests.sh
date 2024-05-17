@@ -72,7 +72,7 @@ CONTENT
 mapfile -d '' profileCommonContent << CONTENT
 [global]
 log-level = "debug"
-log-file = "$RUSTICLONE_TEST_DIR/rusticlone.log"
+log-file = "$RUSTICLONE_TEST_DIR/logs/rusticlone.log"
 
 [global.env]
 RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone-test.conf"
@@ -93,6 +93,11 @@ check_workdir(){
  fi
 }
 
+print_space(){
+ echo " "
+ echo " "
+}
+
 print_warning(){
  echo "[!!] WARNING: this script will destroy the contents of \"$RUSTIC_PROFILES_DIR\" and \"$RUSTICLONE_TEST_DIR\""
  echo "[!!] Required programs: coreutils, bash, python-coverage, rustic, rclone"
@@ -111,7 +116,7 @@ create_dirs(){
  if [[ -d "$RUSTICLONE_TEST_DIR" ]]; then
   rm -r "$RUSTICLONE_TEST_DIR"
  fi
- mkdir -p "$RUSTIC_PROFILES_DIR" "$RUSTICLONE_TEST_DIR"/{source/docs,source/pics}
+ mkdir -p "$RUSTIC_PROFILES_DIR" "$RUSTICLONE_TEST_DIR"/{source/docs,source/pics,logs}
 }
 
 create_confs(){
@@ -140,6 +145,7 @@ create_files(){
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/opengraph.webp"
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/funny.gif"
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
+ chmod 0600 "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
 }
 
 create_sums(){
@@ -256,8 +262,9 @@ rusticlone_restore(){
 
 rusticlone_restore_flags(){
  echo "[OK] Restoring from Rusticlone"
- coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents" --log-file "$RUSTICLONE_TEST_DIR/documents-restore.log" restore
- coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures" --ignore "common" restore
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" restore
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" --ignore "common" restore
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures-test" restore
 }
 
 rusticlone_download(){
@@ -315,42 +322,62 @@ main(){
  create_confs
  create_files
  create_sums
+ 
  # backup
  rusticlone_backup
+ print_space
  destroy_local1
  destroy_remote2
+ print_space
  rusticlone_backup_parallel
+ print_space
  destroy_remote1
  destroy_local2
+ print_space
  rusticlone_archive
+ print_space
  destroy_cache
+ print_space
  rusticlone_upload_parallel
+ print_space
  destroy_remote2
  destroy_cache
+ print_space
  rusticlone_archive_parallel
  rusticlone_upload
+ print_space
  destroy_source12
  destroy_source3
  destroy_local2
+ print_space
  # restore
  rusticlone_restore_parallel
+ print_space
  check_sums
  destroy_local1
  destroy_source2
+ print_space
  rusticlone_download_parallel
  rusticlone_extract
+ print_space
  check_sums
  destroy_cache
+ print_space
  rusticlone_download
  rusticlone_extract_parallel
+ print_space
  check_sums
  destroy_cache
  destroy_source1
  destroy_local2
+ print_space
  rusticlone_restore
+ print_space
  destroy_source2
  destroy_local1
+ print_space
  rusticlone_restore_flags
+ print_space
  # result
  check_sums
  create_coverage

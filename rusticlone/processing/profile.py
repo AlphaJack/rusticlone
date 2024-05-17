@@ -45,13 +45,14 @@ class Profile:
         self.parallel = parallel
         self.source = ""
         self.repo = ""
-        self.log_file = Path("")
+        self.log_file = Path("rusticlone.log")
         self.password_provided = ""
         self.rclone_config = ""
         self.rclone_config_pass = ""
         self.rclone_config_pass_comm = ""
         self.backup_output = ""
         self.source_exists = False
+        self.source_type = "dir"
         self.local_repo_exists = False
         self.remote_repo_exists = False
         self.snapshot_exists = False
@@ -135,7 +136,9 @@ class Profile:
                         "Could not parse repo in config:\n", self.config
                     )
                 case str(self.log_file):
-                    self.result = action.abort("Invalid log file")
+                    self.result = action.abort(
+                        f'Invalid log file: "{str(self.log_file)}"'
+                    )
                 case self.password_provided:
                     self.result = action.abort(
                         "Could not parse password in config:\n", self.config
@@ -183,16 +186,22 @@ class Profile:
         set rclone log file
         if not default has been passed, use it, otherwise use the one in conf
         if there are no matches in conf, use the default one
+        rustic fails if it cannot find the parent folder of the log file when parsing the conf,
+        so it must be created before Profile.read_rustic_config() is run
         from now on, use self.log_file in Profile.upload() and Profile.download()
         """
         if self.result:
-            action = Action("Setting log file for rclone", self.parallel)
-            default_log_file = Path("rusticlone.log")
-            if passed_log_file != default_log_file or str(self.log_file) == ".":
+            action = Action("Setting log file", self.parallel)
+            if passed_log_file != Path("rusticlone.log"):
                 self.log_file = passed_log_file
-                action.stop("RClone uses specified log file")
-            else:
-                action.stop("RClone uses Rustic log file")
+            if self.parallel:
+                suffix_old = self.log_file.suffix
+                suffix_new = "-" + self.profile_name + ".log"
+                self.log_file = Path(str(self.log_file).replace(suffix_old, suffix_new))
+                # rustic fails anyway if it cannot find the path when parsing the conf
+                # self.log_file.parent.mkdir(parents=True, exist_ok=True)
+                # self.log_file.touch(exist_ok=True)
+            action.stop("Log file set")
 
     def check_source_exists(self) -> None:
         """
@@ -201,8 +210,12 @@ class Profile:
         if self.result:
             action = Action("Checking if source exists", self.parallel)
             # print(self.source)
-            folder = Path(self.source)
-            if folder.exists() and folder.is_dir():
+            source = Path(self.source)
+            if source.exists():
+                if source.is_dir():
+                    self.source_type = "dir"
+                else:
+                    self.source_type = "file"
                 self.source_exists = True
                 action.stop("Source exists")
             else:
@@ -232,7 +245,9 @@ class Profile:
             if self.rclone_config:
                 action = Action("Checking if remote repo exists", self.parallel)
                 rclone_log_file = str(self.log_file)
-                rclone_origin = remote_prefix + "/" + self.profile_name
+                # rclone_origin = remote_prefix + "/" + self.profile_name
+                repo_name = str(Path(self.repo).name)
+                rclone_origin = remote_prefix + "/" + repo_name
                 rclone_lsd = Rclone(
                     config=self.rclone_config,
                     config_pass=self.rclone_config_pass,
@@ -402,9 +417,9 @@ class Profile:
             if self.rclone_config != "" and self.local_repo_exists:
                 rclone_log_file = str(self.log_file)
                 rclone_origin = self.repo.replace("\\", "/").replace("//", "/")
-                #rclone_destination = remote_prefix + "/" + self.profile_name
-                repo_stem = str(Path(self.repo).stem)
-                rclone_destination = remote_prefix + "/" + repo_stem
+                # rclone_destination = remote_prefix + "/" + self.profile_name
+                repo_name = str(Path(self.repo).name)
+                rclone_destination = remote_prefix + "/" + repo_name
                 # print(rclone_destination)
                 Rclone(
                     config=self.rclone_config,
@@ -418,7 +433,9 @@ class Profile:
                 # action.stop(f"Uploaded repo: {rclone_destination}")
                 action.stop("Uploaded repo")
             else:
-                action.stop("Rclone config missing or repository is already remote", "")
+                self.result = action.abort(
+                    "RClone config missing or local repo does not exist", ""
+                )
 
     def download(self, remote_prefix: str) -> None:
         """
@@ -431,9 +448,9 @@ class Profile:
                     if self.rclone_config is not None:
                         if self.remote_repo_exists:
                             rclone_log_file = str(self.log_file)
-                            #rclone_origin = remote_prefix + "/" + self.profile_name
-                            repo_stem = str(Path(self.repo).stem)
-                            rclone_origin = remote_prefix + "/" + repo_stem
+                            # rclone_origin = remote_prefix + "/" + self.profile_name
+                            repo_name = str(Path(self.repo).name)
+                            rclone_origin = remote_prefix + "/" + repo_name
                             rclone_destination = self.repo
                             Rclone(
                                 config=self.rclone_config,
@@ -500,14 +517,41 @@ class Profile:
         #    self.snapshot_exists = False
         #    action.abort("Skipping non-existing repo")
 
+    def check_source_type(self) -> None:
+        """
+        Check if the source that needs to be restored is a directory or file
+        """
+        if self.result:
+            action = Action("Checking source type", self.parallel)
+            if self.local_repo_exists and self.snapshot_exists:
+                rustic = Rustic(
+                    self.profile_name,
+                    "ls",
+                    "latest",
+                    "--glob",
+                    f"{self.source}",
+                    "--long",
+                    "--log-file",
+                    str(self.log_file),
+                )
+                if rustic.stdout[0] == "d" or rustic.stdout.count("\n") > 1:
+                    self.source_type = "dir"
+                else:
+                    self.source_type = "file"
+                action.stop(f"Source is a {self.source_type}")
+
     def restore(self) -> None:
         """
         Extract files in the latest snapshot to the source location, after creating it if missing
-        self.source must exist, so rustic can create the folder inside it
+        if self.source is a directory, it is created if missing
+        if self.source is a file, its parent is created if missing
         """
         if self.result:
             action = Action("Extracting snapshot", self.parallel)
-            Path(self.source).mkdir(parents=True, exist_ok=True)
+            if self.source_type == "dir":
+                Path(self.source).mkdir(parents=True, exist_ok=True)
+            else:
+                Path(self.source).parent.mkdir(parents=True, exist_ok=True)
             if self.local_repo_exists and self.snapshot_exists:
                 Rustic(
                     self.profile_name,
