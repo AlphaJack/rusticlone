@@ -26,10 +26,10 @@ name: Create GitHub release and deploy to PyPI from a new tag
 #   git tag v1.1.0 && git push --tags
 
 on:
-
   push:
     tags:
       - 'v*'
+
 jobs:
 
 # ################################ Build and test
@@ -42,7 +42,6 @@ jobs:
     permissions:
       contents: write
     outputs:
-      version: ${{ steps.version.outputs.content }}
       changelog: ${{ steps.changelog.outputs.content }}
     strategy:
       fail-fast: true
@@ -68,10 +67,6 @@ jobs:
           python -m pip install build wheel setuptools
           python -m pip install -e .
 
-      - name: Store version
-        id: version
-        run: awk '/version = / {gsub(/"/,""); print $3}' pyproject.toml
-
       - name: Store partial changelog for release notes
         id: changelog
         uses: orhun/git-cliff-action@8b17108aad4d9362649a5dae020746c2a767c90d # 3.0.2
@@ -80,25 +75,6 @@ jobs:
           args: -vv --latest --strip all
         env:
           OUTPUT: CHANGELOG-PARTIAL.md
-
-      # generating and committing manually, as it would not appear in final release
-      #- name: Store full changelog for package and repo
-      #  id: changelog-full
-      #  uses: orhun/git-cliff-action@8b17108aad4d9362649a5dae020746c2a767c90d # 3.0.2
-      #  with:
-      #    config: pyproject.toml
-      #    args: -vv
-      #  env:
-      #    OUTPUT: CHANGELOG.md
-
-      # skipped, You are not currently on a branch
-      #- name: Commit full changelog to repo
-      #  run: |
-      #    git config user.name github-actions
-      #    git config user.email github-actions@github.com
-      #    git add "CHANGELOG.md"
-      #    git commit -m "auto: updated changelog"
-      #    git push
 
       - name: Build package
         run: |
@@ -139,7 +115,7 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564 # 2.0.4
         with:
-          name: Rusticlone ${{ needs.build.outputs.version }}
+          name: Rusticlone ${{ github.ref_name }}
           body: ${{ needs.build.outputs.changelog }} 
           draft: false
           token: ${{ github.token }}
