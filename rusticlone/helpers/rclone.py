@@ -53,8 +53,8 @@ class Rclone:
             "--drive-chunk-size=128M",
             "--drive-acknowledge-abuse",
             "--drive-stop-on-upload-limit",
-            # 1.66+, if added to 1.65.2 complains that log_file is an invalid option
-            # "--no-update-dir-modtime",
+            # 1.67+, if added to 1.65.2 complains that log_file is an invalid option
+            "--create-empty-src-dirs=false",
             f"--log-file={kwargs['log_file']}",
             # f"--config={kwargs['config']}",
             # f"--password-command=\"echo '{kwargs['config_pass']}'\"",

@@ -17,6 +17,9 @@ Load customizations by interpreting passed arguments
 # file locations
 from pathlib import Path
 
+# args type
+from argparse import Namespace
+
 # os and hostname
 import platform
 
@@ -196,7 +199,7 @@ def process_profiles(
                 system_extract_sequential(profiles=profiles, log_file=log_file)
 
 
-def load_customizations(args: dict):
+def load_customizations(args: Namespace):
     """
     Interpret arguments, make a list of profiles to process, and process them
     """
