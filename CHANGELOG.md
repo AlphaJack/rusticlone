@@ -1,5 +1,15 @@
 # Changelog - toc
 
+## [1.1.0] - 2024-08-20
+### Added
+
+- Added rustic and rclone version check
+
+### Changed
+
+- Enforcing minimum rustic and rclone versions
+- Supportig rclone >=1.67
+
 ## [1.0.1] - 2024-05-17
 ### Added
 
