@@ -22,6 +22,7 @@ release:
 	git-cliff -c pyproject.toml > CHANGELOG.md
 	#toc -lf .tocfiles
 	git tag --delete v$(tag)
+	git add pyproject.toml || true
 	git add CHANGELOG.md || true
 	git commit -m "minor: updated CHANGELOG.md" || true
 	git tag -fa v$(tag)
