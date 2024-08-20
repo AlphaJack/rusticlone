@@ -37,7 +37,7 @@ If it sounds interesting, keep reading!
 
 ## Installation
 
-Install [RClone](https://rclone.org/install/)>=1.67, [Rustic](https://rustic.cli.rs/docs/installation.html)>=0.7, [Python](https://www.python.org/downloads/)>=3.10 and then `rusticlone`:
+Install [RClone](https://rclone.org/install/) >= 1.67, [Rustic](https://rustic.cli.rs/docs/installation.html) >= 0.7, [Python](https://www.python.org/downloads/) >= 3.10 and then `rusticlone`:
 
 ```bash
 pip install rusticlone
@@ -273,7 +273,7 @@ At the end, you can read a test coverage report with your browser, to see which 
 
 ## Known limitations
 
-- You must specify **only one source folder per Rustic profile**, as Rustic 0.7.0 does not support array of sources. Wait for Rustic 0.8.0 and Rusticlone 1.1.0 before including arrays. ([feature request](https://github.com/rustic-rs/rustic/issues/1125#issue-2251075638))
+- You must specify **only one source folder per Rustic profile**, as Rustic 0.7.0 does not support array of sources. Wait for Rustic 0.8.0 and Rusticlone 1.2.0 before including arrays. ([feature request](https://github.com/rustic-rs/rustic/issues/1125#issue-2251075638))
 - Rustic **does not save file and permissions for the source location**, but only for files and folders **inside the source**. If you backup "/home/jack" with user "jack" and permission "0700", when you will restore it will have user "root" and permission "0755" ([intended behavior](https://github.com/rustic-rs/rustic/issues/1108#issuecomment-2016584568))
 
 ## Contribute

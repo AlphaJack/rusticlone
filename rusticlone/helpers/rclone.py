@@ -24,18 +24,7 @@ class Rclone:
         """
         Launch a rclone command
         """
-        default_kwargs = {
-            "check_return_code": True,
-            "action": "--help",
-            "origin": None,
-            "destination": None,
-        }
-        kwargs = default_kwargs | kwargs
-        self.check_return_code = kwargs["check_return_code"]
-        self.action = kwargs["action"]
-        self.origin = kwargs["origin"]
-        self.destination = kwargs["destination"]
-        self.flags = [
+        default_flags = [
             "--auto-confirm",
             "--ask-password=false",
             "--check-first",
@@ -53,12 +42,33 @@ class Rclone:
             "--drive-chunk-size=128M",
             "--drive-acknowledge-abuse",
             "--drive-stop-on-upload-limit",
-            # 1.67+, if added to 1.65.2 complains that log_file is an invalid option
-            "--create-empty-src-dirs=false",
-            f"--log-file={kwargs['log_file']}",
-            # f"--config={kwargs['config']}",
-            # f"--password-command=\"echo '{kwargs['config_pass']}'\"",
         ]
+        default_kwargs = {
+            "check_return_code": True,
+            "config": "",
+            "config_pass": "",
+            "config_pass_command": "",
+            "action": "version",
+            "default_flags": default_flags,
+            "additional_flags": [],
+            "origin": None,
+            "destination": None,
+        }
+        kwargs = default_kwargs | kwargs
+        self.check_return_code = kwargs["check_return_code"]
+        self.action = kwargs["action"]
+        self.origin = kwargs["origin"]
+        self.destination = kwargs["destination"]
+        if kwargs["default_flags"]:
+            self.flags = [
+                *kwargs["default_flags"],
+                f"--log-file={kwargs['log_file']}",
+                # f"--config={kwargs['config']}",
+                # f"--password-command=\"echo '{kwargs['config_pass']}'\"",
+                *kwargs["additional_flags"],
+            ]
+        else:
+            self.flags = []
         self.env = {
             "RCLONE_CONFIG": kwargs["config"],
             "RCLONE_CONFIG_PASS": kwargs["config_pass"],
