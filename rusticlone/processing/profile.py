@@ -61,9 +61,39 @@ class Profile:
         self.config = ""
         # self.repo_info = ""
 
+    def check_rustic_version(self) -> None:
+        """
+        Check that the installed Rustic version is supported
+        """
+        if self.result:
+            action = Action("Checking Rustic version", self.parallel)
+            rustic = Rustic(self.profile_name, "--version")
+            version = rustic.stdout.splitlines()[0].replace("rustic ", "")
+            major_version = int(version.split(".")[0])
+            minor_version = int(version.split(".")[1])
+            if major_version <= 0 and minor_version < 7:
+                self.result = action.abort(f"Rustic >= 0.7 is required")
+            else:
+                action.stop("Rustic version is supported")
+
+    def check_rclone_version(self) -> None:
+        """
+        Check that the installed Rclone version is supported
+        """
+        if self.result:
+            action = Action("Checking Rclone version", self.parallel)
+            rclone = Rclone(default_flags=None)
+            version = rclone.stdout.splitlines()[0].replace("rclone v", "")
+            major_version = int(version.split(".")[0])
+            minor_version = int(version.split(".")[1])
+            if major_version <= 1 and minor_version < 67:
+                self.result = action.abort(f"Rclone >= 1.67 is required")
+            else:
+                action.stop("Rclone version is supported")
+
     def read_rustic_config(self) -> None:
         """
-        Read the profile configuration by running rustic
+        Read the profile configuration by running Rustic
         """
         if self.result:
             rustic = Rustic(self.profile_name, "show-config")
@@ -427,6 +457,11 @@ class Profile:
                     config_pass_command=self.rclone_config_pass_comm,
                     log_file=rclone_log_file,
                     action="sync",
+                    # 1.67+, if added to 1.65.2 complains that log_file is an invalid option
+                    other_flags=[
+                        "--create-empty-src-dirs=false",
+                        "--no-update-dir-modtime",
+                    ],
                     origin=rclone_origin,
                     destination=rclone_destination,
                 )
@@ -458,6 +493,10 @@ class Profile:
                                 config_pass_command=self.rclone_config_pass_comm,
                                 log_file=rclone_log_file,
                                 action="sync",
+                                other_flags=[
+                                    "--create-empty-src-dirs=false",
+                                    "--no-update-dir-modtime",
+                                ],
                                 origin=rclone_origin,
                                 destination=rclone_destination,
                             )

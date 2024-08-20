@@ -350,6 +350,7 @@ main(){
  destroy_source3
  destroy_local2
  print_space
+
  # restore
  rusticlone_restore_parallel
  print_space
@@ -378,6 +379,7 @@ main(){
  print_space
  rusticlone_restore_flags
  print_space
+
  # result
  check_sums
  create_coverage
