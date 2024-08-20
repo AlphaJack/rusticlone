@@ -102,15 +102,6 @@ jobs:
           name: python-dist
           path: dist
 
-      - name: Rename package
-        run: |
-          cd "dist"
-          oldname="$(find -type f -name "*.whl" -print -quit)"
-          newname="${oldname/tableofcontents/toc}"
-          cd ..
-          mkdir gh
-          cp "dist/$oldname" "gh/$newname"
-
       # https://raw.githubusercontent.com/orhun/git-cliff/main/.github/workflows/cd.yml
       - name: Create release
         uses: softprops/action-gh-release@9d7c94cfd0a1f3ed45544c887983e9fa900f0564 # 2.0.4

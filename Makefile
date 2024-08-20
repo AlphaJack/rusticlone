@@ -17,7 +17,7 @@ release:
 	grep -q $(tag) pyproject.toml || sed -i pyproject.toml -e "s|version = .*|version = \"$(tag)\"|"
 	echo "Abort now if there are files that needs to be committed"
 	sleep 10
-	git tag v$(tag)
+	git tag v$(tag) -m v$(tag)
 	# enter "v1.0.0"
 	git-cliff -c pyproject.toml > CHANGELOG.md
 	#toc -lf .tocfiles
@@ -25,5 +25,5 @@ release:
 	git add pyproject.toml || true
 	git add CHANGELOG.md || true
 	git commit -m "minor: updated CHANGELOG.md" || true
-	git tag -fa v$(tag)
+	git tag -fa v$(tag) -m v$(tag)
 	git push --follow-tags
