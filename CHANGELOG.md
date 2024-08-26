@@ -1,5 +1,10 @@
 # Changelog - toc
 
+## [1.1.1] - 2024-08-26
+### Changed
+
+- Supporting only rustic == 0.7, requiring both rustic and rclone to be installed
+
 ## [1.1.0] - 2024-08-20
 ### Added
 
