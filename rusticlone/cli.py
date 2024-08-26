@@ -24,6 +24,7 @@ import argparse
 
 # rusticlone
 from rusticlone.helpers.custom import load_customizations
+from rusticlone.helpers.requirements import check_rustic_version, check_rclone_version
 
 # ################################################################ FUNCTIONS
 
@@ -93,7 +94,8 @@ def main():
     # parse arguments
     # print(sys.argv)
     args = parse_args()
-    load_customizations(args)
+    if check_rustic_version() and check_rclone_version():
+        load_customizations(args)
 
 
 # ################################################################ ENTRY POINT
