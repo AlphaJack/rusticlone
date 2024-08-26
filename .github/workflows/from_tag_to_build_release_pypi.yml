@@ -111,9 +111,7 @@ jobs:
           draft: false
           token: ${{ github.token }}
           fail_on_unmatched_files: true
-          files: |
-            gh/*.whl
-          #  other file
+          files: dist/*.whl
 
 # ################ Deploy to PyPI
 
