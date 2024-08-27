@@ -11,12 +11,12 @@ tests:
 
 release:
 	bash tests/tests.sh
-	mypy .
+	mypy --check-untyped-defs .
 	black .
 	git status
-	grep -q $(tag) pyproject.toml || sed -i pyproject.toml -e "s|version = .*|version = \"$(tag)\"|"
 	echo "Abort now if there are files that needs to be committed"
 	sleep 10
+	grep -q $(tag) pyproject.toml || sed -i pyproject.toml -e "s|version = .*|version = \"$(tag)\"|"
 	git tag v$(tag) -m v$(tag)
 	# enter "v1.0.0"
 	git-cliff -c pyproject.toml > CHANGELOG.md
