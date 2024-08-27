@@ -13,12 +13,16 @@ Define actions that can be run for each Rustic profile
 
 # ################################################################ IMPORTS
 
+# types
+from typing import Any
+
 # file locations, path concatenation
 from pathlib import Path
 
 # stdout parsing
-import re
+import tomllib
 import json
+from datetime import datetime
 
 # hostname
 import platform
@@ -46,140 +50,100 @@ class Profile:
         self.source = ""
         self.repo = ""
         self.log_file = Path("rusticlone.log")
+        self.env: dict[str, str] = {}
         self.password_provided = ""
-        self.rclone_config = ""
-        self.rclone_config_pass = ""
-        self.rclone_config_pass_comm = ""
         self.backup_output = ""
         self.source_exists = False
         self.source_type = "dir"
         self.local_repo_exists = False
-        self.remote_repo_exists = False
         self.snapshot_exists = False
         self.result = True
         self.hostname = platform.node()
-        self.config = ""
+        self.config: dict[str, Any] = {}
+        self.latest_snapshot_timestamp = datetime.min
         # self.repo_info = ""
-
-    def read_rustic_config(self) -> None:
-        """
-        Read the profile configuration by running Rustic
-        """
-        if self.result:
-            rustic = Rustic(self.profile_name, "show-config")
-            if rustic.returncode == 0:
-                self.config = rustic.stdout
-            else:
-                self.result = False
-
-    def parse_rustic_config_source(self) -> None:
-        """
-        Read source from Rustic profile configuration
-        """
-        match_source = re.search(r'source: "(?P<source>.+?)",', self.config)
-        if match_source is not None:
-            self.source = match_source.group("source")
-
-    def parse_rustic_config_repo(self) -> None:
-        """
-        Read repo from Rustic profile configuration
-        """
-        match_repo = re.search(
-            r'repository: Some\(\n?\s*"(?P<repo>.+?)",\n?\s*\),', self.config
-        )
-        if match_repo is not None:
-            self.repo = match_repo.group("repo")
-
-    def parse_rustic_config_log(self) -> None:
-        """
-        Read log file from Rustic profile configuration
-        """
-        match_log = re.search(
-            r'log_file: Some\(\n?\s*"(?P<log>.+?)",\n?\s*\),', self.config
-        )
-        if match_log is not None:
-            self.log_file = Path(match_log.group("log"))
-
-    def parse_rustic_config_password(self) -> None:
-        """
-        Read password from Rustic profile configuration
-        """
-        match_password = re.search(
-            r'password: Some\(\n?\s*"(?P<password>.+?)",\n?\s*\),', self.config
-        )
-        match_password_file = re.search(r"password_file: None,", self.config)
-        match_password_command = re.search(r"password_command: None,", self.config)
-        if (
-            match_password is not None
-            or match_password_file is None
-            or match_password_command is None
-        ):
-            self.password_provided = "OK"
 
     def parse_rustic_config(self) -> None:
         """
-        Parse the configuration to extract source, repo, log file and password
+        Parse the configuration to extract source, repo, log file and environment variables
         """
         if self.result:
             action = Action("Parsing rustic configuration", self.parallel)
-            self.parse_rustic_config_source()
-            self.parse_rustic_config_repo()
-            self.parse_rustic_config_log()
-            self.parse_rustic_config_password()
-            match "":
-                case self.source:
-                    self.result = action.abort(
-                        "Could not parse source in config:\n", self.config
-                    )
-                case self.repo:
-                    self.result = action.abort(
-                        "Could not parse repo in config:\n", self.config
-                    )
-                case str(self.log_file):
-                    self.result = action.abort(
-                        f'Invalid log file: "{str(self.log_file)}"'
-                    )
-                case self.password_provided:
-                    self.result = action.abort(
-                        "Could not parse password in config:\n", self.config
-                    )
-                case _:
+            rustic = Rustic(self.profile_name, "show-config")
+            try:
+                self.config = tomllib.loads(rustic.stdout)
+            except tomllib.TOMLDecodeError:
+                self.result = action.abort("Could not parse rustic config:")
+                print(rustic.stdout)
+                print(rustic.stderr)
+            else:
+                self.result = self.parse_rustic_config_source(action)
+                self.result = self.parse_rustic_config_repo(action)
+                self.result = self.parse_rustic_config_log(action)
+                self.result = self.parse_rustic_config_env(action)
+                if self.result:
                     action.stop("Rustic configuration parsed")
 
-    def parse_rclone_config(self) -> None:
+    def parse_rustic_config_source(self, action) -> bool:
         """
-        Parse Rustic configuration and extract source, repo, rclone config, and rclone config password command.
+        Read source from Rustic profile configuration
+        """
+        try:
+            self.source = self.config["backup"]["sources"][0]["source"]
+        except KeyError:
+            return action.abort("Could not parse source in config:\n", self.config)
+        return True
+
+    def parse_rustic_config_repo(self, action) -> bool:
+        """
+        Read repo from Rustic profile configuration
+        """
+        try:
+            self.repo = self.config["repository"]["repository"]
+        except KeyError:
+            return action.abort("Could not parse repo in config:\n", self.config)
+        return True
+
+    def parse_rustic_config_log(self, action) -> bool:
+        """
+        Read log file from Rustic profile configuration
+        """
+        try:
+            self.log_file = Path(self.config["global"]["log-file"])
+        except KeyError:
+            return action.abort(f'Invalid log file: "{str(self.log_file)}"')
+        return True
+
+    def parse_rustic_config_env(self, action) -> bool:
+        """
+        Read environment variables for Rustic and Rclone
+        """
+        try:
+            self.env = self.config["global"]["env"]
+        except KeyError:
+            return False
+        return True
+
+    def check_rclone_config_exists(self) -> None:
+        """
+        Parse Rustic configuration and extract rclone config, and rclone config password command.
         These will be passed to RClone during upload and download operations, where Rustic is not used.
         """
         if self.result:
-            action = Action("Parsing rclone configuration", self.parallel)
-            if self.config:
-                match_rclone_config = re.search(
-                    r'"RCLONE_CONFIG": "(?P<rclone_config>.*?)"', self.config
+            action = Action("Checking Rclone configuration", self.parallel)
+            try:
+                rclone_config_file = Path(self.env["RCLONE_CONFIG"])
+            except (KeyError, TypeError) as exception:
+                self.result = action.abort(
+                    "Could not parse rclone config:", str(exception)
                 )
-                match_rclone_config_pass = re.search(
-                    r'"RCLONE_CONFIG_PASS": "(?P<rclone_config_pass>.*?)"', self.config
-                )
-                match_rclone_config_pass_comm = re.search(
-                    r'"RCLONE_PASSWORD_COMMAND": "(?P<rclone_config_pass_comm>.*?)"',
-                    self.config,
-                )
-                if match_rclone_config is not None:
-                    self.rclone_config = match_rclone_config.group("rclone_config")
-                if match_rclone_config_pass is not None:
-                    self.rclone_config_pass = match_rclone_config_pass.group(
-                        "rclone_config_pass"
-                    )
-                if match_rclone_config_pass_comm is not None:
-                    self.rclone_config_pass_comm = match_rclone_config_pass_comm.group(
-                        "rclone_config_pass_comm"
-                    )
-                if self.rclone_config != "":
-                    action.stop("RClone configuration parsed")
-                else:
-                    self.result = action.abort("Could not parse rclone config")
             else:
-                self.result = action.abort("Empty rustic config")
+                if rclone_config_file.is_file():
+                    action.stop("Rclone configuration exists")
+                else:
+                    self.result = action.abort(
+                        f"Rclone configuration file does not exist: {rclone_config_file}"
+                    )
 
     def set_log_file(self, passed_log_file: Path) -> None:
         """
@@ -242,32 +206,31 @@ class Profile:
         Check remote repo folder with rclone
         """
         if self.result:
-            if self.rclone_config:
-                action = Action("Checking if remote repo exists", self.parallel)
-                rclone_log_file = str(self.log_file)
-                # rclone_origin = remote_prefix + "/" + self.profile_name
-                repo_name = str(Path(self.repo).name)
-                rclone_origin = remote_prefix + "/" + repo_name
-                rclone_lsd = Rclone(
-                    config=self.rclone_config,
-                    config_pass=self.rclone_config_pass,
-                    config_pass_command=self.rclone_config_pass_comm,
-                    log_file=rclone_log_file,
-                    action="lsd",
-                    origin=rclone_origin,
-                    check_return_code=False,
+            action = Action("Checking if remote repo exists", self.parallel)
+            rclone_log_file = str(self.log_file)
+            # rclone_origin = remote_prefix + "/" + self.profile_name
+            repo_name = str(Path(self.repo).name)
+            rclone_origin = remote_prefix + "/" + repo_name
+            rclone_lsd = Rclone(
+                env=self.env,
+                log_file=rclone_log_file,
+                action="lsd",
+                origin=rclone_origin,
+                check_return_code=False,
+            )
+            # == 3 if does not exist
+            if rclone_lsd.returncode == 0:
+                action.stop("Remote repo exists")
+            else:
+                self.result = action.abort(
+                    f"Remote repo does not exist, Rclone exit code: {rclone_lsd.returncode}"
                 )
-                # == 3 if does not exist
-                if rclone_lsd.returncode == 0:
-                    self.remote_repo_exists = True
-                    action.stop("Remote repo exists")
-                else:
-                    self.result = action.abort("Remote repo does not exist")
 
     def init(self) -> None:
         """
         Initialize the repository if it does not exist, and perform the necessary setup.
-        This method does not take any parameters and returns None.
+        This method does not take any parameters and returns None, however it needs to know if
+        the local repo already exists
         """
         # if self.local_repo_exists:
         #    action = Action("Using existing repo", self.parallel)
@@ -414,33 +377,29 @@ class Profile:
         """
         if self.result:
             action = Action("Uploading repo", self.parallel)
-            if self.rclone_config != "" and self.local_repo_exists:
-                rclone_log_file = str(self.log_file)
-                rclone_origin = self.repo.replace("\\", "/").replace("//", "/")
-                # rclone_destination = remote_prefix + "/" + self.profile_name
-                repo_name = str(Path(self.repo).name)
-                rclone_destination = remote_prefix + "/" + repo_name
-                # print(rclone_destination)
-                Rclone(
-                    config=self.rclone_config,
-                    config_pass=self.rclone_config_pass,
-                    config_pass_command=self.rclone_config_pass_comm,
-                    log_file=rclone_log_file,
-                    action="sync",
-                    # 1.67+, if added to 1.65.2 complains that log_file is an invalid option
-                    other_flags=[
-                        "--create-empty-src-dirs=false",
-                        "--no-update-dir-modtime",
-                    ],
-                    origin=rclone_origin,
-                    destination=rclone_destination,
-                )
-                # action.stop(f"Uploaded repo: {rclone_destination}")
+            rclone_log_file = str(self.log_file)
+            rclone_origin = self.repo.replace("\\", "/").replace("//", "/")
+            # rclone_destination = remote_prefix + "/" + self.profile_name
+            repo_name = str(Path(self.repo).name)
+            rclone_destination = remote_prefix + "/" + repo_name
+            # print(rclone_destination)
+            rclone_upload = Rclone(
+                env=self.env,
+                log_file=rclone_log_file,
+                action="sync",
+                # 1.67+, if added to 1.65.2 complains that log_file is an invalid option
+                other_flags=[
+                    "--create-empty-src-dirs=false",
+                    "--no-update-dir-modtime",
+                ],
+                origin=rclone_origin,
+                destination=rclone_destination,
+            )
+            # action.stop(f"Uploaded repo: {rclone_destination}")
+            if rclone_upload.returncode == 0:
                 action.stop("Uploaded repo")
             else:
-                self.result = action.abort(
-                    "RClone config missing or local repo does not exist", ""
-                )
+                self.result = action.abort("Error uploading repo")
 
     def download(self, remote_prefix: str) -> None:
         """
@@ -450,45 +409,38 @@ class Profile:
             if not self.repo.startswith("rclone:"):
                 action = Action("Downloading repo", self.parallel)
                 if not self.local_repo_exists:
-                    if self.rclone_config is not None:
-                        if self.remote_repo_exists:
-                            rclone_log_file = str(self.log_file)
-                            # rclone_origin = remote_prefix + "/" + self.profile_name
-                            repo_name = str(Path(self.repo).name)
-                            rclone_origin = remote_prefix + "/" + repo_name
-                            rclone_destination = self.repo
-                            Rclone(
-                                config=self.rclone_config,
-                                config_pass=self.rclone_config_pass,
-                                config_pass_command=self.rclone_config_pass_comm,
-                                log_file=rclone_log_file,
-                                action="sync",
-                                other_flags=[
-                                    "--create-empty-src-dirs=false",
-                                    "--no-update-dir-modtime",
-                                ],
-                                origin=rclone_origin,
-                                destination=rclone_destination,
-                            )
-                            action.stop("Downloaded repo")
-                            # action.stop(f"Downloaded repo: {rclone_destination}")
-                        else:
-                            self.result = action.abort("Rclone repo not found")
-                    else:
-                        self.result = action.abort("Missing Rclone config")
+                    rclone_log_file = str(self.log_file)
+                    # rclone_origin = remote_prefix + "/" + self.profile_name
+                    repo_name = str(Path(self.repo).name)
+                    rclone_origin = remote_prefix + "/" + repo_name
+                    rclone_destination = self.repo
+                    Rclone(
+                        env=self.env,
+                        log_file=rclone_log_file,
+                        action="sync",
+                        other_flags=[
+                            "--create-empty-src-dirs=false",
+                            "--no-update-dir-modtime",
+                        ],
+                        origin=rclone_origin,
+                        destination=rclone_destination,
+                    )
+                    action.stop("Downloaded repo")
+                    # action.stop(f"Downloaded repo: {rclone_destination}")
                 else:
                     action.stop("Repo already downloaded")
                 # print(self.repo)
         # else:
         #    action.stop("Not downloading remote-only repo, extracting it directly")
 
-    def latest(self) -> None:
+    def check_latest_snapshot(self) -> None:
         """
-        If repo is local, read from there
+        Read the latest snapshot from a local repo that has just been downloaded
+        Require local repo and snapshot to exist
         """
         if self.result:
+            action = Action("Retrieving latest snapshot", self.parallel)
             if self.local_repo_exists:
-                action = Action("Retrieving latest snapshot", self.parallel)
                 rustic = Rustic(
                     self.profile_name,
                     "snapshots",
@@ -499,61 +451,60 @@ class Profile:
                 )
                 json_output = json.loads(rustic.stdout)
                 if json_output is not None and len(json_output) > 0:
-                    # print(f"output: {json_output}")
-                    snapshot_timestamp = json_output[-1][1][0]["time"]
-                    match_timestamp = re.search(
-                        r"^(?P<date>\d{4}-\d{2}-\d{2})T(?P<time>\d{2}:\d{2}:\d{2}).",
-                        snapshot_timestamp,
-                    )
-                    self.snapshot_exists = True
-                    if match_timestamp is not None:
-                        snapshot_date = match_timestamp.group("date")
-                        snapshot_time = match_timestamp.group("time")
+                    # print(f"output: {json_output}"
+                    try:
+                        self.latest_snapshot_timestamp = datetime.fromisoformat(
+                            json_output[-1][1][0]["time"]
+                        )
+                    except ValueError:
+                        self.result = action.abort("Could not parse timestamp")
+                    else:
+                        timestamp_pretty = self.latest_snapshot_timestamp.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
                         clear_line(parallel=self.parallel)
                         # self.snapshot_exists = True
                         print_stats(
                             "Restoring from:",
-                            f"{snapshot_date} {snapshot_time}",
+                            f"{timestamp_pretty}",
                             20,
                             20,
                             parallel=self.parallel,
                         )
-                    else:
-                        self.result = action.abort("Could not parse timestamp")
                 else:
                     self.result = action.abort("Repo does not have snapshots")
-        # else:
-        #    self.snapshot_exists = False
-        #    action.abort("Skipping non-existing repo")
+            else:
+                self.result = action.abort("Local repo does not exist")
 
     def check_source_type(self) -> None:
         """
         Check if the source that needs to be restored is a directory or file
+        Require local repo and snapshot to exist
         """
         if self.result:
             action = Action("Checking source type", self.parallel)
-            if self.local_repo_exists and self.snapshot_exists:
-                rustic = Rustic(
-                    self.profile_name,
-                    "ls",
-                    "latest",
-                    "--glob",
-                    f"{self.source}",
-                    "--long",
-                    "--log-file",
-                    str(self.log_file),
-                )
-                if rustic.stdout[0] == "d" or rustic.stdout.count("\n") > 1:
-                    self.source_type = "dir"
-                else:
-                    self.source_type = "file"
-                action.stop(f"Source is a {self.source_type}")
+            rustic = Rustic(
+                self.profile_name,
+                "ls",
+                "latest",
+                "--glob",
+                f"{self.source}",
+                "--long",
+                "--log-file",
+                str(self.log_file),
+            )
+            if rustic.stdout[0] == "d" or rustic.stdout.count("\n") > 1:
+                self.source_type = "dir"
+            else:
+                self.source_type = "file"
+            action.stop(f"Source is a {self.source_type}")
 
     def restore(self) -> None:
         """
         Extract files in the latest snapshot to the source location, after creating it if missing
         if self.source is a directory, it is created if missing
         if self.source is a file, its parent is created if missing
+        Require local repo and snapshot to exist
         """
         if self.result:
             action = Action("Extracting snapshot", self.parallel)
@@ -561,15 +512,12 @@ class Profile:
                 Path(self.source).mkdir(parents=True, exist_ok=True)
             else:
                 Path(self.source).parent.mkdir(parents=True, exist_ok=True)
-            if self.local_repo_exists and self.snapshot_exists:
-                Rustic(
-                    self.profile_name,
-                    "restore",
-                    f"latest:{self.source}",
-                    self.source,
-                    "--log-file",
-                    str(self.log_file),
-                )
-                action.stop("Snapshot extracted")
-            else:
-                self.result = action.abort("Repo or snapshot not existing")
+            Rustic(
+                self.profile_name,
+                "restore",
+                f"latest:{self.source}",
+                self.source,
+                "--log-file",
+                str(self.log_file),
+            )
+            action.stop("Snapshot extracted")

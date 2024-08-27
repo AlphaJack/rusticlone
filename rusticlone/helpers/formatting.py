@@ -46,7 +46,7 @@ def print_stats(
     # width_right = 80 - len(content_right)
     begin = ""
     end = "\n"
-    if platform.system() == "Windows":
+    if platform.system() == "Windows":  # pragma: no cover
         end = "\r"
         if content_right != "[OK]":
             begin = "\n"

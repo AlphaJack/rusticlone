@@ -13,6 +13,9 @@ Launch RClone binary with passed flags
 
 # ################################################################ IMPORTS
 
+# typing
+from typing import Any
+
 # launch binaries
 import subprocess
 
@@ -43,11 +46,9 @@ class Rclone:
             "--drive-acknowledge-abuse",
             "--drive-stop-on-upload-limit",
         ]
-        default_kwargs = {
+        default_kwargs: dict[str, Any] = {
+            "env": {},
             "check_return_code": True,
-            "config": "",
-            "config_pass": "",
-            "config_pass_command": "",
             "action": "version",
             "default_flags": default_flags,
             "additional_flags": [],
@@ -55,6 +56,7 @@ class Rclone:
             "destination": None,
         }
         kwargs = default_kwargs | kwargs
+        self.env = kwargs["env"]
         self.check_return_code = kwargs["check_return_code"]
         self.action = kwargs["action"]
         self.origin = kwargs["origin"]
@@ -69,11 +71,6 @@ class Rclone:
             ]
         else:
             self.flags = []
-        self.env = {
-            "RCLONE_CONFIG": kwargs["config"],
-            "RCLONE_CONFIG_PASS": kwargs["config_pass"],
-            "RCLONE_PASSWORD_COMMAND": kwargs["config_pass_command"],
-        }
         self.command_entries = [
             "rclone",
             *self.flags,
@@ -97,7 +94,8 @@ class Rclone:
             print("Error env: '" + str(self.env))
             print("Error args: '" + " ".join(self.command) + "'")
             print("Error status: ", exception.returncode)
-            print(f'Error stderr:"n{exception.stderr.decode("utf-8")}')
+            print(f'Error stderr:\n{exception.stderr.decode("utf-8")}')
+            print("")
             self.returncode = 1
         else:
             self.stdout = self.subprocess.stdout.decode("utf-8")

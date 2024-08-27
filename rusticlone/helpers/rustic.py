@@ -13,6 +13,9 @@ Launch Rustic binary with passed flags
 
 # ################################################################ IMPORTS
 
+# typing
+from typing import Any
+
 # launch binaries
 import subprocess
 
@@ -20,10 +23,15 @@ import subprocess
 
 
 class Rustic:
-    def __init__(self, profile: str, action: str, *args: str):
+    def __init__(self, profile: str, action: str, *args: str, **kwargs):
         """
         Launch a rustic command
         """
+        default_kwargs: dict[str, Any] = {
+            "env": {},
+        }
+        kwargs = default_kwargs | kwargs
+        self.env = kwargs["env"]
         self.flags = ["--no-progress"]
         self.command = [
             "rustic",
@@ -45,7 +53,7 @@ class Rustic:
             # print(self.stdout)
             # wait for completion
             self.subprocess = subprocess.run(
-                self.command, check=True, capture_output=True
+                self.command, check=True, capture_output=True, env=self.env
             )
         except FileNotFoundError:  # pragma: no cover
             print("Rustic executable not found, are you sure it is installed?")

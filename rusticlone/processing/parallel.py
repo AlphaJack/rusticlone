@@ -86,12 +86,12 @@ def system_backup_parallel(profiles: list, log_file: Path, remote_prefix: str) -
         duration_parallel(uploaded_profiles, "Uploading")
     # print(uploaded_profiles)
     # print("DONE!")
-    timer.stop()
+    timer.stop("System backup duration")
 
 
 def system_archive_parallel(profiles: list, log_file: Path, executor=None) -> dict:
     """
-    if launched independently ,start a ThreadPoolExecutor
+    if launched independently, start a ThreadPoolExecutor
     For every profile, archive it
     """
     archived_profiles = {}
@@ -136,7 +136,7 @@ def system_upload_parallel(
             try:
                 success, duration = future.result()
                 name = archived_profiles[future]
-            except Exception as exception:
+            except Exception as exception:  # pragma: no cover
                 print(f"Failure in archiving: '{exception}'")
             else:
                 if success:
@@ -197,7 +197,7 @@ def system_restore_parallel(profiles: list, log_file: Path, remote_prefix: str) 
             executor=executor,
         )
         duration_parallel(extracted_profiles, "Extracting")
-    timer.stop()
+    timer.stop("System restore duration")
 
 
 def system_download_parallel(
@@ -259,7 +259,7 @@ def system_extract_parallel(
             try:
                 success, duration = future.result()
                 name = downloaded_profiles[future]
-            except Exception as exception:
+            except Exception as exception:  # pragma: no cover
                 print(f"Failure in download: '{exception}'")
             else:
                 if success:
