@@ -50,7 +50,7 @@ def system_backup_sequential(
         remote_prefix=remote_prefix,
         archive_results=archive_results,
     )
-    timer.stop()
+    timer.stop("System backup duration")
 
 
 def system_archive_sequential(profiles: list, log_file: Path) -> dict:
@@ -138,7 +138,7 @@ def system_restore_sequential(
         log_file=log_file,
         download_results=download_results,
     )
-    timer.stop()
+    timer.stop("System restore duration")
 
 
 def system_download_sequential(

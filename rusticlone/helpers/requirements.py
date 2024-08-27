@@ -31,10 +31,12 @@ def check_rustic_version() -> bool:
     try:
         major_version = int(version.split(".")[0])
         minor_version = int(version.split(".")[1])
-    except (ValueError, TypeError):
-        return action.abort("Rustic == 0.7 is required")
-    if major_version != 0 or minor_version != 7:
-        return action.abort("Rustic == 0.7 is required")
+    except (ValueError, TypeError):  # pragma: no cover
+        return action.abort("Could not parse Rustic version")
+    if major_version != 0 or minor_version != 8:
+        return action.abort(
+            f"Rustic {major_version}.{minor_version} is installed, but 0.8 is required"
+        )  # pragma: no cover
     return action.stop()
 
 
@@ -49,7 +51,9 @@ def check_rclone_version() -> bool:
         major_version = int(version.split(".")[0])
         minor_version = int(version.split(".")[1])
     except (ValueError, TypeError):
-        return action.abort("Rclone >= 1.67 is required")
+        return action.abort("Could not parse Rclone version")
     if major_version <= 1 and minor_version < 67:
-        return action.abort("Rclone >= 1.67 is required")
+        return action.abort(
+            f"Rclone {major_version}.{minor_version} is installed, but at least 1.67 is required"
+        )  # pragma: no cover
     return action.stop()

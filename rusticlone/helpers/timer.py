@@ -36,10 +36,10 @@ class Timer:
         self.stop_time = self.start_time
         self.duration = "0s"
 
-    def stop(self) -> None:
+    def stop(self, text: str = "Duration") -> None:
         """
         Stop the timer and print the result
         """
         self.stop_time = time.perf_counter()
         self.duration = str(round(self.stop_time - self.start_time)) + "s"
-        print_stats("Duration:", self.duration, parallel=self.parallel)
+        print_stats(text + ":", self.duration, parallel=self.parallel)

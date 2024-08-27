@@ -92,13 +92,13 @@ class Custom:
         else:
             self.profiles = []
 
-    def check_log_file(self):
+    def check_log_file(self) -> None:
         """
         Create log file parent folders if missing, delete old log file
         """
         action = Action("Checking log file")
         if self.log_file != self.default_log_file:
-            used_log = self.log_file
+            used_log = str(self.log_file)
             self.log_file.parents[0].mkdir(parents=True, exist_ok=True)
             self.log_file.unlink(missing_ok=True)
             self.log_file.touch()
