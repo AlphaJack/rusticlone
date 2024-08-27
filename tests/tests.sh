@@ -47,6 +47,9 @@ password = "XXXXXX"
 
 [[backup.sources]]
 source = "$RUSTICLONE_TEST_DIR/source/docs"
+
+[global.env]
+RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone-decrypted.conf"
 CONTENT
 
 mapfile -d '' profile2Content << CONTENT
@@ -57,6 +60,10 @@ password = "XXXXXX"
 
 [[backup.sources]]
 source = "$RUSTICLONE_TEST_DIR/source/pics"
+
+[global.env]
+RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
+RCLONE_CONFIG_PASS="YYYYYY"
 CONTENT
 
 mapfile -d '' profile3Content << CONTENT
@@ -67,20 +74,28 @@ password = "XXXXXX"
 
 [[backup.sources]]
 source = "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
+
+[global.env]
+RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
+RCLONE_PASSWORD_COMMAND="/usr/bin/python -c \"print('YYYYYY')\""
 CONTENT
 
 mapfile -d '' profileCommonContent << CONTENT
 [global]
 log-level = "debug"
 log-file = "$RUSTICLONE_TEST_DIR/logs/rusticlone.log"
-
-[global.env]
-RCLONE_CONFIG="$RUSTIC_PROFILES_DIR/rclone-test.conf"
 CONTENT
 
-mapfile -d '' rcloneConfContent << CONTENT
+mapfile -d '' rcloneConfContentDecrypted << CONTENT
 [gdrive]
 type = local
+CONTENT
+
+mapfile -d '' rcloneConfContentEncrypted << CONTENT
+# Encrypted rclone configuration File
+
+RCLONE_ENCRYPT_V0:
+LDDUg4mDyUxDwMtntnCaiUN+o9SexiohA8Y74ZYJmPD9KD8UjVtH9XYCL+3A6OGR7msabjvu0Gj2W8JRande
 CONTENT
 
 # ################################################################ FUNCTIONS
@@ -91,6 +106,17 @@ check_workdir(){
   echo "[KO] Please run this script from the main folder as 'tests/test.sh'"
   exit 1
  fi
+}
+
+logecho(){
+ if [ "${2+isSet}" ]; then
+  logFile="$2"
+ else
+  logFile="$RUSTICLONE_TEST_DIR/logs/rusticlone.log"
+ fi
+ echo "$1"
+ echo " "  >> "$logFile"
+ echo "$1" >> "$logFile"
 }
 
 print_space(){
@@ -124,14 +150,16 @@ create_confs(){
  profile1Conf="$RUSTIC_PROFILES_DIR/Documents-test.toml"
  profile2Conf="$RUSTIC_PROFILES_DIR/Pictures-test.toml"
  profile3Conf="$RUSTIC_PROFILES_DIR/Passwords-test.toml"
- rcloneConf="$RUSTIC_PROFILES_DIR/rclone-test.conf"
+ rcloneConfDecrypted="$RUSTIC_PROFILES_DIR/rclone-decrypted.conf"
+ rcloneConfEncrypted="$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
  echo "${profile1Content[0]}" > "$profile1Conf"
  echo "${profile2Content[0]}" > "$profile2Conf"
  echo "${profile3Content[0]}" > "$profile3Conf"
  echo "${profileCommonContent[0]}" >> "$profile1Conf"
  echo "${profileCommonContent[0]}" >> "$profile2Conf"
  echo "${profileCommonContent[0]}" >> "$profile3Conf"
- echo "${rcloneConfContent[0]}" > "$rcloneConf"
+ echo "${rcloneConfContentDecrypted[0]}" > "$rcloneConfDecrypted"
+ echo "${rcloneConfContentEncrypted[0]}" > "$rcloneConfEncrypted"
 }
 
 create_files(){
@@ -157,34 +185,34 @@ create_sums(){
 # ################ SEQUENTIAL
 
 rusticlone_backup(){
- echo "[OK] Backing up with Rusticlone"
+ logecho "[OK] Backing up with Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" backup
 }
 
 rusticlone_archive(){
- echo "[OK] Archiving with Rusticlone"
+ logecho "[OK] Archiving with Rusticlone"
  coverage run --append --module rusticlone.cli archive
 }
 
 rusticlone_upload(){
- echo "[OK] Uploading with Rusticlone"
+ logecho "[OK] Uploading with Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" upload
 }
 
 # ################ PARALLEL
 
 rusticlone_backup_parallel(){
- echo "[OK] Backing up with Rusticlone using parallel mode"
+ logecho "[OK] Backing up with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel backup
 }
 
 rusticlone_archive_parallel(){
- echo "[OK] Archiving with Rusticlone using parallel mode"
+ logecho "[OK] Archiving with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --parallel archive
 }
 
 rusticlone_upload_parallel(){
- echo "[OK] Uploading with Rusticlone using parallel mode"
+ logecho "[OK] Uploading with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel upload
 }
 
@@ -256,41 +284,42 @@ destroy_remote12(){
 # ################ SEQUENTIAL
 
 rusticlone_restore(){
- echo "[OK] Restoring from Rusticlone"
+ logecho "[OK] Restoring from Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" restore
 }
 
 rusticlone_restore_flags(){
- echo "[OK] Restoring from Rusticlone"
+ logecho "[OK] Restoring from Rusticlone" "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" restore
+ logecho "[OK] Restoring from Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" --ignore "common" restore
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures-test" restore
 }
 
 rusticlone_download(){
- echo "[OK] Downloading from Rusticlone"
+ logecho "[OK] Downloading from Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" download
 }
 
 rusticlone_extract(){
- echo "[OK] Extracting from Rusticlone"
+ logecho "[OK] Extracting from Rusticlone"
  coverage run --append --module rusticlone.cli extract
 }
 
 # ################ PARALLEL
 
 rusticlone_restore_parallel(){
- echo "[OK] Restoring with Rusticlone using parallel mode"
+ logecho "[OK] Restoring with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel restore
 }
 
 rusticlone_download_parallel(){
- echo "[OK] Downloading with Rusticlone using parallel mode"
+ logecho "[OK] Downloading with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel download
 }
 
 rusticlone_extract_parallel(){
- echo "[OK] Extracting with Rusticlone using parallel mode"
+ logecho "[OK] Extracting with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --parallel extract
 }
 
@@ -352,6 +381,9 @@ main(){
  print_space
 
  # restore
+ rusticlone_restore
+ destroy_source1
+ destroy_local2
  rusticlone_restore_parallel
  print_space
  check_sums
