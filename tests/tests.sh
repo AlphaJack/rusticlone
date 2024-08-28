@@ -193,7 +193,7 @@ create_files(){
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/funny.gif"
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/photos/photo.jpeg"
  head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/photos/deeply/nested/memory.avif"
- sameFile="$(head -c 10000000 /dev/urandom)"
+ sameFile="$(head -c 10000000 /dev/urandom | base64)"
  echo "$sameFile" > "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
  echo "$sameFile" "almost" > "$RUSTICLONE_TEST_DIR/source/secrets/env"
  chmod 0600 "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
