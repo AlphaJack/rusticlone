@@ -1,3 +1,29 @@
+<!--
+// ┌───────────────────────────────────────────────────────────────┐
+// │ Contents of README.md                                         │
+// ├───────────────────────────────────────────────────────────────┘
+// │
+// ├──┐Rusticlone
+// │  ├── Motivation
+// │  ├── Installation
+// │  ├──┐Usage
+// │  │  ├── Backup
+// │  │  ├──┐Restore
+// │  │  │  ├── From the local Rustic repo
+// │  │  │  └── From the RClone remote
+// │  │  ├── Individual commands
+// │  │  ├── Parallel processing
+// │  │  ├── Exclude profiles
+// │  │  ├── Custom log file
+// │  │  └── Automatic system backups
+// │  ├── Testing
+// │  ├── Known limitations
+// │  ├── Contribute
+// │  └── License
+// │
+// └───────────────────────────────────────────────────────────────
+-->
+
 # Rusticlone
 
 <p style='text-align: center;'>
@@ -56,7 +82,7 @@ Include variables for the location (and password) of the RClone configuration:
 [global.env]
 RCLONE_CONFIG = "/home/user/.config/rclone/rclone.conf"
 RCLONE_CONFIG_PASS = "XXXXXX"
-# escape double quotes inside TOML strings
+#escape double quotes inside TOML strings
 #RCLONE_PASSWORD_COMMAND = "/usr/bin/python -c \"print('YYYYYY')\""
 ```
 
@@ -83,14 +109,14 @@ Great! You just backed up your documents to both "/mnt/backup/Documents" and <gd
 Check the result with the following commands:
 
 ```bash
-# size of all your documents
+#size of all your documents
 du -sh "/home/users/Documents"
 
-# contents of local rustic repo 
+#contents of local rustic repo 
 rustic -P "Documents" repoinfo
 tree "/mnt/backup/Documents"
 
-# contents of remote rustic repo
+#contents of remote rustic repo
 rclone ncdu "gdrive:/PC/Documents"
 ```
 
@@ -134,14 +160,14 @@ and you restored your documents from the HDD to their original location.
 Check that everything went well:
 
 ```bash
-# your remote backup files are still there
+#your remote backup files are still there
 rclone ncdu "gdrive:/PC/Documents"
 
-# your new external HDD contains a rustic repo
+#your new external HDD contains a rustic repo
 ls -lah "/mnt/backups/Documents"
 rustic -P "Documents" repoinfo
 
-# your documents have been restored
+#your documents have been restored
 du -sh "/home/users/Documents"
 ls -lah "/home/users/Documents"
 ```
@@ -153,16 +179,16 @@ You can now run `rusticlone -r "gdrive:/PC" backup` as always to keep your data 
 In alternative to `backup` and `restore`, you can also run individual `rusticlone` commands:
 
 ```bash
-# use rustic from source to local repo
+#use rustic from source to local repo
 rusticlone archive
 
-# use rclone from local repo to remote
+#use rclone from local repo to remote
 rusticlone -r "gdrive:/PC" upload
 
-# use rclone from remote to local repo
+#use rclone from remote to local repo
 rusticlone -r "gdrive:/PC" download
 
-# use rustic from local repo to source
+#use rustic from local repo to source
 rusticlone extract
 ```
 
@@ -232,7 +258,7 @@ Create a Systemd timer unit "/etc/systemd/system/rusticlone.timer" and copy insi
 Description=Rusticlone timer
 
 [Timer]
-# every day at midnight
+#every day at midnight
 OnCalendar=*-*-* 00:00:00
 
 [Install]
