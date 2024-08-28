@@ -1,0 +1,11 @@
+[global]
+use-profile = ["common"]
+
+[repository]
+repository = "/backup/rusticlone/Media"
+
+[[backup.sources]]
+source = "/home/jack/Pictures"
+
+[[backup.sources]]
+source = "/home/jack/Videos"

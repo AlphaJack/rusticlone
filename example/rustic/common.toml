@@ -1,12 +1,14 @@
 [global]
 log-level = "debug"
-log-file = "/home/jack/Desktop/rusticlone/rusticlone.log"
+log-file = "/backup/rusticlone/rusticlone.log"
 
 [global.env]
-RCLONE_CONFIG="/home/jack/Documents/git/rusticlone/example/rclone.conf"
+RCLONE_CONFIG = "/home/jack/.config/rclone/rclone.conf"
+RCLONE_CONFIG_PASS = "YYYYYY"
+#RCLONE_PASSWORD_COMMAND = "/usr/bin/python -c \"print('YYYYYY')\""
 
 [repository]
-cache-dir = "/home/jack/Desktop/rusticlone/cache"
+cache-dir = "/backup/rusticlone/cache"
 password = "XXXXXX"
 
 [backup]
