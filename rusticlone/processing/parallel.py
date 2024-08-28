@@ -49,7 +49,7 @@ def duration_parallel(processed_profiles: dict, command: str) -> None:
         try:
             success, duration = future.result()
         except Exception as exception:
-            print_stats(f"Failure {command} {name}: '{exception}'", "[KO]")
+            print_stats(f"Error {command} {name}: '{exception}'", "[KO]")
         else:
             if success:
                 print_stats(f"{command} {name}", duration)
@@ -122,21 +122,21 @@ def system_upload_parallel(
     profiles: list,
     log_file: Path,
     remote_prefix: str,
-    archived_profiles: dict = {},
+    archived_profiles: dict | None = None,
     executor=None,
 ) -> dict:
     """
-    if launched independently ,start a ThreadPoolExecutor
+    if launched independently, start a ThreadPoolExecutor
     otherwise check that the archival operation completed without errors
     For every profile, upload it it
     """
     uploaded_profiles = {}
-    if archived_profiles and executor is not None:
+    if archived_profiles is not None and executor is not None:
         for future in concurrent.futures.as_completed(archived_profiles):
             try:
                 success, duration = future.result()
                 name = archived_profiles[future]
-            except Exception as exception:  # pragma: no cover
+            except Exception as exception:
                 print(f"Failure in archiving: '{exception}'")
             else:
                 if success:
@@ -207,7 +207,7 @@ def system_download_parallel(
     executor=None,
 ) -> dict:
     """
-    if launched independently ,start a ThreadPoolExecutor
+    if launched independently, start a ThreadPoolExecutor
     For every profile, download it
     """
     downloaded_profiles = {}
@@ -245,21 +245,21 @@ def system_download_parallel(
 def system_extract_parallel(
     profiles: list,
     log_file: Path,
-    downloaded_profiles: dict = {},
+    downloaded_profiles: dict | None = None,
     executor=None,
 ) -> dict:
     """
-    if launched independently ,start a ThreadPoolExecutor
+    if launched independently, start a ThreadPoolExecutor
     otherwise check that the download operation completed without errors
     For every profile, extract it it
     """
     extracted_profiles = {}
-    if downloaded_profiles and executor is not None:
+    if downloaded_profiles is not None and executor is not None:
         for future in concurrent.futures.as_completed(downloaded_profiles):
             try:
                 success, duration = future.result()
                 name = downloaded_profiles[future]
-            except Exception as exception:  # pragma: no cover
+            except Exception as exception:
                 print(f"Failure in download: '{exception}'")
             else:
                 if success:
