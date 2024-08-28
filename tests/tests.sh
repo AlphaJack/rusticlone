@@ -13,7 +13,7 @@
 # │  │  ├── SEQUENTIAL
 # │  │  └── PARALLEL
 # │  ├──┐DISASTER SIMULATION
-# │  │  ├── LOSING LOCAL FILES
+# │  │  ├── LOSING SOURCE FILES
 # │  │  ├── LOSING CACHE
 # │  │  ├── LOSING LOCAL BACKUP
 # │  │  └── LOSING REMOTE BACKUP
