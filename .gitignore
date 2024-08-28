@@ -5,3 +5,4 @@ dist
 tests/coverage
 **/.mypy_cache
 **/.coverage
+**.kate-swp
