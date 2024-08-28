@@ -13,6 +13,9 @@ release:
 	bash tests/tests.sh
 	mypy --check-untyped-defs .
 	black .
+	toc -f **/**.md
+	toc -f **/**.py
+	toc -f **/**.sh
 	git status
 	echo "Abort now if there are files that needs to be committed"
 	sleep 10
