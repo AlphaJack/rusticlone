@@ -55,10 +55,10 @@ class Rustic:
             self.subprocess = subprocess.run(
                 self.command, check=True, capture_output=True, env=self.env
             )
-        except FileNotFoundError:  # pragma: no cover
+        except FileNotFoundError:
             print("Rustic executable not found, are you sure it is installed?")
             self.returncode = 1
-        except subprocess.CalledProcessError as exception:  # pragma: no cover
+        except subprocess.CalledProcessError as exception:
             print("Error args: '" + " ".join(self.command) + "'")
             print("Error status: ", exception.returncode)
             print(f'Error stderr:"n{exception.stderr.decode("utf-8")}')

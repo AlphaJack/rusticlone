@@ -87,10 +87,10 @@ class Rclone:
                 capture_output=True,
                 env=self.env,
             )
-        except FileNotFoundError:  # pragma: no cover
+        except FileNotFoundError:
             print("RClone executable not found, are you sure it is installed?")
             self.returncode = 1
-        except subprocess.CalledProcessError as exception:  # pragma: no cover
+        except subprocess.CalledProcessError as exception:
             print("Error env: '" + str(self.env))
             print("Error args: '" + " ".join(self.command) + "'")
             print("Error status: ", exception.returncode)

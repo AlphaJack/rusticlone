@@ -47,14 +47,15 @@ class Profile:
         """
         self.profile_name = profile
         self.parallel = parallel
-        self.source = ""
         self.repo = ""
         self.log_file = Path("rusticlone.log")
         self.env: dict[str, str] = {}
         self.password_provided = ""
-        self.backup_output = ""
-        self.source_exists = False
-        self.source_type = "dir"
+        # json objects
+        self.backup_output: list[dict[Any, Any]] = []
+        self.sources: list[str] = []
+        self.sources_exist: dict[str, bool] = {}
+        self.sources_type: dict[str, str] = {}
         self.local_repo_exists = False
         self.snapshot_exists = False
         self.result = True
@@ -72,24 +73,34 @@ class Profile:
             rustic = Rustic(self.profile_name, "show-config")
             try:
                 self.config = tomllib.loads(rustic.stdout)
-            except tomllib.TOMLDecodeError:
-                self.result = action.abort("Could not parse rustic config:")
-                print(rustic.stdout)
-                print(rustic.stderr)
+            except (AttributeError, tomllib.TOMLDecodeError):
+                self.result = action.abort("Could not parse rustic configuration")
             else:
                 self.result = self.parse_rustic_config_source(action)
                 self.result = self.parse_rustic_config_repo(action)
                 self.result = self.parse_rustic_config_log(action)
                 self.result = self.parse_rustic_config_env(action)
                 if self.result:
-                    action.stop("Rustic configuration parsed")
+                    action.stop("Parsed rustic configuration")
 
     def parse_rustic_config_source(self, action) -> bool:
         """
-        Read source from Rustic profile configuration
+        Read sources from Rustic profile configuration
         """
         try:
-            self.source = self.config["backup"]["sources"][0]["source"]
+            # self.source = self.config["backup"]["sources"][0]["source"]
+            # they can be either string or list of strings:
+            # https://github.com/rustic-rs/rustic/blob/a88afdd4af295c16e5de50de91ec430920f81f56/config/full.toml
+            config_sources = [
+                source["source"] for source in self.config["backup"]["sources"]
+            ]
+            for config_source in config_sources:
+                if config_source and isinstance(config_source, list):
+                    self.sources.extend(config_source)
+                elif config_source:
+                    self.sources.append(config_source)
+            # remove eventual duplicates
+            self.sources = list(set(self.sources))
         except KeyError:
             return action.abort("Could not parse source in config:\n", self.config)
         return True
@@ -121,7 +132,7 @@ class Profile:
         try:
             self.env = self.config["global"]["env"]
         except KeyError:
-            return False
+            return True
         return True
 
     def check_rclone_config_exists(self) -> None:
@@ -165,30 +176,43 @@ class Profile:
                 # rustic fails anyway if it cannot find the path when parsing the conf
                 # self.log_file.parent.mkdir(parents=True, exist_ok=True)
                 # self.log_file.touch(exist_ok=True)
-            action.stop("Log file set")
+            action.stop("Set log file")
 
-    def check_source_exists(self) -> None:
+    def check_sources_exist(self) -> None:
         """
-        Check if the source exists and handle accordingly.
+        Check if all the file sources for the profile exist in the local filesystem
         """
         if self.result:
-            action = Action("Checking if source exists", self.parallel)
+            action = Action("Checking if sources exists", self.parallel)
             # print(self.source)
-            source = Path(self.source)
-            if source.exists():
-                if source.is_dir():
-                    self.source_type = "dir"
+            for source in self.sources:
+                source_path = Path(source)
+                if source_path.exists():
+                    self.sources_exist[source] = True
                 else:
-                    self.source_type = "file"
-                self.source_exists = True
-                action.stop("Source exists")
+                    self.sources_exist[source] = False
+            if all(self.sources_exist.values()):
+                if len(self.sources) > 1:
+                    plural_form = "sources"
+                else:
+                    plural_form = "source"
+                action.stop(f"Found {len(self.sources)} {plural_form}")
             else:
-                # self.source_exists = False
-                self.result = action.abort("Source does not exist")
+                self.result = action.abort("Some sources do not exist")
 
     def check_local_repo_exists(self) -> None:
         """
-        Check local repo folder with pathlib
+        Check if the local repo folder exists using pathlib
+        The program doesn't fail if the local repo doesn't exist,
+        because we can create it with rustic init or by downloading it
+        However, some restore functions depend on its existence,
+        that's why we store the check result as a boolean variable.
+
+        Skip if missing local repo:
+            - check_local_repo_health(), init(), download()
+
+        Fail if missing local repo:
+            - repo_stats(), check_latest_snapshot(), check_source_type(), restore()
         """
         if self.result:
             action = Action("Checking if local repo exists", self.parallel)
@@ -196,61 +220,10 @@ class Profile:
             repo_config_file = Path(self.repo) / "config"
             if repo_config_file.exists() and repo_config_file.is_file():
                 self.local_repo_exists = True
-                action.stop("Local repo exists")
+                action.stop("Local repo already exists")
             else:
                 self.local_repo_exists = False
-                action.stop("Local repo does not exist")
-
-    def check_remote_repo_exists(self, remote_prefix: str) -> None:
-        """
-        Check remote repo folder with rclone
-        """
-        if self.result:
-            action = Action("Checking if remote repo exists", self.parallel)
-            rclone_log_file = str(self.log_file)
-            # rclone_origin = remote_prefix + "/" + self.profile_name
-            repo_name = str(Path(self.repo).name)
-            rclone_origin = remote_prefix + "/" + repo_name
-            rclone_lsd = Rclone(
-                env=self.env,
-                log_file=rclone_log_file,
-                action="lsd",
-                origin=rclone_origin,
-                check_return_code=False,
-            )
-            # == 3 if does not exist
-            if rclone_lsd.returncode == 0:
-                action.stop("Remote repo exists")
-            else:
-                self.result = action.abort(
-                    f"Remote repo does not exist, Rclone exit code: {rclone_lsd.returncode}"
-                )
-
-    def init(self) -> None:
-        """
-        Initialize the repository if it does not exist, and perform the necessary setup.
-        This method does not take any parameters and returns None, however it needs to know if
-        the local repo already exists
-        """
-        # if self.local_repo_exists:
-        #    action = Action("Using existing repo", self.parallel)
-        # else:
-        if self.result:
-            if not self.local_repo_exists:
-                action = Action("Initializing new local repo", self.parallel)
-                # will go interactive if [repository] password is not set
-                rustic = Rustic(
-                    self.profile_name,
-                    "init",
-                    "--set-treepack-size",
-                    "50MB",
-                    "--set-datapack-size",
-                    "500MB",
-                    "--log-file",
-                    str(self.log_file),
-                )
-                self.local_repo_exists = True
-                action.stop("Initialized new local repo")
+                action.stop("Local repo does not exist yet")
 
     def check_local_repo_health(self) -> None:
         """
@@ -262,23 +235,89 @@ class Profile:
                 Rustic(self.profile_name, "check", "--log-file", str(self.log_file))
                 action.stop("Repo is healthy")
 
-    def backup(self):
+    def check_remote_repo_exists(self, remote_prefix: str) -> None:
         """
-        Perform a backup operation and store the output in self.backup_output.
+        Check remote repo folder with rclone
         """
         if self.result:
-            if self.source_exists:
-                action = Action("Backing up source", self.parallel)
+            action = Action("Checking if remote repo exists", self.parallel)
+            rclone_log_file = str(self.log_file)
+            # rclone_origin = remote_prefix + "/" + self.profile_name
+            repo_name = str(Path(self.repo).name)
+            rclone_origin = remote_prefix + "/" + repo_name
+            rclone = Rclone(
+                env=self.env,
+                log_file=rclone_log_file,
+                action="lsd",
+                origin=rclone_origin,
+                check_return_code=False,
+            )
+            # == 3 if does not exist
+            if rclone.returncode != 0:
+                self.result = action.abort(
+                    f"Remote repo does not exist, Rclone exit code: {rclone.returncode}"
+                )
+            else:
+                action.stop("Remote repo exists")
+
+    def init(self) -> None:
+        """
+        Initialize the repository if it does not exist, and perform the necessary setup.
+        This method does not take any parameters and returns None, however it needs to know if
+        the local repo already exists.
+        We don't remove this function even if "--init" flag in backup would do the trick,
+        as we set custom treepack and datapack sizes
+        """
+        # if self.local_repo_exists:
+        #    action = Action("Using existing repo", self.parallel)
+        # else:
+        if self.result:
+            if not self.local_repo_exists:
+                action = Action("Initializing a new local repo", self.parallel)
+                # will go interactive if [repository] password is not set
                 rustic = Rustic(
                     self.profile_name,
-                    "backup",
-                    "--json",
+                    "init",
+                    "--set-treepack-size",
+                    "50MB",
+                    "--set-datapack-size",
+                    "500MB",
                     "--log-file",
                     str(self.log_file),
                 )
-                action.stop("Snapshot created")
-                self.backup_output = rustic.stdout
-                # print(self.backup_output)
+                if rustic.returncode != 0:
+                    self.result = action.abort("Could not inizialize a new local repo")
+                else:
+                    self.local_repo_exists = True
+                    action.stop("Initialized a new local repo")
+
+    def backup(self) -> None:
+        """
+        Perform a backup operation and store the output in self.backup_output.
+        If multiple sources per profile are set, the output is the concatenation of json objects
+        https://stackoverflow.com/a/42985887
+        """
+        if self.result:
+            action = Action("Creating snapshot", self.parallel)
+            rustic = Rustic(
+                self.profile_name,
+                "backup",
+                "--init",
+                "--json",
+                "--log-file",
+                str(self.log_file),
+            )
+            try:
+                text = rustic.stdout.lstrip()
+                while text:
+                    json_object, index = json.JSONDecoder().raw_decode(text)
+                    text = text[index:].lstrip()
+                    self.backup_output.append(json_object)
+            except (AttributeError, json.JSONDecodeError):
+                # print(json.loads(rustic.stdout))
+                self.result = action.abort("Could not create snapshot")
+            else:
+                action.stop("Created Snapshot")
 
     def source_stats(self) -> None:
         """
@@ -290,86 +329,97 @@ class Profile:
             action = Action("Retrieving stats", self.parallel)
             # print(self.backup_output)
             # print(self.backup_output)
-            if self.source_exists and self.backup_output != "":
-                json_output = json.loads(self.backup_output)
-                # print(json_output)
-                source_files = json_output["summary"]["total_files_processed"]
-                source_size = json_output["summary"]["total_bytes_processed"]
-                snapshot_size = json_output["summary"]["data_added"]
-                # else:
-                #    source_files = 0
-                #    source_size = 0
-                #    snapshot_size = 0
+            source_files = 0
+            source_size = 0
+            snapshot_size = 0
+            try:
+                for json_object in self.backup_output:
+                    summary = json_object["summary"]
+                    source_files += int(summary["total_files_processed"])
+                    source_size += int(summary["total_bytes_processed"])
+                    snapshot_size += int(summary["data_added"])
+            # else:
+            #    source_files = 0
+            #    source_size = 0
+            #    snapshot_size = 0
+            except (KeyError, TypeError):
+                self.result = action.abort("Could not retrieve stats")
+            else:
                 clear_line(parallel=self.parallel)
                 # action.stop("Retrieved source stats")
                 print_stats(
-                    "Source size:", convert_size(source_size), parallel=self.parallel
+                    "Number of sources:",
+                    str(len(self.backup_output)),
+                    parallel=self.parallel,
                 )
-                print_stats("Source files:", source_files, parallel=self.parallel)
                 print_stats(
-                    "Snapshot size:",
+                    "Files in sources:", str(source_files), parallel=self.parallel
+                )
+                print_stats(
+                    "Size of sources:",
+                    convert_size(source_size),
+                    parallel=self.parallel,
+                )
+                print_stats(
+                    "Size of snapshot:",
                     convert_size(snapshot_size),
                     parallel=self.parallel,
                 )
                 print_stats("", "", parallel=self.parallel)
-            else:
-                self.result = False  # action.abort("Empty backup output")
 
     def repo_stats(self) -> None:
         """
         Get repo stats and print the number of files and the total size of the repository.
         """
         if self.result:
-            if self.local_repo_exists:
-                # action = Action("Retrieving repo stats", self.parallel)
-                # saving one command, even if it's run before snapshot
-                # json_output = json.loads(self.repo_info)
-                rustic = Rustic(
-                    self.profile_name,
-                    "repoinfo",
-                    "--json",
-                    "--log-file",
-                    str(self.log_file),
+            # action = Action("Retrieving repo stats", self.parallel)
+            # saving one command, even if it's run before snapshot
+            # json_output = json.loads(self.repo_info)
+            rustic = Rustic(
+                self.profile_name,
+                "repoinfo",
+                "--json",
+                "--log-file",
+                str(self.log_file),
+            )
+            if rustic.stdout != "":
+                json_output = json.loads(rustic.stdout)
+                # print(json_output)
+                # "config" is not included in repoinfo
+                repo_files = 1
+                repo_size = 0
+                repo_files += sum(
+                    [entry["count"] for entry in json_output["files"]["repo"]]
                 )
-                if rustic.stdout != "":
-                    json_output = json.loads(rustic.stdout)
-                    # print(json_output)
-                    # "config" is not included in repoinfo
-                    repo_files = 1
-                    repo_size = 0
-                    repo_files += sum(
-                        [entry["count"] for entry in json_output["files"]["repo"]]
-                    )
-                    repo_size += sum(
-                        [entry["size"] for entry in json_output["files"]["repo"]]
-                    )
-                    clear_line(parallel=self.parallel)
-                    # action.stop("Retrieved repo stats")
-                    print_stats(
-                        "Repo size:", convert_size(repo_size), parallel=self.parallel
-                    )
-                    print_stats("Repo files:", str(repo_files), parallel=self.parallel)
-                else:
-                    self.result = False  # action.abort("Repoinfo output is empty")
+                repo_size += sum(
+                    [entry["size"] for entry in json_output["files"]["repo"]]
+                )
+                clear_line(parallel=self.parallel)
+                # action.stop("Retrieved repo stats")
+                print_stats(
+                    "Size of repo:", convert_size(repo_size), parallel=self.parallel
+                )
+                print_stats("Files in repo:", str(repo_files), parallel=self.parallel)
+            else:
+                self.result = False  # action.abort("Repoinfo output is empty")
 
     def forget(self) -> None:
         """
         A method to perform the action of forgetting, with no parameters and returning None.
         """
         if self.result:
-            if self.backup_output != "":
-                action = Action("Pruning repo", self.parallel)
-                Rustic(
-                    self.profile_name,
-                    "forget",
-                    "--json",
-                    "--fast-repack",
-                    "--keep-last",
-                    "1",
-                    "--log-file",
-                    str(self.log_file),
-                )
-                action.stop("Repo pruned")
+            action = Action("Deprecating old snapshots", self.parallel)
+            Rustic(
+                self.profile_name,
+                "forget",
+                "--json",
+                "--fast-repack",
+                "--keep-last",
+                "1",
+                "--log-file",
+                str(self.log_file),
+            )
+            action.stop("Deprecated old snapshots")
 
     def upload(self, remote_prefix: str) -> None:
         """
@@ -383,7 +433,7 @@ class Profile:
             repo_name = str(Path(self.repo).name)
             rclone_destination = remote_prefix + "/" + repo_name
             # print(rclone_destination)
-            rclone_upload = Rclone(
+            rclone = Rclone(
                 env=self.env,
                 log_file=rclone_log_file,
                 action="sync",
@@ -396,10 +446,10 @@ class Profile:
                 destination=rclone_destination,
             )
             # action.stop(f"Uploaded repo: {rclone_destination}")
-            if rclone_upload.returncode == 0:
-                action.stop("Uploaded repo")
+            if rclone.returncode != 0:
+                self.result = action.abort("Could not upload repo")
             else:
-                self.result = action.abort("Error uploading repo")
+                action.stop("Uploaded repo")
 
     def download(self, remote_prefix: str) -> None:
         """
@@ -466,9 +516,9 @@ class Profile:
                         # self.snapshot_exists = True
                         print_stats(
                             "Restoring from:",
-                            f"{timestamp_pretty}",
-                            20,
-                            20,
+                            f"[{timestamp_pretty}]",
+                            19,
+                            21,
                             parallel=self.parallel,
                         )
                 else:
@@ -476,48 +526,66 @@ class Profile:
             else:
                 self.result = action.abort("Local repo does not exist")
 
-    def check_source_type(self) -> None:
+    def check_sources_type(self) -> None:
         """
         Check if the source that needs to be restored is a directory or file
         Require local repo and snapshot to exist
         """
         if self.result:
-            action = Action("Checking source type", self.parallel)
-            rustic = Rustic(
-                self.profile_name,
-                "ls",
-                "latest",
-                "--glob",
-                f"{self.source}",
-                "--long",
-                "--log-file",
-                str(self.log_file),
-            )
-            if rustic.stdout[0] == "d" or rustic.stdout.count("\n") > 1:
-                self.source_type = "dir"
-            else:
-                self.source_type = "file"
-            action.stop(f"Source is a {self.source_type}")
+            action = Action("Checking type of sources", self.parallel)
+            for source in self.sources:
+                rustic = Rustic(
+                    self.profile_name,
+                    "ls",
+                    "latest",
+                    "--filter-paths",
+                    f"{source}",
+                    "--glob",
+                    f"{source}",
+                    "--long",
+                    "--log-file",
+                    str(self.log_file),
+                )
+                try:
+                    rustic.stdout[0]
+                except IndexError:
+                    # empty folders do not return results
+                    pass
+                except AttributeError:
+                    # error in command
+                    self.result = action.abort("Could not determine type of source")
+                else:
+                    if rustic.stdout[0] == "d" or rustic.stdout.count("\n") > 1:
+                        self.sources_type[source] = "dir"
+                    else:
+                        self.sources_type[source] = "file"
+            action.stop("Stored source types")
 
     def restore(self) -> None:
         """
         Extract files in the latest snapshot to the source location, after creating it if missing
-        if self.source is a directory, it is created if missing
-        if self.source is a file, its parent is created if missing
+        if source is a directory, it is created if missing
+        if source is a file, its parent is created if missing
         Require local repo and snapshot to exist
         """
         if self.result:
             action = Action("Extracting snapshot", self.parallel)
-            if self.source_type == "dir":
-                Path(self.source).mkdir(parents=True, exist_ok=True)
-            else:
-                Path(self.source).parent.mkdir(parents=True, exist_ok=True)
-            Rustic(
-                self.profile_name,
-                "restore",
-                f"latest:{self.source}",
-                self.source,
-                "--log-file",
-                str(self.log_file),
-            )
+            for source, source_type in self.sources_type.items():
+                if self.result:
+                    if source_type == "dir":
+                        Path(source).mkdir(parents=True, exist_ok=True)
+                    else:
+                        Path(source).parent.mkdir(parents=True, exist_ok=True)
+                    rustic = Rustic(
+                        self.profile_name,
+                        "restore",
+                        f"latest:{source}",
+                        source,
+                        "--filter-paths",
+                        f"{source}",
+                        "--log-file",
+                        str(self.log_file),
+                    )
+                    if rustic.returncode != 0:
+                        self.result = action.abort(f"Error extracting '{source}'")
             action.stop("Snapshot extracted")
