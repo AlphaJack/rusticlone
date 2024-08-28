@@ -37,7 +37,7 @@ If it sounds interesting, keep reading!
 
 ## Installation
 
-Install [RClone](https://rclone.org/install/) >= 1.67, [Rustic](https://rustic.cli.rs/docs/installation.html) >= 0.7, [Python](https://www.python.org/downloads/) >= 3.10 and then `rusticlone`:
+Install [RClone](https://rclone.org/install/) >= 1.67, [Rustic](https://rustic.cli.rs/docs/installation.html) >= 0.8, [Python](https://www.python.org/downloads/) >= 3.11 and then `rusticlone`:
 
 ```bash
 pip install rusticlone
@@ -46,17 +46,18 @@ pip install rusticlone
 [Configure RClone](https://rclone.org/commands/rclone_config/) by adding a remote.
 
 [Create your Rustic TOML profiles](https://github.com/rustic-rs/rustic/tree/main/config) under "/etc/rustic/" or "$HOME/.config/rustic/" on Linux and MacOS. On Windows, you can put them under "%PROGRAMDATA%/rustic/config" or "%APPDATA%/rustic/config".
-Configure your profiles to have a **single source**.
+Configure your profiles to have one or more sources.
 They should also have a local repository destination, without specifying the RClone remote.
 You can take inspiration from the profiles in the [example](example/rustic) folder.
-
 
 Include variables for the location (and password) of the RClone configuration:
 
 ```toml
 [global.env]
-RCLONE_CONFIG="/home/user/.config/rclone/rclone.conf"
-RCLONE_CONFIG_PASS="XXXXXX"
+RCLONE_CONFIG = "/home/user/.config/rclone/rclone.conf"
+RCLONE_CONFIG_PASS = "XXXXXX"
+# escape double quotes inside TOML strings
+#RCLONE_PASSWORD_COMMAND = "/usr/bin/python -c \"print('YYYYYY')\""
 ```
 
 ## Usage
@@ -266,15 +267,14 @@ You can test Rusticlone with dummy files before using it for your precious data:
 bash tests/tests.sh
 ```
 
-You will need `rclone`, `rustic`, and `python-coverage` installed to run the test.
+You will need `bash`, `coreutils`, `python-coverage`, `rclone`, and `rustic` installed to run the test.
 Before running the test, make sure that you have no important files under "$HOME/.config/rustic".
 
 At the end, you can read a test coverage report with your browser, to see which lines of the source code were run during the test.
 
 ## Known limitations
 
-- You must specify **only one source folder per Rustic profile**, as Rustic 0.7.0 does not support array of sources. Wait for Rustic 0.8.0 and Rusticlone 1.2.0 before including arrays. ([feature request](https://github.com/rustic-rs/rustic/issues/1125#issue-2251075638))
-- Rustic **does not save file and permissions for the source location**, but only for files and folders **inside the source**. If you backup "/home/jack" with user "jack" and permission "0700", when you will restore it will have user "root" and permission "0755" ([intended behavior](https://github.com/rustic-rs/rustic/issues/1108#issuecomment-2016584568))
+- Rustic does not **save ownership and permission** for the source location, but **only for files and folders inside the source**. If you backup "/home/jack" with user "jack" and permission "0700", when you will restore it will have user "root" and permission "0755" ([intended rustic behavior](https://github.com/rustic-rs/rustic/issues/1108#issuecomment-2016584568))
 
 ## Contribute
 

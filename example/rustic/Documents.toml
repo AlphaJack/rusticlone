@@ -2,8 +2,7 @@
 use-profile = ["common"]
 
 [repository]
-repository = "/home/jack/Desktop/rusticlone/backup/Documents"
+repository = "/backup/rusticlone/Documents"
 
 [[backup.sources]]
-# to be created with files
-source = "/home/jack/Desktop/rusticlone/source/docs"
+source = "/home/jack/Documents"
