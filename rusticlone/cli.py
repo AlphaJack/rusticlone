@@ -61,8 +61,8 @@ def parse_args():
     group.add_argument(
         "-P",
         "--profile",
-        nargs=1,
         type=str,
+        default="*",
         help="Individual Rustic profile to process",
     )
     parser.add_argument(

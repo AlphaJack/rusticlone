@@ -88,9 +88,9 @@ class Custom:
         self.ignore_pattern = args.ignore
         # test profile
         if args.profile:
-            self.profiles = args.profile
+            self.provided_profile = args.profile
         else:
-            self.profiles = []
+            self.provided_profile = ""
 
     def check_log_file(self) -> None:
         """
@@ -107,36 +107,63 @@ class Custom:
             used_log = "defined in Rustic profiles"
         action.stop(f"Log file: {used_log}", "")
 
+    def check_profiles_dirs(self) -> None:
+        """
+        Check that at least one profiles directory exists
+        """
+        action = Action("Checking profiles directory")
+        existing_dirs = []
+        old_profiles_dirs = self.profiles_dirs
+        for profile_dir in self.profiles_dirs:
+            if profile_dir.exists() and profile_dir.is_dir():
+                existing_dirs.append(profile_dir)
+        if existing_dirs:
+            self.profiles_dirs = existing_dirs
+            pretty_dirs = str(
+                [str(profiles_dir) for profiles_dir in self.profiles_dirs]
+            )
+            action.stop(f"Profiles directories: {pretty_dirs}", "")
+        else:
+            action.abort(
+                f"Could not find any profiles directory among {old_profiles_dirs}"
+            )
+
 
 # ################################################################ FUNCTIONS
 
 
 def list_profiles(
-    profiles_dirs: list, profiles: list, ignore_pattern: str = "🫣🫣🫣"
+    profiles_dirs: list, provided_profile: str = "*", ignore_pattern: str = "🫣🫣🫣"
 ) -> list:
     """
     Scan profiles from directories if none have been provided explicitely
     Don't scan from /etc/rustic if ~/.config/rustic has some profiles'
     """
     action = Action("Reading profiles")
-    if not profiles:
-        for profiles_dir in profiles_dirs:
-            if len(profiles) == 0 and profiles_dir.exists() and profiles_dir.is_dir():
-                action.stop(f'Scanning "{profiles_dir}"', "")
-                files = sorted(list(profiles_dir.glob("*.toml")))
-                for file in files:
-                    if (
-                        file.is_file()
-                        and ignore_pattern not in file.stem
-                        and file.stem not in profiles
-                    ):
-                        profiles.append(file.stem)
-    if len(profiles) == 0:
-        action.abort("Could not find any rustic profile")
-        sys.exit(1)
-    else:
+    profiles: list[str] = []
+    if not provided_profile:
+        provided_profile = "*"
+    for profiles_dir in profiles_dirs:
+        if not profiles:
+            action.stop(f'Scanning "{profiles_dir}"', "")
+            files = sorted(list(profiles_dir.glob(f"{provided_profile}.toml")))
+            for file in files:
+                if (
+                    file.is_file()
+                    and ignore_pattern not in file.stem
+                    and file.stem not in profiles
+                ):
+                    profiles.append(file.stem)
+    # remove duplicates
+    profiles = list(set(profiles))
+    if profiles:
         action.stop(f"Profiles: {str(profiles)}", "")
         return profiles
+    else:
+        print(provided_profile)
+        print(provided_profile)
+        action.abort("Could not find any rustic profile")
+        sys.exit(1)
 
 
 def process_profiles(
@@ -205,8 +232,9 @@ def load_customizations(args: Namespace):
     """
     custom = Custom(args)
     custom.check_log_file()
+    custom.check_profiles_dirs()
     profiles = list_profiles(
-        custom.profiles_dirs, custom.profiles, custom.ignore_pattern
+        custom.profiles_dirs, custom.provided_profile, custom.ignore_pattern
     )
     process_profiles(
         profiles,
