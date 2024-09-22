@@ -174,8 +174,8 @@ class Profile:
                 suffix_new = "-" + self.profile_name + ".log"
                 self.log_file = Path(str(self.log_file).replace(suffix_old, suffix_new))
                 # rustic fails anyway if it cannot find the path when parsing the conf
-                # self.log_file.parent.mkdir(parents=True, exist_ok=True)
-                # self.log_file.touch(exist_ok=True)
+                self.log_file.parent.mkdir(parents=True, exist_ok=True)
+                self.log_file.touch(exist_ok=True)
             action.stop("Set log file")
 
     def check_sources_exist(self) -> None:
@@ -317,7 +317,7 @@ class Profile:
                 # print(json.loads(rustic.stdout))
                 self.result = action.abort("Could not create snapshot")
             else:
-                action.stop("Created Snapshot")
+                action.stop("Created snapshot")
 
     def source_stats(self) -> None:
         """
