@@ -27,7 +27,9 @@ def check_rustic_version() -> bool:
     """
     action = Action("Checking Rustic version")
     rustic = Rustic("", "--version")
-    version = rustic.stdout.splitlines()[0].replace("rustic ", "")
+    version = (
+        rustic.stdout.splitlines()[0].replace("rustic", "").replace("v", "").strip()
+    )
     try:
         major_version = int(version.split(".")[0])
         minor_version = int(version.split(".")[1])
@@ -46,7 +48,9 @@ def check_rclone_version() -> bool:
     """
     action = Action("Checking Rclone version")
     rclone = Rclone(default_flags=None)
-    version = rclone.stdout.splitlines()[0].replace("rclone v", "")
+    version = (
+        rclone.stdout.splitlines()[0].replace("rclone", "").replace("v", "").strip()
+    )
     try:
         major_version = int(version.split(".")[0])
         minor_version = int(version.split(".")[1])
