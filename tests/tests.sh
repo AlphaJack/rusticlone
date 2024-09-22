@@ -118,7 +118,7 @@ stopwatch_end(){
  dateend="$EPOCHSECONDS"
  datediff="$((dateend-datebegin))"
  runtime="$(date -ud "@$datediff" -u +'%-Mm %-Ss')"
- echo "[KO] Tests completed succesfully in $runtime"
+ echo "[OK] Tests completed succesfully in $runtime"
 }
 
 check_workdir(){
@@ -134,7 +134,9 @@ logecho(){
  else
   logFile="$RUSTICLONE_TEST_DIR/logs/rusticlone.log"
  fi
+ echo " "
  echo "$1"
+ echo " "
  echo " "  >> "$logFile"
  echo "$1" >> "$logFile"
 }
@@ -220,6 +222,15 @@ rusticlone_archive(){
 rusticlone_upload(){
  logecho "[OK] Uploading with Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" upload
+}
+
+rusticlone_backup_flags(){
+ touch "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"
+ logecho "[OK] Backing up from Rusticlone" "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" backup
+ logecho "[OK] Backing up from Rusticlone"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --ignore "common" backup
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" backup
 }
 
 # ################ PARALLEL
@@ -312,6 +323,7 @@ rusticlone_restore(){
 }
 
 rusticlone_restore_flags(){
+ touch "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"4
  logecho "[OK] Restoring from Rusticlone" "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" restore
  logecho "[OK] Restoring from Rusticlone"
@@ -444,6 +456,8 @@ main(){
  # result
  check_source
  rusticlone_backup
+ rusticlone_restore
+ check_source
  print_space
  create_coverage
  check_coverage
