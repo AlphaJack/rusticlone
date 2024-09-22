@@ -29,3 +29,4 @@ release:
 	git commit -m "minor: updated CHANGELOG.md" || true
 	git tag -fa v$(tag) -m v$(tag)
 	git push --follow-tags
+	echo "Remember to update the AUR package"
