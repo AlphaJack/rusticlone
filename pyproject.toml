@@ -22,7 +22,7 @@ packages = ["rusticlone", "rusticlone.helpers", "rusticlone.processing"]
 
 [project]
 name = "rusticlone"
-version = "1.2.0"
+version = "1.2.1"
 authors = [
   { name="AlphaJack" },
 ]

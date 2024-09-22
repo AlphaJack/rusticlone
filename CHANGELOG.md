@@ -1,5 +1,19 @@
 # Changelog - toc
 
+## [1.2.1] - 2024-09-22
+### Documentation
+
+- Added known issues on windows
+
+### Fixed
+
+- Removing "v" when checking for compatible rustic and rclone versions
+- Creating log file for parallel operations
+
+### Testing
+
+- Added a restore after the final backup
+
 ## [1.2.0] - 2024-08-28
 ### Added
 
