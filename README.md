@@ -301,6 +301,8 @@ At the end, you can read a test coverage report with your browser, to see which 
 ## Known limitations
 
 - Rustic does not **save ownership and permission** for the source location, but **only for files and folders inside the source**. If you backup "/home/jack" with user "jack" and permission "0700", when you will restore it will have user "root" and permission "0755" ([intended rustic behavior](https://github.com/rustic-rs/rustic/issues/1108#issuecomment-2016584568))
+- Rustic does not recognize proper Windows paths ([bug](https://github.com/rustic-rs/rustic/issues/1104))
+- Rustic will not archive empty folders ([bug](https://github.com/rustic-rs/rustic/issues/1157))
 
 ## Contribute
 
