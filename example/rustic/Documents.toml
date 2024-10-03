@@ -1,8 +1,11 @@
 [global]
-use-profile = ["common"]
+use-profiles = ["common"]
 
 [repository]
 repository = "/backup/rusticlone/Documents"
 
-[[backup.sources]]
-source = "/home/jack/Documents"
+[[backup.snapshots]]
+sources = [
+    "/home/jack/Documents",
+    "/home/jack/Desktop"
+]
