@@ -45,8 +45,8 @@ repository = "$RUSTICLONE_TEST_DIR/local/Documents"
 cache-dir = "$RUSTICLONE_TEST_DIR/cache"
 password = "XXXXXX"
 
-[[backup.sources]]
-source = "$RUSTICLONE_TEST_DIR/source/docs"
+[[backup.snapshots]]
+sources = ["$RUSTICLONE_TEST_DIR/source/docs"]
 
 [global.env]
 RCLONE_CONFIG = "$RUSTIC_PROFILES_DIR/rclone-decrypted.conf"
@@ -58,11 +58,11 @@ repository = "$RUSTICLONE_TEST_DIR/local/Pictures"
 cache-dir = "$RUSTICLONE_TEST_DIR/cache"
 password = "XXXXXX"
 
-[[backup.sources]]
-source = "$RUSTICLONE_TEST_DIR/source/pics"
+[[backup.snapshots]]
+sources = ["$RUSTICLONE_TEST_DIR/source/pics"]
 
-[[backup.sources]]
-source = "$RUSTICLONE_TEST_DIR/source/photos"
+[[backup.snapshots]]
+sources = ["$RUSTICLONE_TEST_DIR/source/photos"]
 
 [global.env]
 RCLONE_CONFIG = "$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
@@ -75,11 +75,9 @@ repository = "$RUSTICLONE_TEST_DIR/local/Passwords"
 cache-dir = "$RUSTICLONE_TEST_DIR/cache"
 password = "XXXXXX"
 
-[[backup.sources]]
-source = "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
-
-[[backup.sources]]
-source = [
+[[backup.snapshots]]
+sources = [
+  "$RUSTICLONE_TEST_DIR/source/passwords.kdbx",
   "$RUSTICLONE_TEST_DIR/source/secrets"
 ]
 
