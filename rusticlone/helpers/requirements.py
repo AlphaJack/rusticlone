@@ -35,9 +35,9 @@ def check_rustic_version() -> bool:
         minor_version = int(version.split(".")[1])
     except (ValueError, TypeError):
         return action.abort("Could not parse Rustic version")
-    if major_version != 0 or minor_version != 8:
+    if major_version != 0 or minor_version != 9:
         return action.abort(
-            f"Rustic {major_version}.{minor_version} is installed, but 0.8 is required"
+            f"Rustic {major_version}.{minor_version} is installed, but 0.9 is required"
         )
     return action.stop()
 
