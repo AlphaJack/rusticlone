@@ -1,5 +1,18 @@
 # Changelog - toc
 
+## [1.3.0] - 2024-10-03
+### Added
+
+- Added support for rustic == 0.9
+
+### Documentation
+
+- Updated example profiles to rustic 0.9
+
+### Tests
+
+- Updated test profiles to rustic 0.9
+
 ## [1.2.1] - 2024-09-22
 ### Documentation
 
@@ -10,7 +23,7 @@
 - Removing "v" when checking for compatible rustic and rclone versions
 - Creating log file for parallel operations
 
-### Testing
+### Tests
 
 - Added a restore after the final backup
 
@@ -30,7 +43,7 @@
 
 - Removed known limitations of older Rusticlone versions
 
-### Testing
+### Tests
 
 - Added multiple sources
 - Added encrypted rclone config
