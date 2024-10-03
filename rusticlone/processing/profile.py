@@ -92,7 +92,7 @@ class Profile:
             # they can be either string or list of strings:
             # https://github.com/rustic-rs/rustic/blob/a88afdd4af295c16e5de50de91ec430920f81f56/config/full.toml
             config_sources = [
-                source["source"] for source in self.config["backup"]["sources"]
+                section["sources"] for section in self.config["backup"]["snapshots"]
             ]
             for config_source in config_sources:
                 if config_source and isinstance(config_source, list):
