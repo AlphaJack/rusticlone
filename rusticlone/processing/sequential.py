@@ -41,7 +41,7 @@ def system_backup_sequential(
     """
     # action = Action("Backing up system", status="")
     print("========================================")
-    action = Action("System", status="[backup]")
+    Action("System", status="[backup]")
     timer = Timer()
     archive_results = system_archive_sequential(profiles=profiles, log_file=log_file)
     system_upload_sequential(
@@ -128,7 +128,7 @@ def system_restore_sequential(
     """
     # action = Action("Restoring system", status="")
     print("========================================")
-    action = Action("System", False, "[restore]")
+    Action("System", False, "[restore]")
     timer = Timer()
     download_results = system_download_sequential(
         profiles, log_file=log_file, remote_prefix=remote_prefix

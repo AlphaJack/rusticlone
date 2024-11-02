@@ -11,7 +11,8 @@ tests:
 
 release:
 	mypy --check-untyped-defs .
-	black .
+	ruff check --fix .
+	ruff format .
 	find * -type f -exec toc -f {} \;
 	git status
 	bash tests/tests.sh
