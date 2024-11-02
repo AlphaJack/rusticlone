@@ -66,7 +66,7 @@ def system_backup_parallel(profiles: list, log_file: Path, remote_prefix: str) -
     Once a profile has a been archived, upload it without waiting for others
     """
     # action = Action("Backing up system", status="")
-    action = Action("System", status="[backup]")
+    Action("System", status="[backup]")
     timer = Timer()
     with concurrent.futures.ThreadPoolExecutor(
         thread_name_prefix="SystemBackup"
@@ -107,7 +107,7 @@ def system_archive_parallel(profiles: list, log_file: Path, executor=None) -> di
         with concurrent.futures.ThreadPoolExecutor(
             thread_name_prefix="SystemArchiveOnly"
         ) as executor:
-            action = Action("System", status="[archive]")
+            Action("System", status="[archive]")
             archived_profiles = {
                 executor.submit(
                     profile_archive, name=name, log_file=log_file, parallel=True
@@ -156,7 +156,7 @@ def system_upload_parallel(
         with concurrent.futures.ThreadPoolExecutor(
             thread_name_prefix="SystemUploadOnly"
         ) as executor:
-            action = Action("System", status="[upload]")
+            Action("System", status="[upload]")
             uploaded_profiles = {
                 executor.submit(
                     profile_upload,
@@ -179,7 +179,7 @@ def system_restore_parallel(profiles: list, log_file: Path, remote_prefix: str) 
     Once a profile has a been downloaded, extract it without waiting for others
     """
     # action = Action("Restoring system", status="")
-    action = Action("System", status="[restore]")
+    Action("System", status="[restore]")
     timer = Timer()
     with concurrent.futures.ThreadPoolExecutor(
         thread_name_prefix="SystemRestore"
@@ -227,7 +227,7 @@ def system_download_parallel(
         with concurrent.futures.ThreadPoolExecutor(
             thread_name_prefix="SystemDownloadOnly"
         ) as executor:
-            action = Action("System", status="[download]")
+            Action("System", status="[download]")
             downloaded_profiles = {
                 executor.submit(
                     profile_download,
@@ -278,7 +278,7 @@ def system_extract_parallel(
         with concurrent.futures.ThreadPoolExecutor(
             thread_name_prefix="SystemExtractOnly"
         ) as executor:
-            action = Action("System", status="[extract]")
+            Action("System", status="[extract]")
             extracted_profiles = {
                 executor.submit(
                     profile_extract,

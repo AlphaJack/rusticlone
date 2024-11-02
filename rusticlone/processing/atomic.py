@@ -33,7 +33,7 @@ def profile_archive(
     """
     Create a snapshot of a profile in a local rustic repo
     """
-    action = Action(name, parallel, "[archive]")
+    Action(name, parallel, "[archive]")
     timer = Timer(parallel)
     profile = Profile(name, parallel)
     profile.parse_rustic_config()
@@ -57,7 +57,7 @@ def profile_upload(
     """
     Sync the local rustic repo of a profile to a RClone remote
     """
-    action = Action(name, parallel, "[upload]")
+    Action(name, parallel, "[upload]")
     timer = Timer(parallel)
     profile = Profile(name, parallel)
     profile.parse_rustic_config()
@@ -79,7 +79,7 @@ def profile_download(
     """
     Retrieve the RClone remote of a profile to its local rustic repo location
     """
-    action = Action(name, parallel, "[download]")
+    Action(name, parallel, "[download]")
     timer = Timer(parallel)
     profile = Profile(name, parallel)
     profile.parse_rustic_config()
@@ -99,7 +99,7 @@ def profile_extract(
     """
     Extract the latest snapshot of the local rustic repo of a profile to the source location
     """
-    action = Action(name, parallel, "[extract]")
+    Action(name, parallel, "[extract]")
     timer = Timer(parallel)
     profile = Profile(name, parallel)
     profile.parse_rustic_config()
