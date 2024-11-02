@@ -5,7 +5,8 @@
 # ├──┐From tag
 # │  └──┐Build and test
 # │     ├── Release to GitHub
-# │     └── Deploy to PyPI
+# │     ├── Deploy to PyPI
+# │     └── Deploy to AUR
 # │
 # └───────────────────────────────────────────────────────────────
 
@@ -132,3 +133,23 @@ jobs:
 
       - name: Deploy package
         uses: pypa/gh-action-pypi-publish@81e9d935c883d0b210363ab89cf05f3894778450 # 1.8.14
+
+# ################ Deploy to AUR
+
+  aur:
+    name: Deploy to AUR
+    needs: pypi
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Wait for the new release to be accessible from PyPI
+        run: sleep 30
+
+      - name: Update PKGBUILD
+        uses: aksh1618/update-aur-package@93d86c3ea6e57fb485881f5ce8b15375dcd23918 # 1.0.5
+        with:
+          tag_version_prefix: v
+          package_name: rusticlone
+          commit_username: "Github Action"
+          commit_email: alphajack@aur.arch
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
