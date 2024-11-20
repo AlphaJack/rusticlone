@@ -41,6 +41,8 @@ classifiers = [
 dependencies = [
     "importlib_metadata"
 ]
+[project.optional-dependencies]
+full = ["apprise"]
 
 [project.scripts]
 rusticlone = "rusticlone.cli:main"
