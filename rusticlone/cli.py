@@ -45,6 +45,13 @@ def parse_args():
         choices=("archive", "upload", "backup", "download", "extract", "restore"),
     )
     parser.add_argument(
+        "-a",
+        "--apprise-url",
+        type=str,
+        nargs="*",
+        help="Apprise URLs for notification",
+    )
+    parser.add_argument(
         "-i",
         "--ignore",
         type=str,
