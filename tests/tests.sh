@@ -368,8 +368,14 @@ check_source(){
 
 create_coverage(){
  coverage html
+ coverage xml
  rm -rf "tests/coverage"
  mv "htmlcov" "$RUSTICLONE_TEST_DIR/coverage"
+ mv "coverage.xml" "$RUSTICLONE_TEST_DIR/coverage"
+}
+
+create_badge(){
+ genbadge coverage -i "$RUSTICLONE_TEST_DIR/coverage/coverage.xml" -o "images/coverage.svg"
 }
 
 check_coverage(){
@@ -384,6 +390,7 @@ check_coverage(){
 main(){
  # preparation
  check_workdir "$0"
+ source ".venv/bin/activate" || exit 1
  print_warning
  stopwatch_begin
  create_dirs
@@ -461,6 +468,7 @@ main(){
  check_source
  print_space
  create_coverage
+ create_badge
  check_coverage
  stopwatch_end
 }
