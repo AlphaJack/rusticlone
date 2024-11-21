@@ -6,7 +6,7 @@
 #	git push --delete origin v1.0.0
 # and repeat the steps below
 
-tests:
+test:
 	bash tests/tests.sh
 
 release:
