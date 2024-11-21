@@ -39,7 +39,8 @@ classifiers = [
     "Programming Language :: Python :: 3"
 ]
 dependencies = [
-    "importlib_metadata"
+    "importlib_metadata",
+    "ConfigArgParse"
 ]
 [project.optional-dependencies]
 dev = ["mypy", "ruff", "git-cliff", "tableofcontents"]

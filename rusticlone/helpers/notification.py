@@ -67,7 +67,9 @@ def create_notification(results: dict[str, Result]) -> str:
     for result in results.values():
         status = "✅" if result.success else "🟥"
         status = "🟨" if result.duration == "skipped" else status
-        lines.append(f"{status} {result.operation} {result.profile} ({result.duration})")
+        lines.append(
+            f"{status} {result.operation} {result.profile} ({result.duration})"
+        )
     notification = "\n".join(lines)
     return notification
 
@@ -80,7 +82,7 @@ def send_notification(notification: str, apprise_url: str) -> None:
     if not dispatcher.add(apprise_url):
         print(f"Invalid Apprise URL: {apprise_url}")
     else:
-        service = apprise_url.split('://')[0]
+        service = apprise_url.split("://")[0]
         if not dispatcher.notify(
             title="Rusticlone results:",
             body=notification,
