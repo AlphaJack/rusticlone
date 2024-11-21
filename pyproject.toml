@@ -43,7 +43,7 @@ dependencies = [
     "ConfigArgParse"
 ]
 [project.optional-dependencies]
-dev = ["mypy", "ruff", "git-cliff", "tableofcontents"]
+dev = ["mypy", "ruff", "git-cliff", "coverage", "genbadge[coverage]", "tableofcontents"]
 full = ["apprise"]
 
 [project.scripts]
