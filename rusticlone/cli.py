@@ -17,7 +17,7 @@ CLI script for Rusticlone
 # ################################################################ IMPORTS
 
 # accept arguments
-import argparse
+import configargparse
 
 # version
 # from importlib_metadata import version
@@ -33,7 +33,7 @@ def parse_args():
     """
     Parse the command-line arguments and return the parsed arguments
     """
-    parser = argparse.ArgumentParser(
+    parser = configargparse.ArgumentParser(
         prog="rusticlone",
         description="3-2-1 backups using Rustic and RClone",
     )
@@ -45,17 +45,33 @@ def parse_args():
         choices=("archive", "upload", "backup", "download", "extract", "restore"),
     )
     parser.add_argument(
+        "-a",
+        "--apprise-url",
+        type=str,
+        env_var="APPRISE_URL",
+        help="Apprise URL for notification",
+    )
+    parser.add_argument(
         "-i",
         "--ignore",
         type=str,
         default="🫣🫣🫣",
+        env_var="IGNORE",
         help="Ignore rustic profiles containing this pattern",
     )
     parser.add_argument(
-        "-l", "--log-file", type=str, help="Log file for Rustic and RClone"
+        "-l",
+        "--log-file",
+        type=str,
+        env_var="LOG_FILE",
+        help="Log file for Rustic and RClone",
     )
     parser.add_argument(
-        "-p", "--parallel", action="store_true", help="Process profiles in parallel"
+        "-p",
+        "--parallel",
+        action="store_true",
+        env_var="PARALLEL",
+        help="Process profiles in parallel",
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
@@ -63,10 +79,15 @@ def parse_args():
         "--profile",
         type=str,
         default="*",
+        env_var="RUSTIC_PROFILE",
         help="Individual Rustic profile to process",
     )
     parser.add_argument(
-        "-r", "--remote", type=str, help="RClone remote and subdirectory"
+        "-r",
+        "--remote",
+        type=str,
+        env_var="RCLONE_REMOTE",
+        help="RClone remote and subdirectory",
     )
     # parser.add_argument(
     #    "-v",

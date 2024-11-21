@@ -254,9 +254,7 @@ class Profile:
             )
             # == 3 if does not exist
             if rclone.returncode != 0:
-                self.result = action.abort(
-                    f"Remote repo does not exist, Rclone exit code: {rclone.returncode}"
-                )
+                self.result = action.abort("Remote repo does not exist")
             else:
                 action.stop("Remote repo exists")
 

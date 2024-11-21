@@ -143,7 +143,7 @@ jobs:
     steps:
 
       - name: Wait for the new release to be accessible from PyPI
-        run: sleep 30
+        run: sleep 10
 
       - name: Update PKGBUILD
         uses: aksh1618/update-aur-package@93d86c3ea6e57fb485881f5ce8b15375dcd23918 # 1.0.5

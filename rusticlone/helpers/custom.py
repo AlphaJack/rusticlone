@@ -18,7 +18,7 @@ Load customizations by interpreting passed arguments
 from pathlib import Path
 
 # args type
-from argparse import Namespace
+from configargparse import Namespace
 
 # os and hostname
 import platform
@@ -28,6 +28,7 @@ import sys
 
 # rusticlone
 from rusticlone.helpers.action import Action
+from rusticlone.helpers.notification import notify_user
 from rusticlone.processing.parallel import (
     system_backup_parallel,
     system_archive_parallel,
@@ -62,6 +63,7 @@ class Custom:
         self.command = args.command[0]
         self.operating_system = platform.system()
         self.default_log_file = Path("rusticlone.log")
+        self.apprise_url = ""
         # log file
         # rustic use log file from config, while from rclone it is passed from either cli or here
         if args.log_file is not None:
@@ -91,6 +93,8 @@ class Custom:
             self.provided_profile = args.profile
         else:
             self.provided_profile = ""
+        if args.apprise_url:
+            self.apprise_url = args.apprise_url
 
     def check_log_file(self) -> None:
         """
@@ -172,10 +176,12 @@ def process_profiles(
     command: str,
     log_file: Path,
     remote_prefix: str,
+    apprise_url: str,
 ) -> None:
     """
     Process all profiles according to the command specified and parallel flag
     """
+    results = {}
     if parallel:
         match command:
             case "backup":
@@ -200,30 +206,40 @@ def process_profiles(
                 )
             case "extract":
                 system_extract_parallel(profiles=profiles, log_file=log_file)
+            case _:
+                print(f"Invalid command '{command}'")
     else:
         match command:
             case "backup":
-                system_backup_sequential(
+                results = system_backup_sequential(
                     profiles=profiles, log_file=log_file, remote_prefix=remote_prefix
                 )
             case "archive":
-                system_archive_sequential(profiles=profiles, log_file=log_file)
+                results = system_archive_sequential(
+                    profiles=profiles, log_file=log_file
+                )
             case "upload":
-                system_upload_sequential(
+                results = system_upload_sequential(
                     profiles=profiles, log_file=log_file, remote_prefix=remote_prefix
                 )
             case "restore":
-                system_restore_sequential(
+                results = system_restore_sequential(
                     profiles=profiles,
                     log_file=log_file,
                     remote_prefix=remote_prefix,
                 )
             case "download":
-                system_download_sequential(
+                results = system_download_sequential(
                     profiles=profiles, log_file=log_file, remote_prefix=remote_prefix
                 )
             case "extract":
-                system_extract_sequential(profiles=profiles, log_file=log_file)
+                results = system_extract_sequential(
+                    profiles=profiles, log_file=log_file
+                )
+            case _:
+                print(f"Invalid command '{command}'")
+    if apprise_url and results:
+        notify_user(results, apprise_url)
 
 
 def load_customizations(args: Namespace):
@@ -242,4 +258,5 @@ def load_customizations(args: Namespace):
         custom.command,
         custom.log_file,
         custom.remote_prefix,
+        custom.apprise_url,
     )

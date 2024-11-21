@@ -39,8 +39,12 @@ classifiers = [
     "Programming Language :: Python :: 3"
 ]
 dependencies = [
-    "importlib_metadata"
+    "importlib_metadata",
+    "ConfigArgParse"
 ]
+[project.optional-dependencies]
+dev = ["mypy", "ruff", "git-cliff", "coverage", "genbadge[coverage]", "tableofcontents"]
+full = ["apprise"]
 
 [project.scripts]
 rusticlone = "rusticlone.cli:main"
