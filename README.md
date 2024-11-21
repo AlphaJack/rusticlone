@@ -26,6 +26,9 @@
 
 # Rusticlone
 
+<img alt="PyPI Downloads" src="https://static.pepy.tech/badge/rusticlone">
+<img alt="Test Coverage" src="https://github.com/AlphaJack/rusticlone/raw/master/images/coverage.svg">
+
 <p style='text-align: center;'>
 <strong>3-2-1 backups using Rustic and RClone</strong>
 </p>
@@ -192,6 +195,21 @@ rusticlone -r "gdrive:/PC" download
 rusticlone extract
 ```
 
+### Push notifications
+
+Rusticlone can send a push notification with the operation results using Apprise:
+
+<img alt="Push Notification" src="https://github.com/AlphaJack/rusticlone/raw/master/images/notification.png">
+
+Just pass the [Apprise notification URL](https://github.com/caronc/apprise?tab=readme-ov-file#supported-notifications) via the `--apprise-url` argument or `APPRISE_URL` environment variable:
+
+```bash
+rusticlone --apprise-url "tgram:/XXXXXX/YYYYYY/" archive
+
+#alternative
+APPRISE_URL="tgram:/XXXXXX/YYYYYY/" rusticlone archive
+```
+
 ### Parallel processing
 
 You can specify the `--parallel` argument with any command to process all your profiles at the same time:
@@ -201,6 +219,8 @@ rusticlone --parallel -r "gdrive:/PC" backup
 ```
 
 Beware that this may fill your RAM if you have many profiles or several GB of data to archive.
+
+Parallel processing is also not (yet) compatible with push notifications.
 
 ### Exclude profiles
 
@@ -290,10 +310,11 @@ sudo systemctl enable --now rusticlone.timer
 You can test Rusticlone with dummy files before using it for your precious data:
 
 ```bash
-bash tests/tests.sh
+make install
+make test
 ```
 
-You will need `bash`, `coreutils`, `python-coverage`, `rclone`, and `rustic` installed to run the test.
+You will need `bash`, `coreutils`, `rclone`, and `rustic` installed to run the test.
 Before running the test, make sure that you have no important files under "$HOME/.config/rustic".
 
 At the end, you can read a test coverage report with your browser, to see which lines of the source code were run during the test.
