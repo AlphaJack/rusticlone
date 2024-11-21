@@ -18,7 +18,7 @@ Load customizations by interpreting passed arguments
 from pathlib import Path
 
 # args type
-from argparse import Namespace
+from configargparse import Namespace
 
 # os and hostname
 import platform
