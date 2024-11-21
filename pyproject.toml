@@ -42,6 +42,7 @@ dependencies = [
     "importlib_metadata"
 ]
 [project.optional-dependencies]
+dev = ["mypy", "ruff", "git-cliff", "tableofcontents"]
 full = ["apprise"]
 
 [project.scripts]
