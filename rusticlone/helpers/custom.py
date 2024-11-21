@@ -63,7 +63,7 @@ class Custom:
         self.command = args.command[0]
         self.operating_system = platform.system()
         self.default_log_file = Path("rusticlone.log")
-        self.apprise_urls = []
+        self.apprise_url = ""
         # log file
         # rustic use log file from config, while from rclone it is passed from either cli or here
         if args.log_file is not None:
@@ -94,7 +94,7 @@ class Custom:
         else:
             self.provided_profile = ""
         if args.apprise_url:
-            self.apprise_urls = args.apprise_url
+            self.apprise_url = args.apprise_url
 
     def check_log_file(self) -> None:
         """
@@ -176,7 +176,7 @@ def process_profiles(
     command: str,
     log_file: Path,
     remote_prefix: str,
-    apprise_urls: list[str],
+    apprise_url: str,
 ) -> None:
     """
     Process all profiles according to the command specified and parallel flag
@@ -238,8 +238,8 @@ def process_profiles(
                 )
             case _:
                 print(f"Invalid command '{command}'")
-    if apprise_urls and results:
-        notify_user(results, apprise_urls)
+    if apprise_url and results:
+        notify_user(results, apprise_url)
 
 
 def load_customizations(args: Namespace):
@@ -258,5 +258,5 @@ def load_customizations(args: Namespace):
         custom.command,
         custom.log_file,
         custom.remote_prefix,
-        custom.apprise_urls,
+        custom.apprise_url,
     )

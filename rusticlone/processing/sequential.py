@@ -108,8 +108,8 @@ def system_upload_sequential(
     if archive_results is None:
         archive_results = {}
     for name in profiles:
+        archive_success = True
         archive_result = archive_results.get(name + "_archive", None)
-        archive_success = False
         if archive_result is not None:
             archive_success = archive_result.success
         if archive_success:
@@ -206,8 +206,8 @@ def system_extract_sequential(
         download_results = {}
     extract_results = {}
     for name in profiles:
+        download_success = True
         download_result = download_results.get(name + "_download", None)
-        download_success = False
         if download_result is not None:
             download_success = download_result.success
         if download_success:
