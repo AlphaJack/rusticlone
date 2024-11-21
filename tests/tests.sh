@@ -104,6 +104,9 @@ RCLONE_ENCRYPT_V0:
 LDDUg4mDyUxDwMtntnCaiUN+o9SexiohA8Y74ZYJmPD9KD8UjVtH9XYCL+3A6OGR7msabjvu0Gj2W8JRande
 CONTENT
 
+GOOD_APPRISE_URL="dbus://"
+BAD_APPRISE_URL="moz://a"
+
 # ################################################################ FUNCTIONS
 # ################################ PREPARATION
 
@@ -209,7 +212,7 @@ create_check_source(){
 
 rusticlone_backup(){
  logecho "[OK] Backing up with Rusticlone"
- coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" backup
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -a "$GOOD_APPRISE_URL" backup
 }
 
 rusticlone_archive(){
@@ -228,7 +231,7 @@ rusticlone_backup_flags(){
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" backup
  logecho "[OK] Backing up from Rusticlone"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --ignore "common" backup
- coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" backup
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" -a "$BAD_APPRISE_URL" backup
 }
 
 # ################ PARALLEL
@@ -365,8 +368,14 @@ check_source(){
 
 create_coverage(){
  coverage html
+ coverage xml
  rm -rf "tests/coverage"
  mv "htmlcov" "$RUSTICLONE_TEST_DIR/coverage"
+ mv "coverage.xml" "$RUSTICLONE_TEST_DIR/coverage"
+}
+
+create_badge(){
+ genbadge coverage -i "$RUSTICLONE_TEST_DIR/coverage/coverage.xml" -o "images/coverage.svg"
 }
 
 check_coverage(){
@@ -381,6 +390,7 @@ check_coverage(){
 main(){
  # preparation
  check_workdir "$0"
+ source ".venv/bin/activate" || exit 1
  print_warning
  stopwatch_begin
  create_dirs
@@ -458,6 +468,7 @@ main(){
  check_source
  print_space
  create_coverage
+ create_badge
  check_coverage
  stopwatch_end
 }
