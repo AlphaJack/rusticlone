@@ -16,11 +16,14 @@ Notify user using apprise
 
 # push notifications
 try:
-    import apprise
-except ImportError:
+    from apprise import Apprise
+except (ImportError, ModuleNotFoundError):
     HAS_APPRISE = False
 else:
     HAS_APPRISE = True
+
+# rusticlone
+from rusticlone.helpers.formatting import print_stats
 
 # ################################################################ CLASSES
 
@@ -45,36 +48,44 @@ class Result:
 # ################################################################ FUNCTIONS
 
 
-def notify_user(results: dict[str, Result], apprise_urls: list[str]) -> None:
+def notify_user(results: dict[str, Result], apprise_url: str) -> None:
     """
     Check if apprise is installed
     """
     if HAS_APPRISE:
-        message = create_message(results)
-        send_message(message, apprise_urls)
+        notification = create_notification(results)
+        send_notification(notification, apprise_url)
     else:
-        print("Apprise is not installed")
+        print("Please install apprise to send notifications")
 
 
-def create_message(results: dict[str, Result]) -> str:
+def create_notification(results: dict[str, Result]) -> str:
     """
-    Destructure results to create a message
+    Destructure results to create a single notification
     """
-    message = "profile,operation,success,duration\n"
+    lines = []
     for result in results.values():
-        message += (
-            f"{result.profile},{result.operation},{result.success},{result.duration}\n"
-        )
-    return message
+        status = "✅" if result.success else "🟥"
+        status = "🟨" if result.duration == "skipped" else status
+        lines.append(f"{status} {result.operation} {result.profile} ({result.duration})")
+    notification = "\n".join(lines)
+    return notification
 
 
-def send_message(message: str, apprise_urls: list[str]) -> None:
+def send_notification(notification: str, apprise_url: str) -> None:
     """
-    Send the message to the different services using Apprise
+    Send the notification to the notification services using Apprise
     """
-    dispatcher = apprise.Apprise()
-    dispatcher.add(url for url in apprise_urls)
-    dispatcher.notify(
-        title="Rusticlone copleted",
-        body=message,
-    )
+    dispatcher = Apprise()
+    if not dispatcher.add(apprise_url):
+        print(f"Invalid Apprise URL: {apprise_url}")
+    else:
+        service = apprise_url.split('://')[0]
+        if not dispatcher.notify(
+            title="Rusticlone results:",
+            body=notification,
+        ):
+            print_stats("Notification not sent", f"{service}")
+            print(f"\n{notification}")
+        else:
+            print_stats("Notification sent", f"{service}")

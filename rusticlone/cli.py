@@ -48,8 +48,7 @@ def parse_args():
         "-a",
         "--apprise-url",
         type=str,
-        nargs="*",
-        help="Apprise URLs for notification",
+        help="Apprise URL for notification",
     )
     parser.add_argument(
         "-i",
