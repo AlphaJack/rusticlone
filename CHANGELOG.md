@@ -1,5 +1,26 @@
 # Changelog - toc
 
+## [1.4.0] - 2024-11-22
+### Added
+
+- Added support for environment variables
+- Improved apprise error messages
+- Added support for notifications via apprise
+
+### Documentation
+
+- Added notification documentation and screenshot
+- Added coverage badge
+
+### Tests
+
+- Renamed from 'make tests' to 'make test'
+
+### Various
+
+- Merge pull request #1 from AlphaJack/notifications
+- Apprise Notifications
+
 ## [1.3.0] - 2024-10-03
 ### Added
 
