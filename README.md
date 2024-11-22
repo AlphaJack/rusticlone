@@ -26,8 +26,10 @@
 
 # Rusticlone
 
+<div style='text-align: center;'>
 <img alt="PyPI Downloads" src="https://static.pepy.tech/badge/rusticlone">
 <img alt="Test Coverage" src="https://github.com/AlphaJack/rusticlone/raw/master/images/coverage.svg">
+</div>
 
 <p style='text-align: center;'>
 <strong>3-2-1 backups using Rustic and RClone</strong>
