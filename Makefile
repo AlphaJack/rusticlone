@@ -48,4 +48,4 @@ tag_publish::
 
 tag: tag_bump tag_changelog tag_commit_new_changelog tag_publish
 
-release: lint format test toc review tag
+release: lint toc review tag

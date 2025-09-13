@@ -26,6 +26,7 @@ version = "1.4.0"
 authors = [
   { name="AlphaJack" },
 ]
+license = "GPL-3.0-or-later"
 description = "3-2-1 backups using Rustic and RClone"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -34,7 +35,6 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
     "Topic :: System :: Archiving :: Backup",
     "Environment :: Console",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3"
 ]
