@@ -207,11 +207,7 @@ class Profile:
                 else:
                     self.sources_exist[source] = False
             if all(self.sources_exist.values()):
-                if len(self.sources) > 1:
-                    plural_form = "sources"
-                else:
-                    plural_form = "source"
-                action.stop(f"Found {len(self.sources)} {plural_form}")
+                self.sources_number = len(self.sources)
             else:
                 self.result = action.abort("Some sources do not exist")
 
@@ -359,7 +355,6 @@ class Profile:
                 self.result = action.abort("Could not retrieve stats")
             else:
                 clear_line(parallel=self.parallel)
-                self.sources_number = len(self.backup_output)
                 source_text = "sources" if self.sources_number > 1 else "source"
                 print_stats(
                     "Number of sources:",
