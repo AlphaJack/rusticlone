@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
-        if: ${{ env.ACTIONS_RUNTIME_TOKEN }}
+        if: ${{ env.ACT == '' }}
         with:
           name: coverage-reports
           path: /home/runner/rusticlone-tests/coverage/
