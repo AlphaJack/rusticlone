@@ -1,5 +1,12 @@
 # Changelog - toc
 
+## [1.5.0] - 2025-09-13
+### Added
+
+- Using forget and prune options from rustic config
+- Added support for rustic == 0.10
+- Exit on failure, add --version
+
 ## [1.4.0] - 2024-11-22
 ### Added
 
