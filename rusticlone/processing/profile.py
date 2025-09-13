@@ -57,6 +57,7 @@ class Profile:
         # json objects
         self.backup_output: list[dict[Any, Any]] = []
         self.sources: list[str] = []
+        self.sources_number = 0
         self.sources_exist: dict[str, bool] = {}
         self.sources_type: dict[str, str] = {}
         self.local_repo_exists = False
@@ -137,6 +138,17 @@ class Profile:
         except KeyError:
             return True
         return True
+
+    def parse_rustic_config_forget(self) -> bool:
+        """
+        Check if the Rustic config has any "keep-*" keys inside [forget] section
+        Returns True if any keep-* keys are found, False otherwise
+        """
+        try:
+            forget_section = self.config["forget"]
+            return any(key.startswith("keep-") for key in forget_section.keys())
+        except KeyError:
+            return False
 
     def check_rclone_config_exists(self) -> None:
         """
@@ -245,7 +257,6 @@ class Profile:
         if self.result:
             action = Action("Checking if remote repo exists", self.parallel)
             rclone_log_file = str(self.log_file)
-            # rclone_origin = remote_prefix + "/" + self.profile_name
             repo_name = str(Path(self.repo).name)
             rclone_origin = remote_prefix + "/" + repo_name
             rclone = Rclone(
@@ -279,6 +290,7 @@ class Profile:
                 rustic = Rustic(
                     self.profile_name,
                     "init",
+                    "--with-created",
                     "--set-treepack-size",
                     "50MB",
                     "--set-datapack-size",
@@ -347,17 +359,20 @@ class Profile:
                 self.result = action.abort("Could not retrieve stats")
             else:
                 clear_line(parallel=self.parallel)
-                # action.stop("Retrieved source stats")
+                self.sources_number = len(self.backup_output)
+                source_text = "sources" if self.sources_number > 1 else "source"
                 print_stats(
                     "Number of sources:",
-                    str(len(self.backup_output)),
+                    str(self.sources_number),
                     parallel=self.parallel,
                 )
                 print_stats(
-                    "Files in sources:", str(source_files), parallel=self.parallel
+                    f"Files in {source_text}:",
+                    str(source_files),
+                    parallel=self.parallel,
                 )
                 print_stats(
-                    "Size of sources:",
+                    f"Size of {source_text}:",
                     convert_size(source_size),
                     parallel=self.parallel,
                 )
@@ -406,22 +421,21 @@ class Profile:
 
     def forget(self) -> None:
         """
-        A method to perform the action of forgetting, with no parameters and returning None.
+        Mark snapshots for deletion and evenually prune them.
         """
         if self.result:
-            action = Action("Deprecating old snapshots", self.parallel)
-            Rustic(
-                self.profile_name,
-                "forget",
-                "--json",
-                "--keep-last",
-                "1",
-                "--fast-repack",
-                "--no-resize",
-                "--log-file",
-                str(self.log_file),
-            )
-            action.stop("Deprecated old snapshots")
+            if self.parse_rustic_config_forget():
+                action = Action("Deprecating old snapshots", self.parallel)
+                Rustic(
+                    self.profile_name,
+                    "forget",
+                    "--json",
+                    "--fast-repack",
+                    "--no-resize",
+                    "--log-file",
+                    str(self.log_file),
+                )
+                action.stop("Deprecated old snapshots")
 
     def upload(self, remote_prefix: str) -> None:
         """

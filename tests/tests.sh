@@ -48,6 +48,10 @@ password = "XXXXXX"
 [[backup.snapshots]]
 sources = ["$RUSTICLONE_TEST_DIR/source/docs"]
 
+[forget]
+prune = true
+keep-last = 1
+
 [global.env]
 RCLONE_CONFIG = "$RUSTIC_PROFILES_DIR/rclone-decrypted.conf"
 CONTENT
@@ -63,6 +67,9 @@ sources = ["$RUSTICLONE_TEST_DIR/source/pics"]
 
 [[backup.snapshots]]
 sources = ["$RUSTICLONE_TEST_DIR/source/photos"]
+
+[forget]
+keep-daily = 10
 
 [global.env]
 RCLONE_CONFIG = "$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
