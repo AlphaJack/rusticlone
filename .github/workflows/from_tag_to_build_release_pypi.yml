@@ -122,7 +122,7 @@ jobs:
           path: dist
 
       - name: Deploy package
-        uses: pypa/gh-action-pypi-publish@v1
+        uses: pypa/gh-action-pypi-publish@v1.13.0
 
 # ################ Deploy to AUR
 
@@ -136,7 +136,7 @@ jobs:
         run: sleep 10
 
       - name: Update PKGBUILD
-        uses: aksh1618/update-aur-package@v1
+        uses: aksh1618/update-aur-package@v1.0.5
         with:
           tag_version_prefix: v
           package_name: rusticlone
