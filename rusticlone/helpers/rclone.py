@@ -94,7 +94,7 @@ class Rclone:
             print("Error env: '" + str(self.env))
             print("Error args: '" + " ".join(self.command) + "'")
             print("Error status: ", exception.returncode)
-            print(f'Error stderr:\n{exception.stderr.decode("utf-8")}')
+            print(f"Error stderr:\n{exception.stderr.decode('utf-8')}")
             print("")
             self.returncode = 1
         else:
