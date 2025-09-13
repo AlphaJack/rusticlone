@@ -21,7 +21,7 @@ ci:
 	act --workflows ".github/workflows/test.yml"
 
 toc:
-	find * -type f ! -name 'CHANGELOG.md' -exec toc -f {} \;
+	find * -type f ! -name 'CHANGELOG.md' -exec toc -f {} \; 2>/dev/null
 
 review:
 	git status
@@ -38,9 +38,8 @@ tag_changelog:
 
 tag_commit_new_changelog:
 	git tag --delete v$(tag)
-	git add pyproject.toml || true
-	git add CHANGELOG.md || true
-	git commit -m "minor: updated CHANGELOG.md" || true
+	git add --all || true
+	git commit -m "minor: release $(tag)" || true
 	git tag -fa v$(tag) -m v$(tag)
 
 tag_publish::
