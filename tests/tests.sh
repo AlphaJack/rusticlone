@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env uv run bash
 
 # ┌───────────────────────────────────────────────────────────────┐
 # │ Contents of tests.sh                                          │
@@ -151,6 +151,15 @@ print_warning(){
  echo "[!!] WARNING: this script will destroy the contents of \"$RUSTIC_PROFILES_DIR\" and \"$RUSTICLONE_TEST_DIR\""
  echo "[!!] Required programs: bash, coreutils, python-coverage, rustic, rclone"
  sleep 5
+}
+
+check_dependencies(){
+  for dep in b2sum coverage python rustic rclone; do
+    if ! command -v "$dep" &> /dev/null; then
+      echo "[KO] $dep could not be found"
+      exit 1
+    fi
+  done
 }
 
 print_cleanup(){
@@ -390,8 +399,8 @@ check_coverage(){
 main(){
  # preparation
  check_workdir "$0"
- source ".venv/bin/activate" || exit 1
  print_warning
+ check_dependencies
  stopwatch_begin
  create_dirs
  create_confs
@@ -461,12 +470,14 @@ main(){
  rusticlone_restore_flags
  print_space
 
- # result
+ # further run
  check_source
  rusticlone_backup
  rusticlone_restore
  check_source
  print_space
+
+ # results
  create_coverage
  create_badge
  check_coverage

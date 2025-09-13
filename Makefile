@@ -7,19 +7,15 @@
 # and repeat the steps below
 
 install:
-	rm -rf .venv
-	python -m venv .venv
-	.venv/bin/pip install -e ".[dev]"
+	uv sync --all-groups
 
 lint:
-	mypy --check-untyped-defs --ignore-missing-imports .
+	ty check .
 	ruff check --fix .
-
-format:
 	ruff format .
 
 test:
-	bash tests/tests.sh
+	uv run bash tests/tests.sh
 
 toc:
 	find * -type f ! -name 'CHANGELOG.md' -exec toc -f {} \;
