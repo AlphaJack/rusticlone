@@ -1,0 +1,77 @@
+# ┌───────────────────────────────────────────────────────────────┐
+# │ Contents of from_commit_to_build_test.yml                     │
+# ├───────────────────────────────────────────────────────────────┘
+# │
+# ├──┐From commit
+# │  └── Build and test
+# │
+# └───────────────────────────────────────────────────────────────
+
+# ################################################################ From commit
+
+name: Run tests on pushed commits
+
+# Run on all branches except master
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+# ################################ Build and test
+
+  test:
+    name: Test package
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    env:
+      RUSTIC_VERSION: "0.10.0"
+    steps:
+
+      - name: Install Act dependencies
+        if: ${{ env.ACT }}
+        run: apt-get update && apt-get install sudo -y
+
+      - name: Access source code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install RClone
+        run: |
+          curl -sL https://rclone.org/install.sh | bash
+          which rclone
+          rclone --version
+
+      - name: Install rustic
+        run: |
+          curl -sL "https://github.com/rustic-rs/rustic/releases/download/v${RUSTIC_VERSION}/rustic-v${RUSTIC_VERSION}-x86_64-unknown-linux-musl.tar.gz" | 
+          sudo tar -xz -C /usr/bin --strip-components=0 rustic
+          which rustic
+          rustic --version
+
+      - name: Install package and python dependencies
+        run: uv sync --group full
+          
+      - name: Run tests
+        run: uv run bash tests/tests.sh
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: ${{ env.ACTIONS_RUNTIME_TOKEN }}
+        with:
+          name: coverage-reports
+          path: /root/rusticlone-tests/coverage/
+          retention-days: 30

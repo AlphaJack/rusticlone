@@ -90,7 +90,7 @@ sources = [
 
 [global.env]
 RCLONE_CONFIG = "$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
-RCLONE_PASSWORD_COMMAND = "/usr/bin/python -c \"print('YYYYYY')\""
+RCLONE_PASSWORD_COMMAND = "python -c \"print('YYYYYY')\""
 CONTENT
 
 mapfile -d '' profileCommonContent << CONTENT
