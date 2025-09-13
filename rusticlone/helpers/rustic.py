@@ -16,6 +16,9 @@ Launch Rustic binary with passed flags
 # typing
 from typing import Any
 
+# environment variables like $PATH
+from os import environ
+
 # launch binaries
 import subprocess
 
@@ -31,7 +34,9 @@ class Rustic:
             "env": {},
         }
         kwargs = default_kwargs | kwargs
-        self.env = kwargs["env"]
+        # Copy current environment and override with passed env variables
+        self.env = environ.copy()
+        self.env.update(kwargs["env"])
         self.flags = ["--no-progress"]
         self.command = [
             "rustic",

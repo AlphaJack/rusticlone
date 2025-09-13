@@ -17,6 +17,9 @@ lint:
 test:
 	uv run bash tests/tests.sh
 
+ci:
+	act --workflows ".github/workflows/test.yml"
+
 toc:
 	find * -type f ! -name 'CHANGELOG.md' -exec toc -f {} \;
 

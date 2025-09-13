@@ -12,6 +12,7 @@
 // │  │  │  ├── From the local Rustic repo
 // │  │  │  └── From the RClone remote
 // │  │  ├── Individual commands
+// │  │  ├── Push notifications
 // │  │  ├── Parallel processing
 // │  │  ├── Exclude profiles
 // │  │  ├── Custom log file
