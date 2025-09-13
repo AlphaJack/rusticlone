@@ -19,8 +19,11 @@ CLI script for Rusticlone
 # accept arguments
 import configargparse
 
+# exit on failure
+import sys
+
 # version
-# from importlib_metadata import version
+from importlib_metadata import version
 
 # rusticlone
 from rusticlone.helpers.custom import load_customizations
@@ -89,13 +92,13 @@ def parse_args():
         env_var="RCLONE_REMOTE",
         help="RClone remote and subdirectory",
     )
-    # parser.add_argument(
-    #    "-v",
-    #    "--version",
-    #    action="version",
-    #    version="%(prog)s " + version("rusticlone"),
-    #    help="Show the current version",
-    # )
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version="%(prog)s " + version("rusticlone"),
+        help="Show the current version",
+    )
     args = parser.parse_args()
     # https://stackoverflow.com/a/19414853/13448666
     if args.remote is None and args.command[0] in [
@@ -117,6 +120,8 @@ def main():
     args = parse_args()
     if check_rustic_version() and check_rclone_version():
         load_customizations(args)
+    else:
+        sys.exit(1)
 
 
 # ################################################################ ENTRY POINT
