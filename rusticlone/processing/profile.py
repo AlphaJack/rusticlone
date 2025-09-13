@@ -16,6 +16,9 @@ Define actions that can be run for each Rustic profile
 # types
 from typing import Any
 
+# default timezone
+from datetime import timezone
+
 # file locations, path concatenation
 from pathlib import Path
 
@@ -61,7 +64,7 @@ class Profile:
         self.result = True
         self.hostname = platform.node()
         self.config: dict[str, Any] = {}
-        self.latest_snapshot_timestamp = datetime.min
+        self.latest_snapshot_timestamp = datetime.min.replace(tzinfo=timezone.utc)
         # self.repo_info = ""
 
     def parse_rustic_config(self) -> None:
@@ -411,9 +414,10 @@ class Profile:
                 self.profile_name,
                 "forget",
                 "--json",
-                "--fast-repack",
                 "--keep-last",
                 "1",
+                "--fast-repack",
+                "--no-resize",
                 "--log-file",
                 str(self.log_file),
             )
@@ -489,38 +493,50 @@ class Profile:
         if self.result:
             action = Action("Retrieving latest snapshot", self.parallel)
             if self.local_repo_exists:
-                rustic = Rustic(
-                    self.profile_name,
-                    "snapshots",
-                    "latest",
-                    "--json",
-                    "--log-file",
-                    str(self.log_file),
-                )
-                json_output = json.loads(rustic.stdout)
-                if json_output is not None and len(json_output) > 0:
-                    # print(f"output: {json_output}"
-                    try:
-                        self.latest_snapshot_timestamp = datetime.fromisoformat(
-                            json_output[-1][1][0]["time"]
-                        )
-                    except ValueError:
-                        self.result = action.abort("Could not parse timestamp")
+                for source in self.sources:
+                    rustic = Rustic(
+                        self.profile_name,
+                        "snapshots",
+                        "latest",
+                        "--json",
+                        "--filter-paths",
+                        f"{source}",
+                        "--log-file",
+                        str(self.log_file),
+                    )
+                    json_output = json.loads(rustic.stdout)
+                    if json_output is not None and len(json_output) > 0:
+                        # print(f"output: {json_output}"
+                        try:
+                            this_snapshot_timestamp = datetime.fromisoformat(
+                                json_output[-1]["snapshots"][0]["time"]
+                            )
+                        except ValueError:
+                            self.result = action.abort("Could not parse timestamp")
+                        except KeyError:
+                            print(json.dumps(json_output, indent=1))
+                            self.result = action.abort("Invalid json output")
+                        else:
+                            if (
+                                not self.latest_snapshot_timestamp
+                                or this_snapshot_timestamp
+                                > self.latest_snapshot_timestamp
+                            ):
+                                self.latest_snapshot_timestamp = this_snapshot_timestamp
                     else:
-                        timestamp_pretty = self.latest_snapshot_timestamp.strftime(
-                            "%Y-%m-%d %H:%M:%S"
-                        )
-                        clear_line(parallel=self.parallel)
-                        # self.snapshot_exists = True
-                        print_stats(
-                            "Restoring from:",
-                            f"[{timestamp_pretty}]",
-                            19,
-                            21,
-                            parallel=self.parallel,
-                        )
-                else:
-                    self.result = action.abort("Repo does not have snapshots")
+                        self.result = action.abort("Repo does not have snapshots")
+                timestamp_pretty = self.latest_snapshot_timestamp.strftime(
+                    "%Y-%m-%d %H:%M:%S"
+                )
+                clear_line(parallel=self.parallel)
+                # self.snapshot_exists = True
+                print_stats(
+                    "Restoring from:",
+                    f"[{timestamp_pretty}]",
+                    19,
+                    21,
+                    parallel=self.parallel,
+                )
             else:
                 self.result = action.abort("Local repo does not exist")
 
