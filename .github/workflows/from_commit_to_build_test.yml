@@ -51,7 +51,7 @@ jobs:
 
       - name: Install RClone
         run: |
-          curl -sL https://rclone.org/install.sh | bash
+          curl -sL https://rclone.org/install.sh | sudo bash
           which rclone
           rclone --version
 
@@ -63,10 +63,10 @@ jobs:
           rustic --version
 
       - name: Install package and python dependencies
-        run: uv sync --group full
+        run: sudo uv sync --group full
           
       - name: Run tests
-        run: uv run bash tests/tests.sh
+        run: sudo uv run bash tests/tests.sh
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4

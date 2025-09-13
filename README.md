@@ -69,7 +69,7 @@ If it sounds interesting, keep reading!
 
 ## Installation
 
-Install [RClone](https://rclone.org/install/) >= 1.67, [Rustic](https://rustic.cli.rs/docs/installation.html) >= 0.8, [Python](https://www.python.org/downloads/) >= 3.11 and then `rusticlone`:
+Install [RClone](https://rclone.org/install/) >= 1.67, [Rustic](https://rustic.cli.rs/docs/installation.html) >= 0.10, [Python](https://www.python.org/downloads/) >= 3.11 and then `rusticlone`:
 
 ```bash
 pip install rusticlone
@@ -89,7 +89,7 @@ Include variables for the location (and password) of the RClone configuration:
 RCLONE_CONFIG = "/home/user/.config/rclone/rclone.conf"
 RCLONE_CONFIG_PASS = "XXXXXX"
 #escape double quotes inside TOML strings
-#RCLONE_PASSWORD_COMMAND = "/usr/bin/python -c \"print('YYYYYY')\""
+#RCLONE_PASSWORD_COMMAND = "python -c \"print('YYYYYY')\""
 ```
 
 ## Usage
