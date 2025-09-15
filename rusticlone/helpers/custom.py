@@ -76,6 +76,11 @@ class Custom:
                 Path.home() / "AppData/Roaming/rustic/config",
                 Path("C:/ProgramData/rustic/config"),
             ]
+        elif self.operating_system == "Darwin":
+            self.profiles_dirs = [
+                Path.home() / "Library/Application Support/rustic",
+                Path("/etc/rustic"),
+            ]
         else:
             self.profiles_dirs = [
                 Path.home() / ".config/rustic",
