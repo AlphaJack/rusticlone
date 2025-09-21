@@ -18,7 +18,7 @@ test:
 	uv run bash tests/tests.sh
 
 ci:
-	act --workflows ".github/workflows/test.yml"
+	act --workflows ".github/workflows/from_commit_to_build_test.yml"
 
 toc:
 	find * -type f ! -name 'CHANGELOG.md' -exec toc -f {} \; 2>/dev/null
