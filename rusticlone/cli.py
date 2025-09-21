@@ -58,9 +58,9 @@ def parse_args():
         "-i",
         "--ignore",
         type=str,
-        default="🫣🫣🫣",
-        env_var="IGNORE",
-        help="Ignore rustic profiles containing this pattern",
+        default="",
+        help="Deprecated argument, does nothing. Will be removed in a future release",
+        deprecated=True,
     )
     parser.add_argument(
         "-l",

@@ -242,20 +242,17 @@ keep-quarter-yearly = 4
 keep-yearly = 1
 ```
 
+As it doesn't contain a "\[repository]" section, it will not be treated as a standalone profile by Rusticlone.
+
 This "common.toml" profile can be referenced from our documents by adding to "Documents.toml" the following:
 
 ```toml
 [global]
 use-profile = ["common"]
+
+# [...]
 ```
 
-To exclude "common.toml" from Rusticlone (since it cannot be used alone), add the `--ignore` argument followed by "common":
-
-```bash
-rusticlone --ignore "common" -r "gdrive:/PC" backup
-```
-
-All the profiles containing "common" in their name will be excluded, but will still be sourced from other profiles when needed.
 
 ### Custom log file
 
@@ -296,10 +293,10 @@ Description=Rusticlone service
 
 [Service]
 Type=oneshot
-ExecStart=rusticlone --ignore "common" --remote "gdrive:/PC" backup
+ExecStart=rusticlone --remote "gdrive:/PC" backup
 ```
 
-Adjust your `--ignore` and `--remote` as needed.
+Adjust your `--remote` as needed.
 
 Apply your changes and enable the timer:
 
