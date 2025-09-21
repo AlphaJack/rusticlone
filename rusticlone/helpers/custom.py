@@ -26,8 +26,12 @@ import platform
 # exit
 import sys
 
+# toml parsing
+import tomllib
+
 # rusticlone
 from rusticlone.helpers.action import Action
+from rusticlone.helpers.rustic import Rustic
 from rusticlone.helpers.notification import notify_user
 from rusticlone.processing.parallel import (
     system_backup_parallel,
@@ -45,6 +49,7 @@ from rusticlone.processing.sequential import (
     system_download_sequential,
     system_extract_sequential,
 )
+from rusticlone.processing.profile import parse_repo, parse_sources
 
 # ################################################################ CLASSES
 
@@ -75,24 +80,25 @@ class Custom:
             self.profiles_dirs = [
                 Path.home() / "AppData/Roaming/rustic/config",
                 Path("C:/ProgramData/rustic/config"),
+                Path.cwd(),
             ]
         elif self.operating_system == "Darwin":
             self.profiles_dirs = [
                 Path.home() / "Library/Application Support/rustic",
                 Path("/etc/rustic"),
+                Path.cwd(),
             ]
         else:
             self.profiles_dirs = [
                 Path.home() / ".config/rustic",
                 Path("/etc/rustic"),
+                Path.cwd(),
             ]
         # remote prefix: rclone remote + subdirectory without trailing slash
         if args.remote is not None:
             self.remote_prefix = args.remote.rstrip("/")
         else:
             self.remote_prefix = "None:/"
-        # ignore pattern for profiles
-        self.ignore_pattern = args.ignore
         # test profile
         if args.profile:
             self.provided_profile = args.profile
@@ -141,15 +147,29 @@ class Custom:
 # ################################################################ FUNCTIONS
 
 
-def list_profiles(
-    profiles_dirs: list, provided_profile: str = "*", ignore_pattern: str = "🫣🫣🫣"
-) -> list:
+def has_needed_config_components(profile_path: Path) -> bool:
+    """
+    Check if a profile should be processed by running rustic show-config
+    """
+    try:
+        profile_name = profile_path.stem
+        rustic = Rustic(profile_name, "show-config")
+        config = tomllib.loads(rustic.stdout)
+        has_repo = parse_repo(config) is not None
+        has_sources = parse_sources(config) is not None
+        return has_repo and has_sources
+    except (AttributeError, tomllib.TOMLDecodeError, KeyError, IndexError):
+        return False
+
+
+def list_profiles(profiles_dirs: list, provided_profile: str = "*") -> list:
     """
     Scan profiles from directories if none have been provided explicitely
     Don't scan from /etc/rustic if ~/.config/rustic has some profiles'
     """
     action = Action("Reading profiles")
     profiles: list[str] = []
+    opened_files = 0
     if not provided_profile:
         provided_profile = "*"
     for profiles_dir in profiles_dirs:
@@ -157,10 +177,11 @@ def list_profiles(
             action.stop(f'Scanning "{profiles_dir}"', "")
             files = sorted(list(profiles_dir.glob(f"{provided_profile}.toml")))
             for file in files:
+                opened_files += 1
                 if (
                     file.is_file()
-                    and ignore_pattern not in file.stem
                     and file.stem not in profiles
+                    and has_needed_config_components(file)
                 ):
                     profiles.append(file.stem)
     # remove duplicates
@@ -169,9 +190,10 @@ def list_profiles(
         action.stop(f"Profiles: {str(profiles)}", "")
         return profiles
     else:
-        print(provided_profile)
-        print(provided_profile)
-        action.abort("Could not find any rustic profile")
+        print("")
+        print(f"Glob pattern: {provided_profile}")
+        print(f"Files tried: {opened_files}")
+        action.abort("Could not find any valid profile")
         sys.exit(1)
 
 
@@ -243,6 +265,7 @@ def process_profiles(
                 )
             case _:
                 print(f"Invalid command '{command}'")
+                sys.exit(1)
     if apprise_url and results:
         notify_user(results, apprise_url)
 
@@ -254,9 +277,7 @@ def load_customizations(args: Namespace):
     custom = Custom(args)
     custom.check_log_file()
     custom.check_profiles_dirs()
-    profiles = list_profiles(
-        custom.profiles_dirs, custom.provided_profile, custom.ignore_pattern
-    )
+    profiles = list_profiles(custom.profiles_dirs, custom.provided_profile)
     process_profiles(
         profiles,
         custom.parallel,
