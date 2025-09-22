@@ -80,20 +80,14 @@ class Custom:
             self.profiles_dirs = [
                 Path.home() / "AppData/Roaming/rustic/config",
                 Path("C:/ProgramData/rustic/config"),
-                Path.cwd(),
             ]
         elif self.operating_system == "Darwin":
             self.profiles_dirs = [
                 Path.home() / "Library/Application Support/rustic",
                 Path("/etc/rustic"),
-                Path.cwd(),
             ]
         else:
-            self.profiles_dirs = [
-                Path.home() / ".config/rustic",
-                Path("/etc/rustic"),
-                Path.cwd(),
-            ]
+            self.profiles_dirs = [Path.home() / ".config/rustic", Path("/etc/rustic")]
         # remote prefix: rclone remote + subdirectory without trailing slash
         if args.remote is not None:
             self.remote_prefix = args.remote.rstrip("/")

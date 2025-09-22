@@ -158,7 +158,7 @@ class Profile:
                     self.result = action.abort("Lockfile already exists")
                 else:
                     self.result = action.abort(
-                        f'Found another "{existing_operation}" lockfile'
+                        f"Found another {existing_operation} lockfile"
                     )
             else:
                 try:
