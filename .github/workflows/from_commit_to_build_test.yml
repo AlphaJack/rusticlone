@@ -79,5 +79,5 @@ jobs:
         if: ${{ env.ACT == '' }}
         with:
           name: coverage-reports
-          path: /home/runner/rusticlone-tests/coverage/
+          path: /home/runner/.cache/rusticlone-tests/coverage/
           retention-days: 30
