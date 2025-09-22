@@ -1,5 +1,18 @@
 # Changelog - toc
 
+## [1.6.0] - 2025-09-22
+### Added
+
+- Add auto ignore, add lockfile
+- Added rclone flags to speed up upload process
+- Added lockfile mechanism
+- Automatically ignoring invalid rustic profiles
+- Adding macos paths (#2)
+
+### Various
+
+- Merge pull request #3 from AlphaJack/auto-ignore
+
 ## [1.5.0] - 2025-09-13
 ### Added
 
@@ -100,6 +113,7 @@
 
 - Not parsing /etc/rustic if profiles were found in ~/.config/rustic
 
+## [1.0.0] - 2024-05-15
 ### Various
 
 - Initial commit
