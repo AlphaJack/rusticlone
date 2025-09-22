@@ -231,6 +231,10 @@ create_check_source(){
  find "$RUSTICLONE_TEST_DIR/source" -type f -exec b2sum {} \; > "$RUSTICLONE_TEST_DIR/check/source.txt"
 }
 
+wait_background(){
+ while wait -n; do : ; done;
+}
+
 # ################################ RUSTICLONE BACKUP
 # ################ SEQUENTIAL
 
@@ -273,6 +277,23 @@ rusticlone_archive_parallel(){
 rusticlone_upload_parallel(){
  echo "[OK] Uploading with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel upload
+}
+
+# ################ BACKGROUND
+
+rusticlone_backup_background(){
+ echo "[OK] Backing up with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel backup >/dev/null &
+}
+
+rusticlone_archive_background(){
+ echo "[OK] Archiving with Rusticlone in background"
+ coverage run --append --module rusticlone.cli archive >/dev/null &
+}
+
+rusticlone_upload_background(){
+ echo "[OK] Uploading with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" upload >/dev/null &
 }
 
 # ################################ DISASTER SIMULATION
@@ -383,6 +404,23 @@ rusticlone_extract_parallel(){
  coverage run --append --module rusticlone.cli --parallel extract
 }
 
+# ################ BACKGROUND
+
+rusticlone_restore_background(){
+ echo "[OK] Restoring with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel restore >/dev/null &
+}
+
+rusticlone_download_background(){
+ echo "[OK] Downloading with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" download >/dev/null &
+}
+
+rusticlone_extract_background(){
+ echo "[OK] Extracting with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --parallel extract >/dev/null &
+}
+
 # ################################ RESULT
 
 check_source(){
@@ -393,6 +431,7 @@ check_source(){
 create_coverage(){
  coverage html
  coverage xml
+ coverage report
  rm -rf "tests/coverage"
  mv "htmlcov" "$RUSTICLONE_TEST_DIR/coverage"
  mv "coverage.xml" "$RUSTICLONE_TEST_DIR/coverage"
@@ -403,8 +442,6 @@ create_badge(){
 }
 
 check_coverage(){
- cd "$RUSTICLONE_TEST_DIR/coverage"
- coverage report
  echo " "
  echo "[OK] Read the coverage report in detail by running:"
  echo " "
@@ -436,7 +473,16 @@ main(){
  destroy_remote1
  destroy_local2
  print_space
+ rusticlone_backup_background
+ rusticlone_backup_background
+ rusticlone_backup_parallel
+ rusticlone_upload_background
+ rusticlone_archive_background
+ rusticlone_upload_background
+ rusticlone_archive_background
  rusticlone_archive
+ rusticlone_backup_background
+ wait_background
  print_space
  destroy_cache
  print_space
@@ -459,20 +505,32 @@ main(){
  destroy_source1
  destroy_local2
  print_space
+ rusticlone_restore_background
  rusticlone_restore_parallel
+ wait_background
  print_space
  check_source
  destroy_local1
  destroy_source2
  print_space
+ rusticlone_restore_background
+ rusticlone_download_background
+ print_space
  rusticlone_download_parallel
+ rusticlone_archive_parallel
  rusticlone_extract
+ rusticlone_extract
+ wait_background
  print_space
  check_source
  destroy_cache
  print_space
  rusticlone_download
+ rusticlone_extract_background
  rusticlone_extract_parallel
+ rusticlone_extract_background
+ rusticlone_extract_parallel
+ wait_background
  print_space
  check_source
  print_space
@@ -480,7 +538,10 @@ main(){
  destroy_source1
  destroy_local2
  print_space
+ rusticlone_restore_background
+ print_space
  rusticlone_restore
+ wait_background
  print_space
  destroy_source2
  destroy_local1
