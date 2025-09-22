@@ -35,11 +35,14 @@ set -euo pipefail
 RUSTIC_PROFILES_DIR="$HOME/.config/rustic"
 
 # can be any folder
-RUSTICLONE_TEST_DIR="$HOME/rusticlone-tests"
+RUSTICLONE_TEST_DIR="$HOME/.cache/rusticlone-tests"
 
 # ################################ DERIVED
 
 mapfile -d '' profile1Content << CONTENT
+[global]
+use-profiles = ["common"]
+
 [repository]
 repository = "$RUSTICLONE_TEST_DIR/local/Documents"
 cache-dir = "$RUSTICLONE_TEST_DIR/cache"
@@ -111,7 +114,7 @@ RCLONE_ENCRYPT_V0:
 LDDUg4mDyUxDwMtntnCaiUN+o9SexiohA8Y74ZYJmPD9KD8UjVtH9XYCL+3A6OGR7msabjvu0Gj2W8JRande
 CONTENT
 
-GOOD_APPRISE_URL="dbus://"
+GOOD_APPRISE_URL="form://example.org"
 BAD_APPRISE_URL="moz://a"
 
 # ################################################################ FUNCTIONS
@@ -173,11 +176,15 @@ print_cleanup(){
  echo "[OK] Test completed, feel free to read test coverage and remove \"$RUSTIC_PROFILES_DIR\" and \"$RUSTICLONE_TEST_DIR\""
 }
 
-create_dirs(){
- echo "[OK] Creating directories"
+remove_profiles_dir(){
  if [[ -d "$RUSTIC_PROFILES_DIR" ]]; then
   rm -r "$RUSTIC_PROFILES_DIR"
  fi
+}
+
+create_dirs(){
+ echo "[OK] Creating directories"
+ remove_profiles_dir
  if [[ -d "$RUSTICLONE_TEST_DIR" ]]; then
   rm -r "$RUSTICLONE_TEST_DIR"
  fi
@@ -189,12 +196,13 @@ create_confs(){
  profile1Conf="$RUSTIC_PROFILES_DIR/Documents-test.toml"
  profile2Conf="$RUSTIC_PROFILES_DIR/Pictures-test.toml"
  profile3Conf="$RUSTIC_PROFILES_DIR/Passwords-test.toml"
+ profileCommonConf="$RUSTIC_PROFILES_DIR/common.toml"
  rcloneConfDecrypted="$RUSTIC_PROFILES_DIR/rclone-decrypted.conf"
  rcloneConfEncrypted="$RUSTIC_PROFILES_DIR/rclone-encrypted.conf"
  echo "${profile1Content[0]}" > "$profile1Conf"
  echo "${profile2Content[0]}" > "$profile2Conf"
  echo "${profile3Content[0]}" > "$profile3Conf"
- echo "${profileCommonContent[0]}" >> "$profile1Conf"
+ echo "${profileCommonContent[0]}" > "$profileCommonConf"
  echo "${profileCommonContent[0]}" >> "$profile2Conf"
  echo "${profileCommonContent[0]}" >> "$profile3Conf"
  echo "${rcloneConfContentDecrypted[0]}" > "$rcloneConfDecrypted"
@@ -218,9 +226,26 @@ create_files(){
  chmod 0600 "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
 }
 
+create_new_files(){
+ # 10MB each
+ echo "[OK] Creating files"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/docs/important2.pdf"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/docs/veryimportant2.pdf"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/docs/notsoimportant2.docx"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/screenshot2.png"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/opengraph2.webp"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/funny2.gif"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/photos/photo2.jpeg"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/photos/deeply/nested/memory2.avif"
+}
+
 create_check_source(){
  echo "[OK] Creating checksums for source files"
  find "$RUSTICLONE_TEST_DIR/source" -type f -exec b2sum {} \; > "$RUSTICLONE_TEST_DIR/check/source.txt"
+}
+
+wait_background(){
+ while wait -n; do : ; done;
 }
 
 # ################################ RUSTICLONE BACKUP
@@ -246,7 +271,7 @@ rusticlone_backup_flags(){
  logecho "[OK] Backing up from Rusticlone" "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" backup
  logecho "[OK] Backing up from Rusticlone"
- coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --ignore "common" backup
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" backup
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" -a "$BAD_APPRISE_URL" backup
 }
 
@@ -265,6 +290,23 @@ rusticlone_archive_parallel(){
 rusticlone_upload_parallel(){
  echo "[OK] Uploading with Rusticlone using parallel mode"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel upload
+}
+
+# ################ BACKGROUND
+
+rusticlone_backup_background(){
+ echo "[OK] Backing up with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel backup >/dev/null &
+}
+
+rusticlone_archive_background(){
+ echo "[OK] Archiving with Rusticlone in background"
+ coverage run --append --module rusticlone.cli archive >/dev/null &
+}
+
+rusticlone_upload_background(){
+ echo "[OK] Uploading with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" upload >/dev/null &
 }
 
 # ################################ DISASTER SIMULATION
@@ -344,7 +386,7 @@ rusticlone_restore_flags(){
  logecho "[OK] Restoring from Rusticlone" "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log"
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Documents-test" --log-file "$RUSTICLONE_TEST_DIR/logs/log-specified-in-args.log" restore
  logecho "[OK] Restoring from Rusticlone"
- coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" --ignore "common" restore
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Passwords-test" restore
  coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" -P "Pictures-test" restore
 }
 
@@ -375,6 +417,23 @@ rusticlone_extract_parallel(){
  coverage run --append --module rusticlone.cli --parallel extract
 }
 
+# ################ BACKGROUND
+
+rusticlone_restore_background(){
+ echo "[OK] Restoring with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" --parallel restore >/dev/null &
+}
+
+rusticlone_download_background(){
+ echo "[OK] Downloading with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --remote "gdrive:/$RUSTICLONE_TEST_DIR/remote" download >/dev/null &
+}
+
+rusticlone_extract_background(){
+ echo "[OK] Extracting with Rusticlone in background"
+ coverage run --append --module rusticlone.cli --parallel extract >/dev/null &
+}
+
 # ################################ RESULT
 
 check_source(){
@@ -385,6 +444,7 @@ check_source(){
 create_coverage(){
  coverage html
  coverage xml
+ coverage report
  rm -rf "tests/coverage"
  mv "htmlcov" "$RUSTICLONE_TEST_DIR/coverage"
  mv "coverage.xml" "$RUSTICLONE_TEST_DIR/coverage"
@@ -395,7 +455,8 @@ create_badge(){
 }
 
 check_coverage(){
- echo "[OK] Read the coverage report by running:"
+ echo " "
+ echo "[OK] Read the coverage report in detail by running:"
  echo " "
  echo "    firefox \"$RUSTICLONE_TEST_DIR/coverage/index.html\""
  echo " "
@@ -425,7 +486,16 @@ main(){
  destroy_remote1
  destroy_local2
  print_space
+ rusticlone_backup_background
+ rusticlone_backup_background
+ rusticlone_backup_parallel
+ rusticlone_upload_background
+ rusticlone_archive_background
+ rusticlone_upload_background
+ rusticlone_archive_background
  rusticlone_archive
+ rusticlone_backup_background
+ wait_background
  print_space
  destroy_cache
  print_space
@@ -448,20 +518,32 @@ main(){
  destroy_source1
  destroy_local2
  print_space
+ rusticlone_restore_background
  rusticlone_restore_parallel
+ wait_background
  print_space
  check_source
  destroy_local1
  destroy_source2
  print_space
+ rusticlone_restore_background
+ rusticlone_download_background
+ print_space
  rusticlone_download_parallel
+ rusticlone_archive_parallel
  rusticlone_extract
+ rusticlone_extract
+ wait_background
  print_space
  check_source
  destroy_cache
  print_space
  rusticlone_download
+ rusticlone_extract_background
  rusticlone_extract_parallel
+ rusticlone_extract_background
+ rusticlone_extract_parallel
+ wait_background
  print_space
  check_source
  print_space
@@ -469,7 +551,10 @@ main(){
  destroy_source1
  destroy_local2
  print_space
+ rusticlone_restore_background
+ print_space
  rusticlone_restore
+ wait_background
  print_space
  destroy_source2
  destroy_local1
@@ -479,12 +564,14 @@ main(){
 
  # further run
  check_source
+ create_new_files
  rusticlone_backup
  rusticlone_restore
  check_source
  print_space
 
  # results
+ remove_profiles_dir
  create_coverage
  create_badge
  check_coverage
