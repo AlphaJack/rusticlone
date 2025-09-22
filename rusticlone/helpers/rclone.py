@@ -48,6 +48,8 @@ class Rclone:
             "--drive-chunk-size=128M",
             "--drive-acknowledge-abuse",
             "--drive-stop-on-upload-limit",
+            "--no-update-modtime",
+            "--no-update-dir-modtime",
         ]
         default_kwargs: dict[str, Any] = {
             "env": {},
