@@ -226,6 +226,19 @@ create_files(){
  chmod 0600 "$RUSTICLONE_TEST_DIR/source/passwords.kdbx"
 }
 
+create_new_files(){
+ # 10MB each
+ echo "[OK] Creating files"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/docs/important2.pdf"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/docs/veryimportant2.pdf"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/docs/notsoimportant2.docx"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/screenshot2.png"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/opengraph2.webp"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/pics/funny2.gif"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/photos/photo2.jpeg"
+ head -c 10000000 /dev/urandom > "$RUSTICLONE_TEST_DIR/source/photos/deeply/nested/memory2.avif"
+}
+
 create_check_source(){
  echo "[OK] Creating checksums for source files"
  find "$RUSTICLONE_TEST_DIR/source" -type f -exec b2sum {} \; > "$RUSTICLONE_TEST_DIR/check/source.txt"
@@ -551,6 +564,7 @@ main(){
 
  # further run
  check_source
+ create_new_files
  rusticlone_backup
  rusticlone_restore
  check_source
