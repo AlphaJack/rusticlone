@@ -52,6 +52,7 @@ class Profile:
         self.profile_name = profile
         self.parallel = parallel
         self.repo = Path("")
+        self.lockfile = Path("rusticlone.lock")
         self.log_file = Path("rusticlone.log")
         self.env: dict[str, str] = {}
         self.does_forget = False
@@ -100,6 +101,7 @@ class Profile:
                     self.sources = parse_sources(self.config)
                 case "repo":
                     self.repo = parse_repo(self.config)
+                    self.lockfile = self.repo / "rusticlone.lock"
                 case "log":
                     self.log_file = parse_log(self.config)
                 case "env":
@@ -136,6 +138,46 @@ class Profile:
                     self.result = action.abort(
                         f"Rclone configuration file does not exist: {rclone_config_file}"
                     )
+
+    def create_lockfile(self, operation: str) -> None:
+        """
+        Add a lockfile to the repo containing the operation name.
+        If the lockfile already exists, abort and print its contents.
+        """
+        if self.result:
+            action = Action("Creating lockfile", self.parallel)
+            # Create repo directory if it doesn't exist (for new repos)
+            if not self.local_repo_exists:
+                self.repo.mkdir(parents=True, exist_ok=True)
+
+            if self.lockfile.exists():
+                try:
+                    with open(self.lockfile, "r") as f:
+                        existing_operation = f.read()
+                except Exception:
+                    self.result = action.abort("Lockfile already exists")
+                else:
+                    self.result = action.abort(
+                        f'Found another "{existing_operation}" lockfile'
+                    )
+            else:
+                try:
+                    with open(self.lockfile, "w") as f:
+                        f.write(operation)
+                except Exception:
+                    self.result = action.abort("Could not create lockfile")
+                else:
+                    action.stop("Created lockfile")
+
+    def delete_lockfile(self) -> None:
+        """
+        Delete the lockfile from the repo
+        """
+        if self.result:
+            action = Action("Deleting lockfile", self.parallel)
+            if self.lockfile.exists():
+                self.lockfile.unlink()
+                action.stop("Deleted lockfile")
 
     def set_log_file(self, passed_log_file: Path) -> None:
         """
@@ -437,9 +479,9 @@ class Profile:
                 if not self.local_repo_exists:
                     rclone_log_file = str(self.log_file)
                     # rclone_origin = remote_prefix + "/" + self.profile_name
-                    repo_name = self.repo.name
+                    repo_name = str(self.repo.name)
                     rclone_origin = remote_prefix + "/" + repo_name
-                    rclone_destination = self.repo
+                    rclone_destination = str(self.repo)
                     Rclone(
                         env=self.env,
                         log_file=rclone_log_file,
@@ -506,7 +548,7 @@ class Profile:
                 # self.snapshot_exists = True
                 print_stats(
                     "Restoring from:",
-                    f"[{timestamp_pretty}]",
+                    timestamp_pretty,
                     19,
                     21,
                     parallel=self.parallel,
