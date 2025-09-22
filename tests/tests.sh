@@ -11,7 +11,8 @@
 # │  ├── PREPARATION
 # │  ├──┐RUSTICLONE BACKUP
 # │  │  ├── SEQUENTIAL
-# │  │  └── PARALLEL
+# │  │  ├── PARALLEL
+# │  │  └── BACKGROUND
 # │  ├──┐DISASTER SIMULATION
 # │  │  ├── LOSING SOURCE FILES
 # │  │  ├── LOSING CACHE
@@ -19,7 +20,8 @@
 # │  │  └── LOSING REMOTE BACKUP
 # │  ├──┐RUSTICLONE RESTORE
 # │  │  ├── SEQUENTIAL
-# │  │  └── PARALLEL
+# │  │  ├── PARALLEL
+# │  │  └── BACKGROUND
 # │  ├── RESULT
 # │  └── MAIN
 # ├── COMMANDS
