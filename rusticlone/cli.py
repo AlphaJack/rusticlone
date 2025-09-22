@@ -60,7 +60,6 @@ def parse_args():
         type=str,
         default="",
         help="Deprecated argument, does nothing. Will be removed in a future release",
-        deprecated=True,
     )
     parser.add_argument(
         "-l",
