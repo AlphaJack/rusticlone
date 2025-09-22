@@ -3,5 +3,5 @@ Description=Rusticlone Backup - service
 
 [Service]
 Type=oneshot
-# replace the remote and ignore pattern
-ExecStart=rusticlone --remote "gdrive:/PC" --ignore "common" backup
+# replace the remote
+ExecStart=rusticlone --remote "gdrive:/PC" backup

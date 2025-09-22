@@ -8,6 +8,7 @@ Define actions that can be run for each Rustic profile
 # │
 # ├── IMPORTS
 # ├── CLASSES
+# ├── FUNCTIONS
 # │
 # └───────────────────────────────────────────────────────────────
 
@@ -50,16 +51,18 @@ class Profile:
         """
         self.profile_name = profile
         self.parallel = parallel
-        self.repo = ""
+        self.repo = Path("")
+        self.lockfile = Path("rusticlone.lock")
         self.log_file = Path("rusticlone.log")
         self.env: dict[str, str] = {}
+        self.does_forget = False
         self.password_provided = ""
         # json objects
         self.backup_output: list[dict[Any, Any]] = []
-        self.sources: list[str] = []
+        self.sources: list[Path] = []
         self.sources_number = 0
-        self.sources_exist: dict[str, bool] = {}
-        self.sources_type: dict[str, str] = {}
+        self.sources_exist: dict[Path, bool] = {}
+        self.sources_type: dict[Path, str] = {}
         self.local_repo_exists = False
         self.snapshot_exists = False
         self.result = True
@@ -80,75 +83,40 @@ class Profile:
             except (AttributeError, tomllib.TOMLDecodeError):
                 self.result = action.abort("Could not parse rustic configuration")
             else:
-                self.result = self.parse_rustic_config_source(action)
-                self.result = self.parse_rustic_config_repo(action)
-                self.result = self.parse_rustic_config_log(action)
-                self.result = self.parse_rustic_config_env(action)
+                self.result = self.parse_rustic_config_component(action, "sources")
+                self.result = self.parse_rustic_config_component(action, "repo")
+                self.result = self.parse_rustic_config_component(action, "log")
+                self.result = self.parse_rustic_config_component(action, "env")
+                self.result = self.parse_rustic_config_component(action, "forget")
                 if self.result:
                     action.stop("Parsed rustic configuration")
 
-    def parse_rustic_config_source(self, action) -> bool:
+    def parse_rustic_config_component(self, action, component: str) -> bool:
         """
-        Read sources from Rustic profile configuration
+        Store values and return True if successful
         """
         try:
-            # self.source = self.config["backup"]["sources"][0]["source"]
-            # they can be either string or list of strings:
-            # https://github.com/rustic-rs/rustic/blob/a88afdd4af295c16e5de50de91ec430920f81f56/config/full.toml
-            config_sources = [
-                section["sources"] for section in self.config["backup"]["snapshots"]
-            ]
-            for config_source in config_sources:
-                if config_source and isinstance(config_source, list):
-                    self.sources.extend(config_source)
-                elif config_source:
-                    self.sources.append(config_source)
-            # remove eventual duplicates
-            self.sources = list(set(self.sources))
+            match component:
+                case "sources":
+                    self.sources = parse_sources(self.config)
+                case "repo":
+                    self.repo = parse_repo(self.config)
+                    self.lockfile = self.repo / "rusticlone.lock"
+                case "log":
+                    self.log_file = parse_log(self.config)
+                case "env":
+                    self.env = parse_env(self.config)
+                case "forget":
+                    self.does_forget = parse_forget(self.config)
         except KeyError:
-            return action.abort("Could not parse source in config:\n", self.config)
+            match component:
+                case "env":
+                    pass
+                case _:
+                    action.abort(
+                        f"Could not parse {component} in config:\n", str(self.config)
+                    )
         return True
-
-    def parse_rustic_config_repo(self, action) -> bool:
-        """
-        Read repo from Rustic profile configuration
-        """
-        try:
-            self.repo = self.config["repository"]["repository"]
-        except KeyError:
-            return action.abort("Could not parse repo in config:\n", self.config)
-        return True
-
-    def parse_rustic_config_log(self, action) -> bool:
-        """
-        Read log file from Rustic profile configuration
-        """
-        try:
-            self.log_file = Path(self.config["global"]["log-file"])
-        except KeyError:
-            return action.abort(f'Invalid log file: "{str(self.log_file)}"')
-        return True
-
-    def parse_rustic_config_env(self, action) -> bool:
-        """
-        Read environment variables for Rustic and Rclone
-        """
-        try:
-            self.env = self.config["global"]["env"]
-        except KeyError:
-            return True
-        return True
-
-    def parse_rustic_config_forget(self) -> bool:
-        """
-        Check if the Rustic config has any "keep-*" keys inside [forget] section
-        Returns True if any keep-* keys are found, False otherwise
-        """
-        try:
-            forget_section = self.config["forget"]
-            return any(key.startswith("keep-") for key in forget_section.keys())
-        except KeyError:
-            return False
 
     def check_rclone_config_exists(self) -> None:
         """
@@ -170,6 +138,46 @@ class Profile:
                     self.result = action.abort(
                         f"Rclone configuration file does not exist: {rclone_config_file}"
                     )
+
+    def create_lockfile(self, operation: str) -> None:
+        """
+        Add a lockfile to the repo containing the operation name.
+        If the lockfile already exists, abort and print its contents.
+        """
+        if self.result:
+            action = Action("Creating lockfile", self.parallel)
+            # Create repo directory if it doesn't exist (for new repos)
+            if not self.local_repo_exists:
+                self.repo.mkdir(parents=True, exist_ok=True)
+
+            if self.lockfile.exists():
+                try:
+                    with open(self.lockfile, "r") as f:
+                        existing_operation = f.read()
+                except Exception:
+                    self.result = action.abort("Lockfile already exists")
+                else:
+                    self.result = action.abort(
+                        f"Found another {existing_operation} lockfile"
+                    )
+            else:
+                try:
+                    with open(self.lockfile, "w") as f:
+                        f.write(operation)
+                except Exception:
+                    self.result = action.abort("Could not create lockfile")
+                else:
+                    action.stop("Created lockfile")
+
+    def delete_lockfile(self) -> None:
+        """
+        Delete the lockfile from the repo
+        """
+        if self.result:
+            action = Action("Deleting lockfile", self.parallel)
+            if self.lockfile.exists():
+                self.lockfile.unlink()
+                action.stop("Deleted lockfile")
 
     def set_log_file(self, passed_log_file: Path) -> None:
         """
@@ -201,13 +209,13 @@ class Profile:
             action = Action("Checking if sources exists", self.parallel)
             # print(self.source)
             for source in self.sources:
-                source_path = Path(source)
-                if source_path.exists():
+                if source.exists():
                     self.sources_exist[source] = True
                 else:
                     self.sources_exist[source] = False
             if all(self.sources_exist.values()):
                 self.sources_number = len(self.sources)
+                action.stop("All sources exist")
             else:
                 self.result = action.abort("Some sources do not exist")
 
@@ -227,8 +235,7 @@ class Profile:
         """
         if self.result:
             action = Action("Checking if local repo exists", self.parallel)
-            # self.repo_type = "local"
-            repo_config_file = Path(self.repo) / "config"
+            repo_config_file = self.repo / "config"
             if repo_config_file.exists() and repo_config_file.is_file():
                 self.local_repo_exists = True
                 action.stop("Local repo already exists")
@@ -253,7 +260,7 @@ class Profile:
         if self.result:
             action = Action("Checking if remote repo exists", self.parallel)
             rclone_log_file = str(self.log_file)
-            repo_name = str(Path(self.repo).name)
+            repo_name = str(self.repo.name)
             rclone_origin = remote_prefix + "/" + repo_name
             rclone = Rclone(
                 env=self.env,
@@ -419,7 +426,7 @@ class Profile:
         Mark snapshots for deletion and evenually prune them.
         """
         if self.result:
-            if self.parse_rustic_config_forget():
+            if self.does_forget:
                 action = Action("Deprecating old snapshots", self.parallel)
                 Rustic(
                     self.profile_name,
@@ -439,9 +446,9 @@ class Profile:
         if self.result:
             action = Action("Uploading repo", self.parallel)
             rclone_log_file = str(self.log_file)
-            rclone_origin = self.repo.replace("\\", "/").replace("//", "/")
+            rclone_origin = str(self.repo).replace("\\", "/").replace("//", "/")
             # rclone_destination = remote_prefix + "/" + self.profile_name
-            repo_name = str(Path(self.repo).name)
+            repo_name = str(self.repo.name)
             rclone_destination = remote_prefix + "/" + repo_name
             # print(rclone_destination)
             rclone = Rclone(
@@ -467,14 +474,14 @@ class Profile:
         Uploads the remote repository to a local destination using rclone.
         """
         if self.result:
-            if not self.repo.startswith("rclone:"):
+            if not str(self.repo).startswith("rclone:"):
                 action = Action("Downloading repo", self.parallel)
                 if not self.local_repo_exists:
                     rclone_log_file = str(self.log_file)
                     # rclone_origin = remote_prefix + "/" + self.profile_name
-                    repo_name = str(Path(self.repo).name)
+                    repo_name = str(self.repo.name)
                     rclone_origin = remote_prefix + "/" + repo_name
-                    rclone_destination = self.repo
+                    rclone_destination = str(self.repo)
                     Rclone(
                         env=self.env,
                         log_file=rclone_log_file,
@@ -535,13 +542,13 @@ class Profile:
                     else:
                         self.result = action.abort("Repo does not have snapshots")
                 timestamp_pretty = self.latest_snapshot_timestamp.strftime(
-                    "%Y-%m-%d %H:%M:%S"
+                    "%Y-%m-%d %H:%M"
                 )
                 clear_line(parallel=self.parallel)
                 # self.snapshot_exists = True
                 print_stats(
                     "Restoring from:",
-                    f"[{timestamp_pretty}]",
+                    timestamp_pretty,
                     19,
                     21,
                     parallel=self.parallel,
@@ -612,3 +619,52 @@ class Profile:
                     if rustic.returncode != 0:
                         self.result = action.abort(f"Error extracting '{source}'")
             action.stop("Snapshot extracted")
+
+
+# ################################################################ FUNCTIONS
+
+
+def parse_repo(config: dict[str, Any]) -> Path:
+    """
+    Extract repository folder from Rustic profile configuration
+    """
+    return Path(config["repository"]["repository"])
+
+
+def parse_sources(config: dict[str, Any]) -> list[Path]:
+    """
+    Extract list of sources from Rustic profile configuration
+    """
+    sources: list[str] = []
+    raw_sources = [snapshot["sources"] for snapshot in config["backup"]["snapshots"]]
+    # raw_sources can be either lists or strings
+    for source in raw_sources:
+        if source and isinstance(source, list):
+            sources.extend(source)
+        else:
+            sources.append(source)
+    # remove eventual duplicates and convert to Path
+    unique_sources = list(set({Path(source) for source in sources}))
+    return unique_sources
+
+
+def parse_log(config: dict[str, Any]) -> Path:
+    """
+    Extract log file location from Rustic profile configuration
+    """
+    return Path(config["global"]["log-file"])
+
+
+def parse_env(config: dict[str, Any]) -> dict[str, Any]:
+    """
+    Extract environment variables from Rustic profile configuration
+    """
+    return config["global"]["env"]
+
+
+def parse_forget(config: dict[str, Any]) -> bool:
+    """
+    Check if the Rustic config has any "keep-*" keys inside [forget] section
+    Returns True if any keep-* keys are found, False otherwise
+    """
+    return any(key.startswith("keep-") for key in config["forget"].keys())
