@@ -35,7 +35,7 @@ set -euo pipefail
 RUSTIC_PROFILES_DIR="$HOME/.config/rustic"
 
 # can be any folder
-RUSTICLONE_TEST_DIR="$HOME/.rusticlone-tests"
+RUSTICLONE_TEST_DIR="$HOME/.cache/rusticlone-tests"
 
 # ################################ DERIVED
 
