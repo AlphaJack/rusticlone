@@ -610,7 +610,7 @@ class Profile:
                         self.profile_name,
                         "restore",
                         f"latest:{source}",
-                        source,
+                        f"{source}",
                         "--filter-paths",
                         f"{source}",
                         "--log-file",
