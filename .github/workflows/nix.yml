@@ -2,7 +2,7 @@ name: Nix
 
 # Opens a pull request that updates flake.lock when its nixpkgs has a rustic older than the one Cargo.toml pins,
 # which packaging/nix/package.nix refuses.
-# requirements: the app of release-plz.yml, whose pull requests start CI
+# requirements: the RELEASE_PLZ_TOKEN of release-plz.yml, whose pull requests start CI
 
 on:
   workflow_call:
@@ -22,15 +22,6 @@ jobs:
     permissions:
       contents: read
     steps:
-
-      - name: Create app token
-        id: token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
 
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
@@ -62,7 +53,7 @@ jobs:
         if: steps.locked.outputs.stale == 'true'
         uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
-          token: ${{ steps.token.outputs.token }}
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
           branch: nix-flake-lock
           delete-branch: true
           add-paths: flake.lock
