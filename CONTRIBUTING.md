@@ -9,11 +9,9 @@ The README is the only public document for now, so it has to be a complete guide
 ## Setup
 
 ```sh
-cargo install --locked cargo-nextest # runs the tests with a timeout for tests that hang
-cargo install cargo-insta            # reviews recorded fixtures (cargo insta review)
-rustup component add rust-analyzer   # needed by cargo xtask acyclic
-cargo install cargo-binstall         # the integration tests run the rustic pinned in Cargo.toml
-cargo binstall rustic-rs
+cargo install cargo-binstall
+rustup component add rust-analyzer # needed by cargo xtask acyclic
+cargo binstall cargo-nextest cargo-insta rustic-rs cargo-deny
 ```
 
 Or open the repository in its dev container (`.devcontainer`), which sets all of this up on Linux.
@@ -116,14 +114,21 @@ cargo nextest run --test integration restore::  # one file of integration tests
 cargo nextest run restores_a                    # tests by name
 ```
 
-Run these checks before pushing:
+Run the checks of [ci.yml](.github/workflows/ci.yml) before pushing:
 
 ```sh
-cargo nextest run --workspace     # a test that hangs fails, after the time in .config/nextest.toml
-cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt --all
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+cargo doc --workspace --no-deps --all-features --document-private-items
+cargo xtask acyclic
+cargo nextest run --workspace     # a test that hangs fails, after the time in .config/nextest.toml
 cargo xtask vendor --check
+cargo xtask logo --check
+cargo deny check
 ```
+
+CI also runs the tests on Linux and macOS, verifies the systemd units with `systemd-analyze`, and runs clippy on Windows. Tests for another system do not compile on yours, so the dev container covers Linux.
 
 ## Pull requests
 

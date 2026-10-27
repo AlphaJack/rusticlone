@@ -115,7 +115,7 @@ jobs:
       - name: Check the systemd units, as the system's and a user's
         if: runner.os == 'Linux'
         run: |
-          export PATH="$PWD/target/debug:$PATH"
+          sudo ln -s "$PWD/target/debug/rusticlone" /usr/local/bin/
           for unit in packaging/linux/*.service; do
             systemd-analyze verify "$unit"
             systemd-analyze --user verify "$unit"

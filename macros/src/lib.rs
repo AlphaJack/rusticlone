@@ -298,7 +298,7 @@ fn mistakes(path: &Path, english: &Catalog) -> Vec<String> {
 }
 
 /// `struct Catalogs`, the embedded catalogs, and `const FALLBACK`, the language every message is in. Fails on
-/// each translation's [`mistakes`].
+/// each translation's `mistakes`.
 #[proc_macro]
 pub fn catalogs(_: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let english = match CATALOG.as_ref() {

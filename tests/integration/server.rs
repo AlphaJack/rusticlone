@@ -640,7 +640,9 @@ fn install_enables_a_user_service() {
     sb.run_with(&["install"], &[("PATH", &path)]).assert_exit(0);
     let dir = sb.path("config/systemd/user");
     let (unit, drop_in) = (dir.join(format!("{NAME}.service")), dir.join(format!("{NAME}.service.d/install.conf")));
-    assert_eq!(fs::read_to_string(&unit).unwrap(), include_str!("../../packaging/linux/rusticlone.service"));
+    // The packaged unit, below the line that says what generates it.
+    let packaged = include_str!("../../packaging/linux/rusticlone.service").split_once('\n').map(|(_, unit)| unit);
+    assert_eq!(Some(fs::read_to_string(&unit).unwrap().as_str()), packaged);
     let conf = fs::read_to_string(&drop_in).unwrap();
     assert!(conf.contains(&format!("{NAME}\" serve\n")) && conf.contains(&format!("PATH={path}\"")), "{conf}");
     let calls = fs::read_to_string(&log).unwrap();
