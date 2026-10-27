@@ -1,8 +1,11 @@
 [package]
 name = "rusticlone-macros"
-version = "0.0.0"
-edition = "2024"
-publish = false
+description = "Compile-time checked translations for rusticlone"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [package.metadata.dist]
 dist = false
