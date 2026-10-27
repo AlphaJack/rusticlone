@@ -4,6 +4,8 @@ git_tag_enable = false
 git_release_enable = false
 changelog_update = false
 semver_check = false
+# crates.yml publishes once dist has built every target.
+publish = false
 # Chores and docs alone open no release PR.
 release_commits = "^(feat|fix|perf)"
 # Without a scope, which pr-title.yml would reject.
