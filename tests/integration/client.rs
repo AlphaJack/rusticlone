@@ -88,13 +88,14 @@ impl Server {
     pub(crate) fn request(&self, method: &str, path: &str, headers: &[&str], body: &str) -> Response {
         let mut stream = TcpStream::connect(&self.addr).unwrap();
         let headers: String = headers.iter().map(|h| format!("{h}\r\n")).collect();
-        write!(
-            stream,
+        // In one write: a server that rejects the headers closes before reading a body sent apart, and the
+        // unread body makes the system reset the connection, losing the response.
+        let request = format!(
             "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nContent-Length: {}\r\n{headers}\r\n{body}",
             self.addr,
             body.len()
-        )
-        .unwrap();
+        );
+        stream.write_all(request.as_bytes()).unwrap();
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).unwrap();
         // Downloads may be binary.
