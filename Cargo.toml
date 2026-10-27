@@ -3,12 +3,13 @@ name = "rusticlone"
 description = "3-2-1-1-0 backups using rustic profiles"
 # Also what desktop search matches: build.rs hands them to the code.
 keywords = ["backup", "restore", "snapshot"]
-version = "2.0.0"
-publish = false
-edition = "2024"
-rust-version = "1.95"
-license = "AGPL-3.0-or-later"
-repository = "https://github.com/AlphaJack/rusticlone"
+categories = ["command-line-utilities"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude = [".*", "flake.*", "packaging", "screenshots", "xtask"]
 
 [features]
 default = ["desktop", "self-update"]
@@ -121,7 +122,7 @@ fluent = "0.17.0"
 fluent-langneg = { version = "0.13.1", optional = true }
 # The languages that macOS's and Windows's settings list, when no LANG or LC_* variable asks for one.
 sys-locale = "0.3.2"
-rusticlone-macros = { path = "macros" }
+rusticlone-macros = { path = "macros", version = "2.0.0" }
 # The catalogs, in debug builds too, which run on other computers than the one that builds them.
 rust-embed = { version = "8.13.0", features = ["debug-embed"] }
 
@@ -204,6 +205,13 @@ dist = true
 
 [workspace]
 members = ["macros", "xtask"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/AlphaJack/rusticlone"
 
 [profile.release]
 lto = "thin"
