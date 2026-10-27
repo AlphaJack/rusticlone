@@ -6,6 +6,8 @@ changelog_update = false
 semver_check = false
 # Chores and docs alone open no release PR.
 release_commits = "^(feat|fix|perf)"
+# Without a scope, which pr-title.yml would reject.
+pr_name = "chore: release v{{ version }}"
 
 [[package]]
 name = "rusticlone"
@@ -26,10 +28,6 @@ git_release_body = """
 {% endfor %}
 {%- endif %}
 """
-
-[[package]]
-name = "xtask"
-release = false
 
 [changelog]
 body = """
