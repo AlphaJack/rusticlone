@@ -2,9 +2,9 @@
 [Desktop Entry]
 Type=Application
 Name=Rusticlone
-Comment=3-2-1-1-0 backups using rustic profiles
+Comment=Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications
 Exec="rusticlone" serve --open
 Icon=rusticlone
 Terminal=false
 Categories=Utility;Archiving;
-Keywords=backup;restore;snapshot;
+Keywords=backup;restore;snapshot;rustic;restic;

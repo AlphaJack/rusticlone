@@ -30,7 +30,7 @@ FROM alpine:latest
 ARG NAME
 ARG VERSION
 LABEL org.opencontainers.image.title="${NAME}" \
-      org.opencontainers.image.description="3-2-1-1-0 backups using rustic profiles" \
+      org.opencontainers.image.description="Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
       org.opencontainers.image.version="${VERSION}"
 RUN apk add --no-cache ca-certificates tzdata rclone openssh-client

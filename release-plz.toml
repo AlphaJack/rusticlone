@@ -1,10 +1,11 @@
 [workspace]
-git_only = true
 git_tag_name = "v{{ version }}"
 git_tag_enable = false
 git_release_enable = false
 changelog_update = false
 semver_check = false
+# Chores and docs alone open no release PR.
+release_commits = "^(feat|fix|perf)"
 
 [[package]]
 name = "rusticlone"

@@ -7,7 +7,7 @@ pkgname=$_name-bin
 # Set by .github/workflows/aur.yml at each release.
 pkgver=0
 pkgrel=1
-pkgdesc="3-2-1-1-0 backups using rustic profiles"
+pkgdesc="Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications"
 arch=('x86_64' 'aarch64' 'armv7h')
 url="https://github.com/AlphaJack/rusticlone"
 license=('AGPL-3.0-or-later')

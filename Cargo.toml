@@ -1,18 +1,17 @@
 [package]
 name = "rusticlone"
-description = "3-2-1-1-0 backups using rustic profiles"
-# Also what desktop search matches: build.rs hands them to the code.
-keywords = ["backup", "restore", "snapshot"]
-version = "2.0.0"
-publish = false
-edition = "2024"
-rust-version = "1.95"
-license = "AGPL-3.0-or-later"
-repository = "https://github.com/AlphaJack/rusticlone"
+description = "Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications"
+keywords = ["backup", "restore", "snapshot", "rustic", "restic"]
+categories = ["command-line-utilities"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+exclude = [".*", "flake.*", "packaging", "screenshots", "xtask"]
 
 [features]
 default = ["desktop", "self-update"]
-# The scheduler and the web UI.
 server = [
     "dep:askama",
     "dep:axum",
@@ -26,8 +25,7 @@ server = [
     "dep:fluent-langneg",
     "dep:tokio-util",
 ]
-# What a computer with a user needs, and a container does not: the tray icon and starting the server at
-# login.
+
 desktop = [
     "server",
     "dep:tray-icon",
@@ -43,7 +41,7 @@ desktop = [
     "dep:zbus",
     "dep:winresource",
 ]
-# Downloading rusticlone's and rustic's releases: `update`, `--auto-update`, and rustic when it is missing.
+
 self-update = [
     "dep:flate2",
     "dep:minisign-verify",
@@ -87,8 +85,7 @@ mercurio = { version = "0.2.4", default-features = false, features = [
     "service-xml",
 ] }
 redb = { version = "4.4.0", features = ["experimental-multiprocess"] }
-# kqueue on macOS: FSEvents reports another process's writes to the state late or not at all, so a
-# cancelled run kept waiting.
+# kqueue on macOS: FSEvents reports another process's writes to the state late or not at all, so a cancelled run kept waiting.
 notify = { version = "8.2.0", default-features = false, features = ["macos_kqueue"] }
 parking_lot = "0.12.5"
 quick_cache = { version = "0.7.0", optional = true }
@@ -114,14 +111,13 @@ self-replace = { version = "1.5.0", optional = true }
 ring = "0.17.14"
 # GitHub's build attestations of rusticlone's releases.
 sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
-# Text for users, in the language the user prefers: i18n/<language>/rusticlone.ftl.
 i18n-embed = { version = "0.16.0", features = ["fluent-system"] }
 fluent = "0.17.0"
 # Picks a page's language from its Accept-Language header.
 fluent-langneg = { version = "0.13.1", optional = true }
 # The languages that macOS's and Windows's settings list, when no LANG or LC_* variable asks for one.
 sys-locale = "0.3.2"
-rusticlone-macros = { path = "macros" }
+rusticlone-macros = { path = "macros", version = "2.0.0" }
 # The catalogs, in debug builds too, which run on other computers than the one that builds them.
 rust-embed = { version = "8.13.0", features = ["debug-embed"] }
 
@@ -204,6 +200,13 @@ dist = true
 
 [workspace]
 members = ["macros", "xtask"]
+
+[workspace.package]
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/AlphaJack/rusticlone"
 
 [profile.release]
 lto = "thin"
