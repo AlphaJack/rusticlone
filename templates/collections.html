@@ -1,0 +1,34 @@
+{% import "macros.html" as m %}
+{% macro collection(collection) %}{{ m::collection_dot(collection) }}{% if collection.configured %}<a class="strong" href="{{ ("base"|value::<String>)? }}{{ Route::Collection(collection.name) }}">{{ collection.title }}</a>{% else %}<span class="strong">{{ collection.title }}</span>{% endif %}{% endmacro %}
+<div class="card-head">
+  <div><h1>{{ Heading::Collections }}</h1></div>
+  {% if overview.actions %}
+  <div class="actions">
+    <button class="btn primary" {{ m::run(base, Route::Runs, "backup") }}>{{ m::icon("backup") }}{{ Button::BackUpAll }}</button>
+    <button class="btn" {{ m::run(base, Route::Runs, "check") }}>{{ m::icon("check") }}{{ Button::CheckAll }}</button>
+    <button class="btn" {{ m::run(base, Route::Runs, "prune") }}>{{ m::icon("prune") }}{{ Button::PruneAll }}</button>
+    <button class="btn" hx-post="{{ base }}{{ Route::Refresh }}">{{ m::icon("refresh") }}{{ Button::RefreshAll }}</button>
+  </div>
+  {% endif %}
+</div>
+<div class="table-wrap"><table class="table" data-sort="collections">
+  <thead><tr><th>{{ Heading::Collection }}</th><th>{{ Heading::Repositories }}</th><th>{{ Heading::BackedUp }}</th><th class="wide">{{ Heading::Checked }}</th><th class="wide">{{ Heading::Pruned }}</th></tr></thead>
+  {% for collection in overview.collections %}
+  <tbody class="group">
+  {% for repo in collection.repos %}
+  <tr>
+    {% if loop.first %}<td class="nowrap" rowspan="{{ collection.repos.len() }}">{% call collection(collection) %}{% endcall %}</td>{% endif %}
+    <td class="nowrap">{{ m::place(repo.remote, repo.location) }}{% if repo.exists %}<a class="tag" href="{{ base }}{{ Route::Repo(collection.name, repo.name) }}" title="{{ repo.status }}">{{ m::dot(repo.class, repo.status) }}{{ repo.name }}</a>{% else %}<span class="tag" title="{{ repo.status }}">{{ m::dot(repo.class, repo.status) }}{{ repo.name }}</span>{% endif %}</td>
+    <td class="nowrap">{{ m::schedule(repo.backup_schedule) }} {{ repo.backed_up }}</td>
+    <td class="nowrap wide">{{ m::schedule(repo.check_schedule) }} {{ repo.checked }}</td>
+    <td class="nowrap wide">{{ m::schedule(repo.prune_schedule) }} {{ repo.pruned }}</td>
+  </tr>
+  {% else %}
+  <tr>
+    <td class="nowrap">{% call collection(collection) %}{% endcall %}</td>
+    <td colspan="4"><span class="issue {{ collection.level }}">{% for p in collection.issues %}{% if !loop.first %}; {% endif %}{{ p.text(self::now()) }}{% endfor %}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  {% endfor %}
+</table></div>

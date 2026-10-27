@@ -1,0 +1,22 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<form method="post" action="{{ base }}{{ Route::RepoRuns(collection, repo) }}" hx-post="{{ base }}{{ Route::RepoRuns(collection, repo) }}" data-close-on-success>
+  <input type="hidden" name="kind" value="re-create">
+  <div class="card-head"><div><h2>{{ Button::RecreateThis { repo: repo } }}</h2></div></div>
+  <div class="form-grid">
+    <label for="recreate-from">{{ Heading::From }}</label>
+    {% if sources.is_empty() %}
+    <span>{{ default }}</span>
+    {% else %}
+    <select name="from" id="recreate-from">
+      <option value="">{{ default }}</option>
+      {% for name in sources %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    <span></span><span class="muted small">{{ Hint::OnlyIfUnlisted }}</span>
+  </div>
+  <div class="dialog-foot">
+    <span></span>
+    <span class="btn-group"><button type="button" class="btn" command="close" commandfor="dialog">{{ Button::Cancel }}</button><button class="btn primary">{{ m::icon("recreate") }}{{ Button::Recreate }}</button></span>
+  </div>
+</form>

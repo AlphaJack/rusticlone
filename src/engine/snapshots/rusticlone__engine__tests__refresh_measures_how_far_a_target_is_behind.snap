@@ -1,0 +1,66 @@
+---
+source: src/engine/tests.rs
+assertion_line: 112
+expression: outcome
+---
+{
+  "rustic": [
+    "-P Docs repoinfo --only-index --json",
+    "-P Docs snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs-usb repoinfo --only-index --json",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs"
+  ],
+  "report": [],
+  "steps": [],
+  "status": {
+    "title": "Docs",
+    "level": "success",
+    "issues": [],
+    "last_backup": "2026-10-16T09:00:00Z",
+    "backup_schedule": null,
+    "snapshot": null,
+    "primary": {
+      "name": "Docs",
+      "prune_schedule": null,
+      "check_schedule": null,
+      "repository": "rest:http://backup/docs",
+      "latest_snapshot": "2026-10-16T09:00:00Z",
+      "next_subset": null,
+      "check_subsets": "10",
+      "prune": null,
+      "check": null,
+      "forget": null,
+      "missing": false,
+      "stale_at": "2026-10-23T09:00:00Z",
+      "status": {
+        "kind": "in-sync"
+      }
+    },
+    "targets": [
+      {
+        "name": "Docs-usb",
+        "prune_schedule": null,
+        "check_schedule": null,
+        "repository": "rest:http://usb/docs",
+        "latest_snapshot": "2026-10-15T13:20:00Z",
+        "next_subset": null,
+        "check_subsets": "10",
+        "prune": null,
+        "check": null,
+        "forget": null,
+        "lag": {
+          "checked_at": "2026-10-16T12:00:00Z",
+          "behind_since": "2026-10-16T09:00:00Z",
+          "listed": true
+        },
+        "missing": false,
+        "stale_at": "2026-10-23T09:00:00Z",
+        "status": {
+          "kind": "behind",
+          "since": "2026-10-16T09:00:00Z"
+        }
+      }
+    ],
+    "running": []
+  }
+}

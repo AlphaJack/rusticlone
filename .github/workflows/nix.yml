@@ -1,0 +1,72 @@
+name: Nix
+
+# Opens a pull request that updates flake.lock when its nixpkgs has a rustic older than the one Cargo.toml pins,
+# which packaging/nix/package.nix refuses.
+# requirements: the app of release-plz.yml, whose pull requests start CI
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+
+  lock:
+    name: Update flake.lock
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+
+      - name: Create app token
+        id: token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+
+      - name: Check the locked rustic
+        id: locked
+        run: |
+          if nix eval --raw .#packages.x86_64-linux.default.drvPath; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update nixpkgs
+        if: steps.locked.outputs.stale == 'true'
+        run: nix flake update
+
+      - name: Build
+        if: steps.locked.outputs.stale == 'true'
+        run: nix build -L
+
+      - name: Open pull request
+        if: steps.locked.outputs.stale == 'true'
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ steps.token.outputs.token }}
+          branch: nix-flake-lock
+          delete-branch: true
+          add-paths: flake.lock
+          commit-message: "fix(deps): update nixpkgs for the rustic that Cargo.toml pins"
+          title: "fix(deps): update nixpkgs for the rustic that Cargo.toml pins"
+          body: |
+            The Nix package refused the rustic of the nixpkgs in flake.lock, which is older than the one Cargo.toml pins. `nix flake update` took a newer nixpkgs, and the package builds with it.

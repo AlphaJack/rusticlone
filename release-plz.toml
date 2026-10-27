@@ -1,0 +1,71 @@
+[workspace]
+git_only = true
+git_tag_name = "v{{ version }}"
+git_tag_enable = false
+git_release_enable = false
+changelog_update = false
+semver_check = false
+
+[[package]]
+name = "rusticlone"
+git_tag_enable = true
+changelog_update = true
+git_release_enable = true
+git_release_name = "v{{ version }}"
+git_release_draft = true
+# Thanks people other than the owner on the release page.
+git_release_body = """
+{{ changelog }}
+{%- set_global others = [] %}
+{%- for c in remote.contributors %}{% if c.username != "AlphaJack" %}{% set_global others = others | concat(with=c.username) %}{% endif %}{% endfor %}
+{%- if others %}
+### Contributors
+
+{% for u in others %}- @{{ u }}
+{% endfor %}
+{%- endif %}
+"""
+
+[[package]]
+name = "xtask"
+release = false
+
+[changelog]
+body = """
+## [{{ version }}]{%- if release_link -%}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{%- set_global unscoped = [] %}{% for c in commits %}{% if not c.scope %}{% set_global unscoped = unscoped | concat(with=c) %}{% endif %}{% endfor %}
+{%- if unscoped %}
+{{ self::list(commits=unscoped) }}
+{%- endif %}
+{%- for scope, scoped in commits | group_by(attribute="scope") %}
+
+#### {{ scope | upper_first }}
+{{ self::list(commits=scoped) }}
+{%- endfor %}
+{% endfor %}
+{%- macro list(commits) -%}
+{%- for c in commits | filter(attribute="breaking", value=true) %}
+- **breaking**: {{ c.message | upper_first }}{{ self::extra(c=c) }}
+{%- if c.breaking_description != c.message %}
+  {{ c.breaking_description }}
+{%- endif %}
+{%- endfor %}
+{%- for c in commits | filter(attribute="breaking", value=false) %}
+- {{ c.message | upper_first }}{{ self::extra(c=c) }}
+{%- endfor %}
+{%- endmacro -%}
+{%- macro extra(c) -%}
+{%- for f in c.footers %}{% if f.token == "Fixes" or f.token == "Closes" %}, fixes #{{ f.value | trim_start_matches(pat="#") }}{% endif %}{% endfor -%}
+{%- if c.remote.username and c.remote.username != "AlphaJack" %}, by @{{ c.remote.username }}{% endif -%}
+{%- endmacro %}
+"""
+commit_parsers = [
+    { message = "^feat", group = "added" },
+    { message = "^fix", group = "fixed" },
+    { message = "^perf", group = "performance" },
+    # Other types are invisible to users, unless they break something.
+    { message = "^[a-z]+(\\([^)]*\\))?!:", group = "changed" },
+    { message = ".*", skip = true },
+]

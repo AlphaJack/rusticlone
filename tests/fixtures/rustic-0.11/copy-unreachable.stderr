@@ -1,0 +1,33 @@
+[ERROR] service=s3 name=primary path=config: stat failed Unexpected (persistent) at stat => send http request
+
+Context:
+   url: https://s3.example.com/backups/Documents/config
+   called: reqwest::send
+   service: s3
+   path: config
+
+Source:
+   error sending request for url (https://s3.example.com/backups/Documents/config): client error (Connect): tcp connect error: Connection refused (os error 61)
+
+[ERROR] error copying to target: `rustic_core` experienced an error related to `the backend`.
+
+Message:
+Path `config` does not exist.
+
+We believe this is a bug, please report it by opening an issue at:
+https://github.com/rustic-rs/rustic_core/issues/new
+
+If you can, please attach an anonymized debug log to the issue.
+
+Thank you for helping us improve rustic!
+
+
+Some additional details ...
+
+Caused by:
+Unexpected (persistent) at stat, context: { url: https://s3.example.com/backups/Documents/config, called: reqwest::send, service: s3, path: config } => send http request, source: error sending request for url (https://s3.example.com/backups/Documents/config)
+ : (source: error sending request for url (https://s3.example.com/backups/Documents/config))
+
+Backtrace:
+disabled backtrace (set 'RUST_BACKTRACE="1"' environment variable to enable)
+

@@ -1,0 +1,32 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<nav class="crumbs"><a href="{{ base }}{{ Route::Index }}">{{ Heading::Collections }}</a><span>/</span><a href="{{ base }}{{ Route::Collection(collection) }}">{{ title }}</a><span>/</span><a href="{{ base }}{{ Route::Repo(collection, repo) }}">{{ repo }}</a><span>/</span><span>{{ short }}</span></nav>
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h1>{{ short }}</h1>
+      <div class="meta"><span>{{ at }}</span><span class="path">{% for (name, target) in crumbs %}<a href="?path={{ target|urlencode }}">{{ name }}</a>{% if !loop.last && !loop.first %}<span class="sep">/</span>{% endif %}{% endfor %}</span></div>
+    </div>
+    <a class="btn" href="{{ base }}{{ Route::Diff(collection, repo, id.as_str()) }}">{{ m::icon("diff") }}{{ Button::Changes }}</a>
+  </div>
+  {% if let Some(error) = error %}<div class="notice failure">{{ error }}</div>{% endif %}
+  <div class="table-wrap"><table class="table" data-sort="entries">
+    <thead><tr><th>{{ Heading::Name }}</th><th class="right">{{ Heading::Size }}</th><th>{{ Heading::Modified }}</th><th class="tools right">{{ Heading::Actions }}</th></tr></thead>
+    <tbody>
+    {% for e in entries %}
+    <tr>
+      <td>{% if e.kind == NodeKind::Dir %}<a class="entry" href="?path={{ e.path|urlencode }}">{{ m::icon(e.kind) }}{{ e.name }}</a>{% else %}<span class="entry">{{ m::icon(e.kind) }}{{ e.name }}</span>{% endif %}</td>
+      <td class="right num nowrap">{% if let Some(size) = e.size %}{{ size }}{% endif %}</td>
+      <td class="nowrap">{{ e.modified }}</td>
+      <td class="right nowrap tools">
+        <span class="btn-group">
+          {% if e.kind != NodeKind::Symlink %}<a class="icon-btn" title="{{ Button::Download }}" href="{{ base }}{{ Route::Download(collection, repo, id.as_str()) }}?path={{ e.path|urlencode }}{% if e.kind == NodeKind::Dir %}&amp;dir=true{% endif %}">{{ m::icon("download") }}</a>{% endif %}
+          <button class="icon-btn" title="{{ Button::Restore }}" hx-get="{{ base }}{{ Route::NewRun(collection) }}?kind=restore&amp;repo={{ repo|urlencode }}&amp;snapshot={{ id }}&amp;path={{ e.path|urlencode }}" hx-target="#dialog">{{ m::icon("restore") }}</button>
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if entries.is_empty() && error.is_none() %}<p class="muted">{{ Hint::Empty }}</p>{% endif %}
+</section>

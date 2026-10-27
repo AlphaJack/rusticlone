@@ -1,0 +1,298 @@
+@layer tokens, base, components;
+
+/* each surface has a light and a dark color defined together */
+@layer tokens {
+  :root {
+    color-scheme: light dark;
+    --background: light-dark(hsl(30 8% 98%), hsl(220 5.5% 9%));
+    --foreground: light-dark(hsl(30 0% 10%), hsl(220 2% 97%));
+    --card: light-dark(hsl(30 0% 100%), hsl(220 5.5% 10.5%));
+    --muted: light-dark(hsl(26 6% 94%), hsl(220 6% 16%));
+    --muted-foreground: light-dark(hsl(24 3% 38%), hsl(220 4% 67%));
+    --accent: light-dark(hsl(20 23% 94%), hsl(220 5% 15.5%));
+    --border: light-dark(hsl(30 8% 86%), hsl(220 3% 17%));
+    --table-header: light-dark(hsl(225 6% 97%), hsl(220 6% 13%));
+    --primary: light-dark(hsl(240 6% 10%), hsl(220 2% 96%));
+    --primary-foreground: light-dark(hsl(30 0% 100%), hsl(220 4% 10%));
+    --success: light-dark(#16a34a, #22c55e);
+    --warning: light-dark(#ca8a04, #eab308);
+    --failure: light-dark(#dc2626, #ef4444);
+    --radius: .8rem;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+}
+
+@layer base {
+  * { box-sizing: border-box; }
+  /* room for the scrollbar on every page, so that a page that scrolls does not shift */
+  html { scrollbar-gutter: stable; }
+  body { margin: 0; background: var(--background); color: var(--foreground); font: 14px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  code { font: 12.5px var(--mono); }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
+  .i { width: 16px; height: 16px; flex: none; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  h1 .i { width: 22px; height: 22px; margin-right: 10px; vertical-align: -2px; color: var(--muted-foreground); }
+  th .i { width: 14px; height: 14px; margin-right: 4px; }
+  h2 { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+  h1 .dot { width: 10px; height: 10px; margin-right: 12px; vertical-align: 4px; }
+  .path { display: flex; align-items: center; margin-top: 8px; overflow-wrap: anywhere; }
+  h3 { font-size: 15px; font-weight: 600; }
+  .muted { color: var(--muted-foreground); }
+  .small { font-size: 13px; }
+  .strong, .strong code { font-weight: 600; }
+  .nowrap { white-space: nowrap; }
+  .right { text-align: right; }
+  .spacer { flex: 1; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  .page { max-width: 1440px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  main { display: flex; flex-direction: column; gap: 16px; }
+}
+
+@layer components {
+  .topbar { display: flex; align-items: center; gap: 12px; height: 64px; padding: 0 20px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); view-transition-name: topbar; }
+  .brand { display: flex; align-items: center; gap: 8px; font-size: 21px; font-weight: 800; letter-spacing: -.03em; }
+  .brand:hover { text-decoration: none; }
+  .brand .logo { height: 28px; }
+  .host { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted-foreground); padding-left: 12px; border-left: 1px solid var(--border); }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .card:empty { display: none; }
+  .card-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .card-head > :first-child { flex: 1 1 18rem; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  form.actions { flex-wrap: nowrap; }
+  /* on the empty overview, the title stays where a profile's title would be */
+  .crumbs { display: flex; gap: 8px; align-items: center; color: var(--muted-foreground); min-height: 1lh; }
+
+  /* the meta line under a title: icons and text, separated by thin rules */
+  .meta { display: flex; flex-wrap: wrap; align-items: center; color: var(--muted-foreground); }
+  .meta > * { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-left: 1px solid var(--border); line-height: 1.1; white-space: nowrap; }
+  .meta code { white-space: normal; overflow-wrap: anywhere; }
+  .meta > :first-child { padding-left: 0; border-left: 0; }
+  .meta .i { width: 15px; height: 15px; }
+  /* a run's progress fits in the line without changing its height, so the page does not shift */
+  .card-head .meta { min-height: 24px; }
+
+  .table-wrap { border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+  .table-wrap.scroll { max-height: 460px; overflow: auto; }
+  .table thead tr > :first-child { border-top-left-radius: 7px; }
+  .table thead tr > :last-child { border-top-right-radius: 7px; }
+  table.table { width: 100%; border-collapse: collapse; }
+  .table th, .table thead td { text-align: left; font-weight: 500; color: var(--muted-foreground); background: var(--table-header); padding: 10px 14px; white-space: nowrap; }
+  .table th.right { text-align: right; }
+  .table-wrap.scroll thead tr > * { position: sticky; top: 0; z-index: 1; }
+  /* sortable headers show the direction as a triangle in the cell padding, on the side away from
+     the column edge, so that neither the label nor the column moves */
+  table[data-sort] th:not(:empty) { cursor: pointer; user-select: none; }
+  table[data-sort] th:not(:empty, .right)::after, table[data-sort] th.right:not(:empty)::before { content: ""; display: inline-block; border: 4px solid transparent; vertical-align: 2px; }
+  table[data-sort] th:not(:empty, .right)::after { margin: 0 -14px 0 6px; }
+  table[data-sort] th.right:not(:empty)::before { margin: 0 6px 0 -14px; }
+  table[data-sort] th[aria-sort=ascending]:not(:empty)::after, table[data-sort] th[aria-sort=ascending]:not(:empty)::before { border-bottom-color: currentColor; vertical-align: 4px; }
+  table[data-sort] th[aria-sort=descending]:not(:empty)::after, table[data-sort] th[aria-sort=descending]:not(:empty)::before { border-top-color: currentColor; vertical-align: -1px; }
+  .table tbody td { padding: 12px 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+  /* lit: the commands and log lines of the step or command under the pointer */
+  .table tbody tr:hover td, .table tbody tr[aria-current] td, .table tbody tr.lit td, .table tbody.group:hover td { background: var(--accent); }
+  .jump { cursor: pointer; }
+  /* the log is dark in both themes; whole lines light up */
+  .log > span { display: block; }
+  .log .lit { background: #27272a; }
+  .table td.end { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .table td.ellipsis { max-width: 1px; width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .table.aligned { table-layout: fixed; }
+  .aligned .name { width: 24%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .aligned .state { width: 13%; }
+  .aligned .count, .aligned .size { width: 9%; }
+  .aligned .age { width: 13%; }
+  /* a time too long for its column wraps beside its icon */
+  .when { display: inline-flex; align-items: center; gap: 6px; }
+  .aligned .tools { width: 200px; }
+  .table td.activity { min-width: 280px; }
+  .empty { padding: 32px; text-align: center; color: var(--muted-foreground); }
+
+  /* hidden, but copied and read by screen readers */
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .dot { position: relative; display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--success); margin-right: 8px; vertical-align: 1px; }
+  .dot.warning { background: var(--warning); }
+  .dot.failure { background: var(--failure); }
+  .dot.muted { background: var(--muted-foreground); }
+  .success { --c: var(--success); }
+  .warning { --c: var(--warning); }
+  .failure { --c: var(--failure); }
+  .muted { --c: var(--muted-foreground); }
+  .tag { display: inline-flex; align-items: center; gap: 6px; margin: 2px 6px 2px 0; vertical-align: middle; padding: 1px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; white-space: nowrap; }
+  .tag .dot { width: 6px; height: 6px; margin: 0; }
+  .issue { color: var(--c); overflow-wrap: anywhere; }
+  .issues { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .issues li { display: flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+  .issues .dot { margin-right: 4px; }
+  .notice { padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); border-left: 3px solid var(--c); overflow-wrap: anywhere; }
+  .schedule { display: inline-flex; vertical-align: -3px; color: var(--muted-foreground); opacity: .45; }
+  .schedule.on { color: var(--success); opacity: 1; }
+  .schedule.failure { color: var(--failure); opacity: 1; }
+
+  /* browsing */
+  .path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font: 13px var(--mono); }
+  .path .sep { color: var(--muted-foreground); }
+  .path a { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; }
+  .entry { display: inline-flex; align-items: center; gap: 8px; }
+  .entry .i { color: var(--muted-foreground); }
+
+  /* progress */
+  .progress { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; white-space: nowrap; }
+  .progress .muted { white-space: normal; }
+  .progress .doing { font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+  .table .progress { flex-wrap: nowrap; }
+  /* in the fixed columns of steps, the text goes below the bar rather than past the cell */
+  .steps .progress { flex-wrap: wrap; }
+  /* a run's dot or spinner, in its own column */
+  .table .status { width: 1px; padding-right: 0; }
+  .table .status .dot { margin-right: 0; }
+  /* the same column widths for every run: results wrap */
+  .steps { table-layout: fixed; overflow-wrap: anywhere; }
+  .steps .index { width: 3.5em; }
+  .steps .status { width: 32px; }
+  .steps .step { width: 30%; }
+  .steps .duration { width: 9em; }
+  .steps .holds { width: 9em; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--foreground); animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  /* a running run's spinner becomes a red cross under the pointer, to stop it */
+  .stop { display: inline-flex; padding: 0; border: 0; background: none; color: var(--failure); cursor: pointer; vertical-align: middle; }
+  .stop .i { display: none; width: 12px; height: 12px; stroke-width: 3; }
+  .stop:hover .spinner, .stop:focus-visible .spinner { display: none; }
+  .stop:hover .i, .stop:focus-visible .i { display: block; }
+  progress { appearance: none; width: 120px; height: 8px; border: 0; border-radius: 999px; background: var(--table-header); overflow: hidden; }
+  progress::-webkit-progress-bar { background: var(--table-header); }
+  progress::-webkit-progress-value { background: var(--success); border-radius: 999px; transition: width .8s ease; }
+  progress::-moz-progress-bar { background: var(--success); border-radius: 999px; }
+
+  .table .sub { font-size: 12px; white-space: normal; }
+  /* a size measured before the last change, with a button to measure again */
+  .icon-btn.stale { color: var(--warning); vertical-align: -5px; margin-left: 4px; }
+  /* the actions stay visible when a table scrolls sideways */
+  .table .tools { position: sticky; right: 0; background: var(--card); }
+  .table th.tools { background: var(--table-header); }
+
+  /* logs */
+  .log { margin: 0; max-height: 460px; min-height: 100px; overflow: auto; padding: 12px 14px; border-radius: 8px; background: #09090b; color: #d4d4d8; border: 1px solid var(--border); font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  /* a run's steps, each with its report lines */
+  .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 20px 0 10px; }
+  .card > h3 { margin: 20px 0 10px; }
+  .table .line.warning { color: var(--warning); }
+  .table .line.failure { color: var(--failure); }
+  .lines li { padding: 6px 10px; border: 1px solid var(--border); border-left: 3px solid var(--c); border-radius: 6px; overflow-wrap: anywhere; }
+
+  /* buttons */
+  .btn, .icon-btn { font: inherit; font-weight: 500; color: var(--foreground); background: transparent; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background .12s; }
+  .btn { height: 36px; padding: 0 14px; }
+  .icon-btn { width: 32px; height: 32px; }
+  .icon-btn.small { width: 22px; height: 22px; }
+  .icon-btn.small .i { width: 13px; height: 13px; }
+  /* no taller than the text beside it, so a row keeps its height when it appears */
+  .table .icon-btn.small { margin-block: -4px; vertical-align: middle; }
+  .icon-btn.plain { border: 0; color: var(--muted-foreground); margin-right: 4px; }
+  .btn:hover, .icon-btn:hover { background: var(--accent); text-decoration: none; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .btn.primary:hover { opacity: .9; }
+  .icon-btn:disabled, .btn:disabled { opacity: .35; cursor: not-allowed; background: transparent; }
+  .btn-group { display: inline-flex; gap: 4px; }
+  .htmx-request.btn, .htmx-request.icon-btn { opacity: .5; cursor: progress; }
+
+  /* dialogs and forms */
+  dialog { color: inherit; width: min(720px, calc(100% - 32px)); border-color: var(--foreground); box-shadow: 0 20px 60px rgba(0, 0, 0, .35); }
+  dialog:not([open]) { display: none; }
+  dialog::backdrop { background: rgba(0, 0, 0, .35); }
+  .form-grid { display: grid; grid-template-columns: 90px 1fr; gap: 10px 16px; align-items: center; }
+  .form-grid label { color: var(--muted-foreground); }
+  .form-grid .hint { grid-column: 1 / -1; }
+  /* a repository's password, apart from its service's fields, and only if there is a repository */
+  .location .password { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .location:has(input[value=none]:checked) .password { display: none; }
+  .checks { display: flex; flex-direction: column; gap: 6px; }
+  .checks label { display: inline-flex; align-items: center; gap: 8px; }
+  input[type=text], input[type=password], select, textarea { font: inherit; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--foreground); width: 100%; max-width: 520px; }
+  textarea { height: auto; padding: 8px 12px; resize: vertical; }
+  select option { background: var(--card); }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--border); outline-offset: 1px; }
+  /* radio buttons as a row of toggles */
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* a row of choices per group, after its name */
+  .kinds { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; align-items: center; }
+  .choices label { padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+  .choices label:has(:checked) { background: var(--foreground); color: var(--background); border-color: var(--foreground); }
+  .choices label:has(:focus-visible) { outline: 2px solid var(--border); outline-offset: 1px; }
+  .choices input { position: absolute; opacity: 0; pointer-events: none; }
+  .setup { display: flex; flex-direction: column; gap: 16px; }
+  .setup .form-grid { grid-template-columns: 120px 1fr; }
+  .sources { display: grid; gap: 8px; justify-items: start; }
+  input.command { font: 13px var(--mono); }
+  /* the first folder stays; its button keeps its place, so that the fields line up */
+  .source:first-child [data-remove] { visibility: hidden; }
+  .free { font-size: 13px; }
+  .free .warning-text { color: var(--warning); }
+  .form-grid label:has(+ .sources) { align-self: start; margin-top: 9px; }
+  .sources .source { width: 100%; }
+  .field-row { display: flex; gap: 8px; align-items: center; }
+  .setup-saved { gap: 24px; }
+  .setup-saved ol { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  dialog p:empty { display: none; }
+  .dialog-foot { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+
+  /* flash messages */
+  #flash { position: fixed; right: 20px; bottom: 20px; z-index: 9; max-width: 460px; }
+  .flash { padding: 12px 16px; border-radius: 10px; background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--c); box-shadow: 0 10px 30px rgba(0, 0, 0, .25); animation: flash 6s forwards; }
+  @keyframes flash { 0%, 85% { opacity: 1; } 100% { opacity: 0; visibility: hidden; } }
+
+  /* login */
+  footer { display: flex; justify-content: flex-end; align-items: center; font-size: 12px; color: var(--muted-foreground); }
+  .page:has(.not-found) footer { display: none; }
+  .not-found { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 10vh; text-align: center; }
+  .not-found h1 { font-size: 48px; font-weight: 500; letter-spacing: 0; }
+  .login { max-width: 400px; width: 100%; margin: 12vh auto 0; }
+  .login input { max-width: none; }
+  .login .error { color: var(--failure); }
+
+  /* narrow cards hide secondary columns, but keep the actions */
+  .card { container-type: inline-size; }
+  @container (width < 760px) {
+    .table .wide { display: none; }
+    .table td.activity { min-width: 0; }
+    .card { padding: 16px; }
+    /* tables take the width of their text and scroll sideways, instead of squeezing columns into each other */
+    .table.aligned, .steps { table-layout: auto; }
+    .table.aligned :is(th, td) { width: auto; }
+    .aligned td:not(.tools), .steps code { white-space: nowrap; }
+    .steps td:last-child { min-width: 12em; }
+    .table td.ellipsis { max-width: 16em; }
+    /* pinned, the actions would cover most of a phone's width */
+    .table .tools { position: static; }
+    .log { white-space: pre; overflow-wrap: normal; }
+  }
+}
+
+/* outside the layers, so it wins over any display a layer sets */
+[hidden] { display: none; }
+
+/* on a phone, the top bar stays on one line */
+@media (width < 600px) {
+  .topbar { padding: 0 12px; gap: 8px; }
+  .topbar .btn .label { display: none; }
+  /* and a form's labels go above their fields, so that a path fits */
+  .form-grid, .setup .form-grid, .kinds { grid-template-columns: 1fr; gap: 6px; }
+  .form-grid > label:not(:first-child), .kinds > span:not(:first-child) { margin-top: 8px; }
+}
+
+/* page changes cross-fade and the top bar stays, where browsers support it */
+@view-transition { navigation: auto; }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } }
+/* Astro's fade */
+::view-transition-old(root) { animation: 90ms cubic-bezier(.4, 0, 1, 1) both fade-out; }
+::view-transition-new(root) { animation: 210ms cubic-bezier(0, 0, .2, 1) 90ms both fade-in; }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+}

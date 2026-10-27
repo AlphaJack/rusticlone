@@ -1,0 +1,2 @@
+{% for line in self.0 %}<span{% if let Some(step) = line.origin.step %} data-step="{{ step }}"{% endif %}{% if let Some(call) = line.origin.call %} data-call="{{ call }}"{% endif %}>{{ line.text }}
+</span>{% endfor %}

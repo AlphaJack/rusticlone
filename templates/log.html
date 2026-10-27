@@ -1,0 +1,49 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+{% if let Some(run) = log.run %}
+<section class="card" id="log">
+  <div class="card-head">
+    <div><h2>{{ Heading::RunDetails }}</h2></div>
+  </div>
+  {% if !log.results.is_empty() %}<ul class="lines">{% for (level, result) in log.results %}<li class="{{ level }}">{{ result }}</li>{% endfor %}</ul>{% endif %}
+  {% if !log.steps.is_empty() %}
+  <h3>{{ Heading::Steps }}</h3>
+  <div class="table-wrap"><table class="table steps">
+    <thead><tr><th class="right index">{{ Heading::Index }}</th><th class="status"><span class="sr">{{ Heading::Status }}</span></th><th class="step">{{ Heading::Step }}</th><th class="duration right wide">{{ Heading::Wait }}</th><th class="duration right wide">{{ Heading::Duration }}</th><th class="holds wide">{{ Heading::WaitingFor }}</th><th class="holds wide">{{ Heading::Using }}</th><th>{{ Heading::Result }}</th></tr></thead>
+    <tbody>
+    {% for step in log.steps %}
+    <tr data-step="{{ loop.index0 }}">
+      <td class="right num">{{ loop.index }}</td>
+      <td class="status">{% if step.class == "running" && log.stoppable %}<button class="stop" title="{{ Button::Stop }}" aria-label="{{ Button::Stop }}" hx-delete="{{ base }}{{ Route::Step(log.collection, **run, *loop.index0) }}"><span class="spinner"></span>{{ m::icon("close") }}</button>{% else if step.class == "running" %}<span class="spinner" title="{{ crate::result::Status::Running }}"></span>{% else %}{{ m::dot(step.class, step.status) }}{% endif %}</td>
+      <td class="nowrap jump">{{ step.label }}</td>
+      <td class="right nowrap wide">{{ step.waited }}</td>
+      <td class="right nowrap wide">{% if let Some(since) = step.since %}{{ since }}{% else %}{{ step.duration }}{% endif %}</td>
+      <td class="wide">{% if let Some(lock) = step.holds.waiting_for %}<span class="tag">{{ lock }}</span>{% endif %}</td>
+      <td class="wide">{% for lock in step.holds.using %}<span class="tag">{{ lock }}</span> {% endfor %}</td>
+      {% if let Some(p) = step.progress %}
+      <td class="ellipsis"><span class="progress"><span class="doing">{{ p.doing }}</span>{% if let Some(percent) = p.percent %}<progress max="100" value="{{ percent }}"></progress><span class="num">{{ percent }}%</span>{% endif %}<span class="muted">{% if p.cancelling %}{{ Label::Stopping }}{% else %}{{ p.detail }}{% endif %}</span></span></td>
+      {% else %}
+      <td>{% for (level, result) in step.results %}<div class="line {{ level }}">{{ result }}</div>{% else %}<span class="muted">{{ step.status }}</span>{% endfor %}</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+  {% if !log.calls.is_empty() %}
+  <div class="section-head">
+    <h3>{{ Heading::Commands }}</h3>
+    <button type="button" class="btn" data-copy="{{ log.commands() }}">{{ m::icon("copy") }}{{ Button::CopyCommands }}</button>
+  </div>
+  <div class="table-wrap"><table class="table steps">
+    <thead><tr><th class="right index">{{ Heading::Index }}</th><th class="status"><span class="sr">{{ Heading::Status }}</span></th><th>{{ Heading::Command }}</th><th class="duration right wide">{{ Heading::Duration }}</th></tr></thead>
+    <tbody>{% for call in log.calls %}<tr data-call="{{ loop.index0 }}"{% if let Some(step) = call.step %} data-step="{{ step }}"{% endif %}><td class="right num">{{ loop.index }}</td><td class="status">{% if call.class == "running" %}<span class="spinner" title="{{ crate::result::Status::Running }}"></span>{% else %}{{ m::dot(call.class, call.exit) }}{% endif %}</td><td class="jump"><code>{{ call.command }}</code></td><td class="right nowrap wide">{% if let Some(since) = call.since %}{{ since }}{% else %}{{ call.duration }}{% endif %}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% endif %}
+  <div class="section-head">
+    <h3>{{ Heading::Log }}</h3>
+    <button type="button" class="btn" data-copy-log>{{ m::icon("copy") }}{{ Button::CopyLog }}</button>
+  </div>
+  <pre class="log" tabindex="0" id="log-{{ run }}"{% if log.kept %} hx-preserve{% endif %}>{{ log.lines|safe }}</pre>
+</section>
+{% endif %}

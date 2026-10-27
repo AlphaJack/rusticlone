@@ -1,0 +1,12 @@
+---
+source: src/rustic/commands.rs
+expression: restore_plan(&out)
+---
+Some(
+    RestorePlan {
+        create: 1,
+        replace: 1,
+        keep: 0,
+        additional: 2,
+    },
+)

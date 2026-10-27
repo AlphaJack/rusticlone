@@ -1,0 +1,75 @@
+---
+source: src/rustic/contents.rs
+expression: dirs(&listing)
+---
+{
+    "": [
+        Node {
+            name: "fixture",
+            kind: Dir,
+            size: 0,
+            mtime: None,
+        },
+    ],
+    "fixture": [
+        Node {
+            name: "src",
+            kind: Dir,
+            size: 0,
+            mtime: None,
+        },
+    ],
+    "fixture/src": [
+        Node {
+            name: "docs",
+            kind: Dir,
+            size: 0,
+            mtime: None,
+        },
+    ],
+    "fixture/src/docs": [
+        Node {
+            name: "a \"x\"\tb\\c.txt",
+            kind: File,
+            size: 5,
+            mtime: Some(
+                2026-10-15T13:20:00Z,
+            ),
+        },
+        Node {
+            name: "empty",
+            kind: Dir,
+            size: 0,
+            mtime: Some(
+                2026-10-15T13:20:00Z,
+            ),
+        },
+        Node {
+            name: "link",
+            kind: Symlink,
+            size: 9,
+            mtime: Some(
+                2026-10-15T13:21:00Z,
+            ),
+        },
+        Node {
+            name: "sub",
+            kind: Dir,
+            size: 0,
+            mtime: Some(
+                2026-10-15T13:20:00Z,
+            ),
+        },
+    ],
+    "fixture/src/docs/empty": [],
+    "fixture/src/docs/sub": [
+        Node {
+            name: "b.txt",
+            kind: File,
+            size: 3,
+            mtime: Some(
+                2026-10-15T13:20:00Z,
+            ),
+        },
+    ],
+}

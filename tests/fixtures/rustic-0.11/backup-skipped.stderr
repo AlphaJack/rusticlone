@@ -1,0 +1,15 @@
+[INFO] using config ./a.toml
+[INFO] using backup sources from config file.
+[INFO] repository local:/fixture/repo: password is correct.
+[INFO] using no cache
+[INFO] using parents 22222222
+[INFO] starting to backup ["/fixture/src/docs"] ...
+[WARN] ignoring error: Error: Failed to get next entry from walk iterator. (kind: related to internal operations): caused by: /fixture/src/docs/sub: IO error for operation on /fixture/src/docs/sub: Permission denied (os error 13)
+[WARN] ignoring error: Error: Failed to open ReadSourceOpen at `/fixture/src/docs/secret`
+Failed to open file at `/fixture/src/docs/secret`. Please make sure the file exists and is accessible. (kind: related to input/output operations): caused by: Permission denied (os error 13)
+[INFO] Files:       0 new, 0 changed, 2 unchanged
+[INFO] Dirs:        0 new, 5 changed, 1 unchanged
+[INFO] Added to the repo: 1 KiB (raw: 2 KiB)
+[INFO] processed 2 files, 12 B
+[INFO] snapshot 33333333 successfully saved.
+[INFO] backup of /fixture/src/docs done.

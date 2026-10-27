@@ -1,0 +1,8 @@
+[INFO] using config ./a.toml
+[INFO] repository local:/fixture/repo: password is correct.
+[INFO] using no cache
+[INFO] using config ./t.toml
+[INFO] copying to target local:/fixture/target...
+[INFO] repository local:/fixture/target: password is correct.
+[INFO] using no cache
+[ERROR] error copying to target: cannot copy to repository with different chunker parameter (re-chunking not implemented)!

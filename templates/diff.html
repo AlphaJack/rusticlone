@@ -1,0 +1,24 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<nav class="crumbs"><a href="{{ base }}{{ Route::Index }}">{{ Heading::Collections }}</a><span>/</span><a href="{{ base }}{{ Route::Collection(collection) }}">{{ title }}</a><span>/</span><a href="{{ base }}{{ Route::Repo(collection, repo) }}">{{ repo }}</a><span>/</span><a href="{{ base }}{{ Route::Snapshot(collection, repo, id.as_str()) }}">{{ short }}</a><span>/</span><span>{{ Label::ChangesCrumb }}</span></nav>
+<section class="card">
+  <h1>{{ Heading::ChangesIn { snapshot: short } }}</h1>
+  <div class="meta">{% if let Some((before, time)) = before %}<span>{{ Label::Since }} <a href="{{ base }}{{ Route::Snapshot(collection, repo, before.as_str()) }}"><code>{{ before.short() }}</code></a>&nbsp;{{ time }}</span>{% else %}<span>{{ Hint::FirstSnapshot }}</span>{% endif %}{% for total in totals %}<span>{{ total }}</span>{% endfor %}</div>
+  {% if let Some(error) = error %}<div class="notice failure">{{ error }}</div>{% endif %}
+  {% if !changes.is_empty() %}
+  <div class="table-wrap scroll"><table class="table" data-sort="changes">
+    <thead><tr><td class="status"></td><th>{{ Heading::Kind }}</th><th>{{ Heading::Path }}</th><th class="right">{{ Heading::Previous }}</th><th class="right">{{ Heading::Current }}</th></tr></thead>
+    <tbody>
+    {% for (kind, path) in changes %}
+    <tr>
+      <td class="status"><span class="dot {% if kind == "added" %}success{% else if kind == "removed" %}failure{% else %}warning{% endif %}"></span></td>
+      <td class="nowrap">{{ kind }}</td>
+      <td><code>{{ path }}</code></td>
+      <td class="right">{% if kind != "added" %}{% if let Some((before, _)) = before %}<a class="icon-btn small" title="{{ Button::DownloadPrevious }}" href="{{ base }}{{ Route::Download(collection, repo, before.as_str()) }}?path={{ path|urlencode }}">{{ m::icon("download") }}</a>{% endif %}{% endif %}</td>
+      <td class="right">{% if kind != "removed" %}<a class="icon-btn small" title="{{ Button::DownloadCurrent }}" href="{{ base }}{{ Route::Download(collection, repo, id.as_str()) }}?path={{ path|urlencode }}">{{ m::icon("download") }}</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% else if before.is_some() && error.is_none() %}<p class="muted">{{ Hint::NothingChanged }}</p>{% endif %}
+</section>

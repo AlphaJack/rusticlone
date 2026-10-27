@@ -1,0 +1,58 @@
+---
+source: src/engine/schedule.rs
+expression: due
+---
+{
+  "requests": [
+    [
+      "backup",
+      "2026-10-16T11:10:00Z"
+    ],
+    [
+      {
+        "copy": "Docs"
+      },
+      null
+    ],
+    [
+      {
+        "prune": [
+          "Docs"
+        ]
+      },
+      null
+    ],
+    [
+      {
+        "check": [
+          [
+            "Docs",
+            null
+          ]
+        ]
+      },
+      null
+    ],
+    [
+      {
+        "prune": [
+          "Docs-usb"
+        ]
+      },
+      null
+    ],
+    [
+      {
+        "check": [
+          [
+            "Docs-usb",
+            null
+          ]
+        ]
+      },
+      null
+    ]
+  ],
+  "first_seen": [],
+  "unscheduled": []
+}

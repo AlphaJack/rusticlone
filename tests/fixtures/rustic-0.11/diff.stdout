@@ -1,0 +1,7 @@
+-    "fixture/src/docs/a \"x\"\tb\\c.txt"
++    "fixture/src/docs/new.txt"
+M    "fixture/src/docs/sub/b.txt"
+Files   : 0 =, 1 +, 1 -, 1 M, 0 U
+Dirs    : 5 =, 0 +, 0 -, 0 M, 0 U
+Symlinks: 1 =, 0 +, 0 -, 0 M, 0 U
+

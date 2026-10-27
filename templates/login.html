@@ -1,0 +1,8 @@
+{% let base = ("base"|value::<String>)? %}
+<form class="card login" method="post" action="{{ base }}{{ Route::Login }}">
+  <h1>{{ Button::LogIn }}</h1>
+  <p class="muted">{% if let Some(file) = file %}{{ Hint::TokenIn { host: crate::sys::hostname(), file: &file.display().to_string() } }}{% else %}{{ Hint::TokenSet { host: crate::sys::hostname(), key: crate::settings::ADMIN_TOKEN.key } }}{% endif %}</p>
+  <input type="password" name="token" placeholder="{{ Heading::Token }}" aria-label="{{ Heading::Token }}" autocomplete="current-password" autofocus required>
+  {% if failed %}<p class="error">{{ Hint::WrongToken }}</p>{% endif %}
+  <button class="btn primary">{{ Button::LogIn }}</button>
+</form>

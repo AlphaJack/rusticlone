@@ -1,0 +1,21 @@
+[INFO] using config /home/me/.config/rustic/Docs.toml
+[INFO] using backup sources from config file.
+[INFO] repository local:/backup/Docs: password is correct.
+[INFO] reading index...: 1 done in 793.42µs
+[INFO] getting latest snapshot...: 1 done in 218.71µs
+[INFO] using parents 9a637a04
+[INFO] starting to backup ["/home/me/docs"] ...
+[ERROR] error backing up /home/me/docs: `rustic_core` experienced an error related to `input/output operations`.
+
+Message:
+Failed to open the file `/backup/Docs/data/d0/d0296cff9dc416fd17915b28e6b232f0826fb9a4a592e1cb3b069a0c7ae3c6ec-tmp-`. Please check the file and try again.
+
+Some additional details ...
+
+Caused by:
+Permission denied (os error 13)
+
+Backtrace:
+disabled backtrace (set 'RUST_BACKTRACE="1"' environment variable to enable)
+
+error: Not all snapshots were generated successfully!

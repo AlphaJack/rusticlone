@@ -1,0 +1,8 @@
+rules:
+  unpinned-uses: { ignore: [release.yml] }
+  unpinned-images: { ignore: [release.yml] }
+  template-injection: { ignore: [release.yml] }
+  cache-poisoning: { ignore: [release.yml] }
+  secrets-inherit: { ignore: [release.yml] }
+  excessive-permissions: { ignore: [release.yml] }
+  self-repository: { ignore: [release.yml] }

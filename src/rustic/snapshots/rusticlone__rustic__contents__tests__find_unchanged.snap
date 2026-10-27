@@ -1,0 +1,17 @@
+---
+source: src/rustic/contents.rs
+expression: found(&report)
+---
+[
+    Found {
+        id: "11111111",
+        time: "2026-10-15 13:20:00",
+        more: 1,
+        files: [
+            (
+                "lrwxrwxrwx       me       me         9 15 Oct 2026 13:21",
+                "/fixture/src/docs/link",
+            ),
+        ],
+    },
+]

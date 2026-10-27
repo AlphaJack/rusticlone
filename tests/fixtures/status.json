@@ -1,0 +1,163 @@
+{
+  "collections": [
+    {
+      "backup_schedule": {
+        "cron": "@daily",
+        "next": "2026-10-17T00:00:00Z"
+      },
+      "issues": [
+        {
+          "by": null,
+          "kind": "warned",
+          "level": "warning",
+          "step": "snapshot:Docs",
+          "text": "the last backup could not read 1 item: /a (denied)",
+          "warnings": [
+            {
+              "count": 1,
+              "items": [
+                [
+                  "/a",
+                  "denied"
+                ]
+              ],
+              "kind": "skipped",
+              "level": "warning",
+              "text": "the last backup could not read 1 item: /a (denied)"
+            }
+          ]
+        },
+        {
+          "by": null,
+          "error": {
+            "error": "unreachable",
+            "kind": "failed",
+            "level": "failure",
+            "step": "copy to Docs-usb",
+            "stopped": false,
+            "subject": "copy to Docs-usb",
+            "text": "unreachable"
+          },
+          "kind": "copy-failed",
+          "level": "warning",
+          "step": "copy:Docs/Docs-usb",
+          "text": "copy to Docs-usb: unreachable"
+        }
+      ],
+      "last_backup": "2026-10-16T12:00:00Z",
+      "level": "warning",
+      "primary": {
+        "check": null,
+        "check_schedule": {
+          "cron": "@daily",
+          "next": "2026-10-17T00:00:00Z"
+        },
+        "check_subsets": "10",
+        "forget": null,
+        "latest_snapshot": null,
+        "missing": false,
+        "name": "Docs",
+        "next_subset": null,
+        "prune": null,
+        "prune_schedule": {
+          "cron": "@daily",
+          "next": "2026-10-17T00:00:00Z"
+        },
+        "repository": "rest:http://backup/docs",
+        "stale_at": "2026-10-18T00:00:00Z",
+        "status": {
+          "kind": "in-sync"
+        }
+      },
+      "running": [],
+      "snapshot": {
+        "by": null,
+        "cancelled": false,
+        "failures": 0,
+        "last_attempt": "2026-10-16T12:00:00Z",
+        "last_error": null,
+        "last_ok": "2026-10-16T12:00:00Z",
+        "note": {
+          "kind": "backed-up",
+          "level": "success",
+          "new_repository": false,
+          "repo": "Docs",
+          "snapshots": [
+            "22222222"
+          ],
+          "subject": "Docs",
+          "text": "backed up 22222222"
+        },
+        "ok_started": "2026-10-16T12:00:00Z",
+        "warnings": [
+          {
+            "count": 1,
+            "items": [
+              [
+                "/a",
+                "denied"
+              ]
+            ],
+            "kind": "skipped",
+            "level": "warning",
+            "text": "the last backup could not read 1 item: /a (denied)"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "check": null,
+          "check_schedule": {
+            "cron": "@daily",
+            "next": "2026-10-17T00:00:00Z"
+          },
+          "check_subsets": "10",
+          "copy": {
+            "by": null,
+            "cancelled": false,
+            "failures": 1,
+            "last_attempt": "2026-10-16T12:00:00Z",
+            "last_error": {
+              "error": "unreachable",
+              "kind": "failed",
+              "level": "failure",
+              "step": "copy to Docs-usb",
+              "stopped": false,
+              "subject": "copy to Docs-usb",
+              "text": "unreachable"
+            },
+            "last_ok": null,
+            "note": null,
+            "ok_started": null,
+            "warnings": []
+          },
+          "forget": null,
+          "lag": {
+            "behind_since": "2026-10-16T12:00:00Z",
+            "checked_at": "2026-10-16T12:00:00Z",
+            "listed": true
+          },
+          "latest_snapshot": null,
+          "missing": false,
+          "name": "Docs-usb",
+          "next_subset": null,
+          "prune": null,
+          "prune_schedule": {
+            "cron": "@daily",
+            "next": "2026-10-17T00:00:00Z"
+          },
+          "repository": "rest:http://usb/docs",
+          "stale_at": "2026-10-18T00:00:00Z",
+          "status": {
+            "kind": "copy-failing"
+          }
+        }
+      ],
+      "title": "Docs"
+    }
+  ],
+  "level": "warning",
+  "time": "2026-10-16T12:00:00Z",
+  "untested": null,
+  "version": 0
+}

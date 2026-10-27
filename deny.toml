@@ -1,0 +1,38 @@
+[graph]
+all-features = true
+
+[advisories]
+unmaintained = "all"
+ignore = [
+  { id = "RUSTSEC-2026-0374", reason = "compile-time only, in askama_derive; no replacement released" },
+  { id = "RUSTSEC-2024-0370", reason = "in the GTK of tray-icon on Linux, where rusticlone has no tray icon" },
+]
+
+[licenses]
+allow = [
+  "AGPL-3.0-or-later",
+  "CC0-1.0",
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-1-Clause",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+]
+private = { ignore = true }
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

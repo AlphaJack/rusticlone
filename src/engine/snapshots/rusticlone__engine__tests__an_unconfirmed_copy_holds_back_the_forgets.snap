@@ -1,0 +1,208 @@
+---
+source: src/engine/tests.rs
+assertion_line: 171
+expression: "outcome(&replay, &report, &engine, &collections[0])"
+---
+{
+  "rustic": [
+    "-P Docs snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs cat config",
+    "-P Docs-usb cat config",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs copy 2222222222222222222222222222222222222222222222222222222222222222 --target Docs-usb",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs"
+  ],
+  "report": [
+    [
+      "failure",
+      "copy to Docs-usb: 1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log"
+    ],
+    [
+      "warning",
+      "forget on Docs-usb: skipped because copy to Docs-usb did not succeed"
+    ],
+    [
+      "warning",
+      "forget on Docs: skipped because copy to Docs-usb did not succeed"
+    ]
+  ],
+  "steps": [
+    {
+      "label": "copy to Docs-usb",
+      "repo": "Docs-usb",
+      "needs": [],
+      "status": "failed",
+      "started": "2026-10-16T12:00:00Z",
+      "finished": "2026-10-16T12:01:00Z",
+      "results": [
+        {
+          "level": "failure",
+          "subject": "copy to Docs-usb",
+          "text": "1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log",
+          "error": "1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log",
+          "kind": "failed",
+          "step": "copy to Docs-usb",
+          "stopped": false
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    },
+    {
+      "label": "forget on Docs-usb",
+      "repo": "Docs-usb",
+      "needs": [
+        0
+      ],
+      "status": "skipped",
+      "started": null,
+      "finished": null,
+      "results": [
+        {
+          "level": "warning",
+          "subject": "forget on Docs-usb",
+          "text": "skipped because copy to Docs-usb did not succeed",
+          "kind": "unmet",
+          "needs": [
+            "copy to Docs-usb"
+          ],
+          "step": "forget on Docs-usb"
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    },
+    {
+      "label": "forget on Docs",
+      "repo": "Docs",
+      "needs": [
+        0
+      ],
+      "status": "skipped",
+      "started": null,
+      "finished": null,
+      "results": [
+        {
+          "level": "warning",
+          "subject": "forget on Docs",
+          "text": "skipped because copy to Docs-usb did not succeed",
+          "kind": "unmet",
+          "needs": [
+            "copy to Docs-usb"
+          ],
+          "step": "forget on Docs"
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    }
+  ],
+  "status": {
+    "title": "Docs",
+    "level": "warning",
+    "issues": [
+      {
+        "kind": "copy-failed",
+        "step": "copy:Docs/Docs-usb",
+        "error": {
+          "level": "failure",
+          "subject": "copy to Docs-usb",
+          "text": "1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log",
+          "error": "1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log",
+          "kind": "failed",
+          "step": "copy to Docs-usb",
+          "stopped": false
+        },
+        "by": {
+          "collection": "Docs",
+          "run": 1792152000000,
+          "step": 0,
+          "scheduled": false
+        },
+        "level": "warning",
+        "text": "copy to Docs-usb: 1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log"
+      }
+    ],
+    "last_backup": "2026-10-16T09:00:00Z",
+    "backup_schedule": null,
+    "snapshot": null,
+    "primary": {
+      "name": "Docs",
+      "prune_schedule": null,
+      "check_schedule": null,
+      "repository": "rest:http://backup/docs",
+      "latest_snapshot": "2026-10-16T09:00:00Z",
+      "next_subset": null,
+      "check_subsets": "10",
+      "prune": null,
+      "check": null,
+      "forget": null,
+      "missing": false,
+      "stale_at": "2026-10-23T09:00:00Z",
+      "status": {
+        "kind": "in-sync"
+      }
+    },
+    "targets": [
+      {
+        "name": "Docs-usb",
+        "prune_schedule": null,
+        "check_schedule": null,
+        "repository": "rest:http://usb/docs",
+        "latest_snapshot": "2026-10-15T13:20:00Z",
+        "next_subset": null,
+        "check_subsets": "10",
+        "prune": null,
+        "check": null,
+        "forget": null,
+        "copy": {
+          "last_ok": null,
+          "last_attempt": "2026-10-16T12:01:00Z",
+          "failures": 1,
+          "last_error": {
+            "level": "failure",
+            "subject": "copy to Docs-usb",
+            "text": "1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log",
+            "error": "1 of 1 snapshot not copied: rustic copy exited 0 without doing it; see rustic's log",
+            "kind": "failed",
+            "step": "copy to Docs-usb",
+            "stopped": false
+          },
+          "note": null,
+          "cancelled": false,
+          "ok_started": null,
+          "warnings": [],
+          "by": {
+            "collection": "Docs",
+            "run": 1792152000000,
+            "step": 0,
+            "scheduled": false
+          }
+        },
+        "lag": {
+          "checked_at": "2026-10-16T12:01:00Z",
+          "behind_since": "2026-10-16T09:00:00Z",
+          "listed": false
+        },
+        "missing": false,
+        "stale_at": "2026-10-23T09:00:00Z",
+        "status": {
+          "kind": "copy-failing"
+        }
+      }
+    ],
+    "running": []
+  }
+}

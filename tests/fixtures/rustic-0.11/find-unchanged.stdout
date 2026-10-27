@@ -1,0 +1,4 @@
+
+searching in snapshots group (host [host], label [], paths [/fixture/src/docs])...
+found in 11111111 from 2026-10-15 13:20:00 (+1)
+lrwxrwxrwx       me       me         9 15 Oct 2026 13:21 "fixture/src/docs/link" -> sub/b.txt

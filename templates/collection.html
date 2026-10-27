@@ -1,0 +1,25 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<nav class="crumbs"><a href="{{ base }}{{ Route::Index }}">{{ Heading::Collections }}</a><span>/</span><span>{{ collection.title }}</span></nav>
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h1>{{ m::collection_dot(collection) }}{{ collection.title }}</h1>
+      {% if let Some(file) = collection.file %}<p class="path muted">{{ m::copyable("file", file) }}<code>{{ file }}</code></p>{% endif %}
+    </div>
+    {% if collection.notifies %}<div class="actions"><button class="btn" hx-post="{{ base }}{{ Route::Notifications(collection.name) }}">{{ m::icon("test") }}{{ Button::TestNotification }}</button></div>{% endif %}
+  </div>
+</section>
+{% if !collection.issues.is_empty() %}
+<section class="card">
+  <div class="card-head"><div><h2>{{ Heading::Issues }}</h2></div></div>
+  <ul class="issues">{% for issue in collection.issues %}<li>{{ m::health(issue.level()) }}<span>{% if let Some(by) = issue.by() %}<a href="{{ base }}{{ Route::Run(by.collection, *by.run) }}#log">{{ issue.text(self::now()) }}</a>{% else if let Some(url) = issue.fix_url() %}<a href="{{ url }}">{{ issue.text(self::now()) }}</a>{% else %}{{ issue.text(self::now()) }}{% endif %}</span>{% if let Some(step) = issue.step() %}<button class="icon-btn small" title="{{ Button::Dismiss }}" hx-delete="{{ base }}{{ Route::Failure(collection.name, step.to_string().as_str()) }}">{{ m::icon("close") }}</button>{% endif %}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% include "sources.html" %}
+{% include "repos.html" %}
+<section class="card" id="runs">
+  <div class="card-head"><div><h2>{{ Heading::Runs }}</h2></div></div>
+  {% include "runs.html" %}
+</section>
+{% include "log.html" %}

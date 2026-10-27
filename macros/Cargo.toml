@@ -1,0 +1,25 @@
+[package]
+name = "rusticlone-macros"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata.dist]
+dist = false
+
+[lib]
+proc-macro = true
+# No tests of its own: the derives are tested where they are used. Its test binary would also need libstd
+# from the toolchain at run time, which a test runner that clears DYLD_* variables does not pass on.
+test = false
+doctest = false
+
+[lints]
+workspace = true
+
+[dependencies]
+fluent-syntax = "0.12.0"
+heck = "0.5.0"
+proc-macro2 = "1.0.107"
+quote = "1.0.47"
+syn = { version = "2.0.119", features = ["full"] }

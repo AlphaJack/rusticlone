@@ -1,0 +1,25 @@
+---
+source: src/rustic/contents.rs
+expression: diff(&report)
+---
+Diff {
+    changes: [
+        (
+            "removed",
+            "/fixture/src/docs/a \"x\"\tb\\c.txt",
+        ),
+        (
+            "added",
+            "/fixture/src/docs/new.txt",
+        ),
+        (
+            "changed",
+            "/fixture/src/docs/sub/b.txt",
+        ),
+    ],
+    totals: [
+        "files: 1 added, 1 removed, 1 changed",
+        "dirs: 5 identical",
+        "symlinks: 1 identical",
+    ],
+}

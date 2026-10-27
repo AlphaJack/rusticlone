@@ -1,0 +1,83 @@
+name: Bug
+description: Something does not work as the README says
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+      placeholder: |
+        I ran `rusticlone backup Documents`. I expected a copy in Documents-b2, but it failed with "...".
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The commands you ran or the pages you clicked.
+      placeholder: |
+        1. rusticlone backup Documents
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Run the failing command again with `-v` (for example `rusticlone -v backup Documents`) and paste everything it prints. For the web UI, paste the run's log. Hide your file names.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: profiles
+    attributes:
+      label: Profiles
+      description: The rustic profiles of the collection. Replace passwords, tokens and keys with XXXXXX.
+      render: toml
+    validations:
+      required: true
+  - type: textarea
+    id: collections
+    attributes:
+      label: Collection status
+      description: The output of `rusticlone collections --json`.
+      render: json
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: The output of `rusticlone --version; rustic --version; rclone version | head -1`
+      placeholder: rusticlone 2.0.0, rustic v0.11.4, rclone v1.71.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed with
+      options:
+        - One-line installer
+        - Release binary
+        - Container image
+        - AUR
+        - cargo
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: runner
+    attributes:
+      label: Runs as
+      options:
+        - Regular user
+        - Admin user
+        - Container
+    validations:
+      required: true

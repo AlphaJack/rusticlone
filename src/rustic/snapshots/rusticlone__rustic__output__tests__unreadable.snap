@@ -1,0 +1,5 @@
+---
+source: src/rustic/output.rs
+expression: "output(\"snapshots\", &stderr, false).failure()"
+---
+rustic snapshots failed (exit 1): Failed to read the contents of the file. Please check the file and try again. (path: /fixture/repo/snapshots/1111111111111111111111111111111111111111111111111111111111111111; Permission denied (os error 13))

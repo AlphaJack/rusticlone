@@ -1,0 +1,28 @@
+{% import "macros.html" as m %}
+{% if runs.is_empty() %}
+<p class="muted">{{ Hint::NoRuns }}</p>
+{% else %}
+<div class="table-wrap scroll"><table class="table" data-sort="runs">
+  <thead><tr>{% if with_collection %}<th>{{ Heading::Collection }}</th>{% endif %}<th class="status"><span class="sr">{{ Heading::Status }}</span></th><th>{{ Heading::Run }}</th><th>{{ Heading::Start }}</th><th class="right wide">{{ Heading::Wait }}</th><th class="right wide">{{ Heading::Duration }}</th><th class="wide">{{ Heading::Trigger }}</th><th class="wide">{{ Heading::WaitingFor }}</th><th class="wide">{{ Heading::Using }}</th><th>{{ Heading::Result }}</th></tr></thead>
+  <tbody>
+  {% for run in runs %}
+  <tr{% if run.shown %} aria-current="true"{% endif %}>
+    {% if with_collection %}<td class="nowrap"><a class="strong" href="{{ base }}{{ Route::Collection(run.collection) }}">{{ run.title }}</a></td>{% endif %}
+    <td class="status">{% if run.stoppable %}<button class="stop" title="{{ Button::Stop }}" aria-label="{{ Button::Stop }}" hx-delete="{{ base }}{{ Route::Run(run.collection, *run.id) }}"><span class="spinner"></span>{{ m::icon("close") }}</button>{% else if run.level == "running" %}<span class="spinner" title="{% if run.waiting %}{{ Label::Waiting }}{% else %}{{ crate::result::Status::Running }}{% endif %}"></span>{% else %}{{ m::dot(run.level, run.level) }}{% endif %}</td>
+    <td class="nowrap">{% if run.waiting %}{{ run.label }}{% else %}{% let href = Route::Run(run.collection, *run.id) %}<a href="{{ base }}{{ href }}#log"{% if !with_collection %} hx-get="{{ base }}{{ href }}" hx-select="main" hx-target="main" hx-swap="outerHTML" hx-push-url="true"{% endif %}>{{ run.label }}</a>{% endif %}</td>
+    <td class="nowrap">{{ run.time }}</td>
+    <td class="right nowrap wide">{% if let Some(since) = run.waiting_since %}{{ since }}{% else %}{{ run.waited }}{% endif %}</td>
+    <td class="right nowrap wide">{% if let Some(since) = run.since %}{{ since }}{% else %}{{ run.duration }}{% endif %}</td>
+    <td class="wide"><span class="tag">{{ run.trigger }}</span></td>
+    <td class="nowrap wide">{% if let Some(lock) = run.holds.waiting_for %}{% if let Some(holder) = run.holder %}<a class="tag" href="{{ base }}{{ holder }}#log" title="{{ Hint::Holder }}">{{ lock }}</a>{% else %}<span class="tag">{{ lock }}</span>{% endif %}{% endif %}</td>
+    <td class="nowrap wide">{% for lock in run.holds.using %}<span class="tag">{{ lock }}</span> {% endfor %}</td>
+    {% if !run.progress.is_empty() %}
+    <td class="ellipsis">{{ run.summary }}</td>
+    {% else %}
+    <td class="ellipsis" title="{{ run.summary }}">{% if !run.summary.is_empty() %}{{ m::copyable("copy", run.summary) }}{% endif %}{{ run.summary }}</td>
+    {% endif %}
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
