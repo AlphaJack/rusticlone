@@ -1,5 +1,10 @@
 # Changelog - toc
 
+## [1.6.1.post1] - 2026-10-27
+### Documentation
+
+- Deprecate v1
+
 ## [1.6.0] - 2025-09-22
 ### Added
 
