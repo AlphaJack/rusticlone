@@ -1,7 +1,9 @@
 # Rusticlone
 
-![Web UI collections](./screenshots/web-light-collections.png#gh-light-mode-only)
-![Web UI collections](./screenshots/web-dark-collections.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-dark-collections.png">
+  <img alt="Web UI collections" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-light-collections.png">
+</picture>
 
 Rusticlone backs up your computers and servers on a schedule, keeps copies in more than one place and warns you when something needs your attention.
 
@@ -54,8 +56,10 @@ Profiles are simple .toml files that contain the information about what folders 
 
 **Keep a copy of them away from the computer (e.g. password manager, cloud drive, private git repo), as you'll need them to restore your files in case of a disaster.**
 
-<img alt="Web UI setup" src="./screenshots/web-light-setup.png#gh-light-mode-only" width="500">
-<img alt="Web UI setup" src="./screenshots/web-dark-setup.png#gh-dark-mode-only" width="500">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-dark-setup.png">
+  <img alt="Web UI setup" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-light-setup.png" width="500">
+</picture>
 
 If you already use rustic, just add these environment variables to your profiles and launch the server with the same command:
 
@@ -161,8 +165,10 @@ RUSTICLONE_CHECK_SUBSETS="50"
 `rusticlone backup --collection Documents` snapshots the sources to the primary repository, copies the new snapshot to `Documents-b2`, then marks old snapshots for deletion in each repository according to its `[forget]` policy.
 For safety, the primary forgets only after every target has received the copy.
 
-![CLI backup progress](./screenshots/cli-light-backup-3.png#gh-light-mode-only)
-![CLI backup progress](./screenshots/cli-dark-backup-3.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-dark-backup-3.png">
+  <img alt="CLI backup progress" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-light-backup-3.png">
+</picture>
 
 For extra safety, one of your copy targets can be, like `Documents-b2`, a repository on an air-gapped device (unmounted HDD) or an immutable endpoint (blob storage with [Object Lock](https://www.backblaze.com/blog/object-lock-101-protecting-data-from-ransomware/), or an append-only [REST server](https://github.com/restic/rest-server)).
 This will give you the second 1 in the [3-2-1-1-0](https://www.backblaze.com/blog/whats-the-diff-3-2-1-vs-3-2-1-1-0-vs-4-3-2/#:~:text=What%20Is%203-2-1-1-0%3F) backup strategy.
@@ -178,8 +184,10 @@ Add-MpPreference -ExclusionProcess rustic.exe
 
 A snapshot is not a full copy of your files, but a record of what has changed since the last backup:
 
-![Web UI changes](./screenshots/web-light-changes.png#gh-light-mode-only)
-![Web UI changes](./screenshots/web-dark-changes.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-dark-changes.png">
+  <img alt="Web UI changes" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-light-changes.png">
+</picture>
 
 That's why only the first snapshot is large, and backups are much faster from the second one onwards.
 
@@ -189,8 +197,10 @@ That's why only the first snapshot is large, and backups are much faster from th
 By default, 1/10th of each repo is checked every time and Rusticlone remembers which subset is due next, so with 10 runs it covers the entire repo.
 If a subset is failing, it will not advance to the next subset, and will notify you of the issue.
 
-![CLI check](./screenshots/cli-light-check-progress.png#gh-light-mode-only)
-![CLI check](./screenshots/cli-dark-check-progress.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-dark-check-progress.png">
+  <img alt="CLI check" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-light-check-progress.png">
+</picture>
 
 The `RUSTICLONE_CHECK_SUBSETS` variable also accepts 0 for fast metadata-only checks, and values like "10MiB" or "10%" for random subsets.
 Repositories in the same collection can have separate check schedules.
@@ -199,8 +209,10 @@ Repositories in the same collection can have separate check schedules.
 
 `rusticlone prune --collection Documents` deletes files of snapshots marked for deletion.
 
-![CLI prune](./screenshots/cli-light-prune.png#gh-light-mode-only)
-![CLI prune](./screenshots/cli-dark-prune.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-dark-prune.png">
+  <img alt="CLI prune" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-light-prune.png">
+</picture>
 
 As this can be a slow operation, its schedule is independent of the backup and check ones.
 Like checks, repositories in the same collection can have separate prune schedules.
@@ -212,15 +224,19 @@ A repository without `keep-*` options in `[forget]` won't be pruned by Rusticlon
 `rusticlone due --collection Documents` runs whatever is past due for the collection according to its repo schedules.
 This means you can run overdue backups, checks and prunes without spinning up the server or running each command individually.
 
-![CLI due](./screenshots/cli-light-due.png#gh-light-mode-only)
-![CLI due](./screenshots/cli-dark-due.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-dark-due.png">
+  <img alt="CLI due" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-light-due.png">
+</picture>
 
 ### Notifications
 
 Notifications are only sent when a collection's status changes (like Uptime Kuma up/down), not at every run.
 
-<img alt="Notification" src="./screenshots/notification-light.png#gh-light-mode-only" width="503">
-<img alt="Notification" src="./screenshots/notification-dark.png#gh-dark-mode-only" width="503">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/notification-dark.png">
+  <img alt="Notification" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/notification-light.png" width="503">
+</picture>
 
 If you'd rather receive a notification at every backup operation, you can use rustic [hooks](https://github.com/rustic-rs/rustic/blob/main/config/full.toml#L207) in your profiles.
 
@@ -237,8 +253,10 @@ Don't panic! On a reinstalled computer:
 2. download Rusticlone and move it to the folder with your profiles
 3. run `rusticlone restore --all`. Rusticlone offers to download rustic if it's missing. If you don't feel sure yet, append `--dry-run` to see what would happen, or restore one `--collection` at a time
 
-![CLI restore](./screenshots/cli-light-restore.png#gh-light-mode-only)
-![CLI restore](./screenshots/cli-dark-restore.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-dark-restore.png">
+  <img alt="CLI restore" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-light-restore.png">
+</picture>
 
 This will restore each collection from the latest snapshot of available repositories, giving preference to the primary.
 Rusticlone then offers to copy the profiles where it usually looks for them, so the backup server can use them too.
@@ -260,8 +278,10 @@ More flags are available with `rusticlone restore --help`
 
 The web UI offers the same options:
 
-![Web UI restore](./screenshots/web-light-restore.png#gh-light-mode-only)
-![Web UI restore](./screenshots/web-dark-restore.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-dark-restore.png">
+  <img alt="Web UI restore" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-light-restore.png">
+</picture>
 
 ### Resuming backups after disaster recovery
 
@@ -284,8 +304,10 @@ rusticlone recreate --repo Documents-hdd
 `rusticlone serve` shows the status of your collections, live progress and logs.
 From there you can start and stop runs, browse and download snapshots, compare them, and restore files or folders.
 
-![Web UI runs](./screenshots/web-light-runs.png#gh-light-mode-only)
-![Web UI runs](./screenshots/web-dark-runs.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-dark-runs.png">
+  <img alt="Web UI runs" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-light-runs.png">
+</picture>
 
 If `RUSTICLONE_LISTEN` is not set, the server will listen on localhost on port 32110.
 If `RUSTICLONE_ADMIN_TOKEN` is not set, the server generates a random token in the state folder (see location below).
@@ -295,8 +317,10 @@ If `RUSTICLONE_ADMIN_TOKEN` is not set, the server generates a random token in t
 To access the web UI, open the desktop app, use the tray icon or run `rusticlone serve --open`.
 This way, the token will be automatically passed to the login page and you won't need to enter it manually.
 
-<img alt="Tray icon" src="./screenshots/tray-light.png#gh-light-mode-only" width="390">
-<img alt="Tray icon" src="./screenshots/tray-dark.png#gh-dark-mode-only" width="390">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/tray-dark.png">
+  <img alt="Tray icon" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/tray-light.png" width="390">
+</picture>
 
 #### Remote server
 
@@ -368,8 +392,10 @@ There you can find rustic logs, process locks and a [redb](https://www.redb.org/
 
 Commands, the server and its schedule can run at the same time: each run waits for the disk, network link or CPU that another holds.
 
-![CLI backups at the same time](./screenshots/cli-light-holds.png#gh-light-mode-only)
-![CLI backups at the same time](./screenshots/cli-dark-holds.png#gh-dark-mode-only)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-dark-holds.png">
+  <img alt="CLI backups at the same time" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/cli-light-holds.png">
+</picture>
 
 ### Container image
 
