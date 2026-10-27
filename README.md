@@ -33,10 +33,11 @@ Arch Linux (AUR):
 yay -S rusticlone-bin
 ```
 
-Cargo bininstall:
+Cargo, as a release binary or built from source:
 
 ```sh
-cargo binstall --git https://github.com/AlphaJack/rusticlone rusticlone
+cargo binstall rusticlone
+cargo install rusticlone
 ```
 
 Manual installation: [GitHub release binaries](https://github.com/AlphaJack/rusticlone/releases)
