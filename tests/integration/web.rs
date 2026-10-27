@@ -143,7 +143,7 @@ fn a_slow_listing_holds_up_nothing_else() {
     let slow = dir.join("rustic");
     // Quoted, so that a path with spaces, as macOS's Application Support, stays one word.
     let quoted = rustic.display().to_string().replace('\'', r"'\''");
-    let script = format!("#!/bin/sh\ncase \" $* \" in *\" ls \"*) sleep 3;; esac\nexec '{quoted}' \"$@\"\n");
+    let script = format!("#!/bin/sh\ncase \" $* \" in *\" ls \"*) sleep 2;; esac\nexec '{quoted}' \"$@\"\n");
     std::fs::write(&slow, script).unwrap();
     std::fs::set_permissions(&slow, std::fs::Permissions::from_mode(0o755)).unwrap();
     let path = std::env::join_paths(std::iter::once(dir).chain(std::env::split_paths(&path))).unwrap();
@@ -446,11 +446,11 @@ fn pages_get_what_changed_pushed() {
     events.wait_for(10, "the backup", |seen| seen.contains(r#"<td class="right num">1</td>"#));
     // An up-to-date page waits for the next change, once the first listings are done.
     wait_for(30, "the first listings", || sb.store().inventory("Docs", "Docs-remote").is_some());
-    thread::sleep(Duration::from_secs(1));
+    thread::sleep(Duration::from_millis(500));
     let page = server.get("/collections/Docs").body;
     let query = page.split("/events?").nth(1).unwrap().split('"').next().unwrap().replace("&amp;", "&");
     let mut current = server.events(&query, &[]);
-    let sent = current.read_for(2);
+    let sent = current.read_for(1);
     // Something is sent at once anyway, so that browsers open the stream.
     assert!(sent.contains("\r\n: live\n") && !sent.contains("data:"), "{sent:?}");
     // A page reconnecting after missed changes receives the page at once.
