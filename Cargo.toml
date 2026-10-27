@@ -8,7 +8,6 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-# Shown by crates.io and the Homebrew formula.
 homepage = "https://github.com/AlphaJack/rusticlone"
 exclude = [".*", "flake.*", "packaging", "screenshots", "xtask"]
 
@@ -222,7 +221,6 @@ inherits = "release"
 cargo-dist-version = "0.33.0"
 ci = "github"
 installers = ["shell", "powershell", "homebrew"]
-# The formula, written at each stable release: `brew install AlphaJack/tap/rusticlone`.
 tap = "AlphaJack/homebrew-tap"
 publish-jobs = ["homebrew"]
 targets = [
@@ -258,7 +256,6 @@ armv7-unknown-linux-musleabihf = "ubuntu-24.04"
 aarch64-apple-darwin = "macos-14"
 x86_64-pc-windows-msvc = "windows-2022"
 
-# What the formula installs beside rusticlone, from homebrew-core.
 [workspace.metadata.dist.dependencies.homebrew]
 rustic = { stage = ["run"] }
 
