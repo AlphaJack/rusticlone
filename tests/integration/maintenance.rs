@@ -138,30 +138,31 @@ fn a_stopped_prune_leaves_the_repository_whole() {
     let prune = || {
         sb.command("rustic").args(["-P", "Docs", "prune"]).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap()
     };
-    // The faster of two: the first can be slowed by a cold disk cache that the stopped ones no longer meet.
-    let timed = || {
-        copy(&kept, &repo);
-        let started = Instant::now();
-        assert!(prune().wait().unwrap().success());
-        started.elapsed()
-    };
-    let whole = timed().min(timed());
+    copy(&kept, &repo);
+    let started = Instant::now();
+    assert!(prune().wait().unwrap().success());
+    let whole = started.elapsed();
     let mut stopped = 0;
     for sixth in 1..6 {
-        copy(&kept, &repo);
-        let mut pruning = prune();
         // In the first half of its time, so that a prune on a machine twice as fast is still stopped.
-        std::thread::sleep(whole * sixth / 12);
-        // Finished before the kill on a much less busy machine: nothing to stop.
-        if pruning.try_wait().unwrap().is_some() {
-            continue;
+        let mut wait = whole * sixth / 12;
+        // A prune that ended before the kill, as the first one can be slower, starts again with half the wait.
+        for _ in 0..4 {
+            copy(&kept, &repo);
+            let mut pruning = prune();
+            std::thread::sleep(wait);
+            if pruning.try_wait().unwrap().is_some() {
+                wait /= 2;
+                continue;
+            }
+            stopped += 1;
+            _ = pruning.kill();
+            _ = pruning.wait();
+            // A killed prune could lose a pack or index. `check` verifies that every referenced one exists.
+            assert!(ok(&["check"]), "killed at {sixth}/6: the repository is damaged");
+            assert!(ok(&["prune"]) && ok(&["check"]), "killed at {sixth}/6: the next prune failed");
+            break;
         }
-        stopped += 1;
-        _ = pruning.kill();
-        _ = pruning.wait();
-        // A killed prune could lose a pack or index. `check` verifies that every referenced one exists.
-        assert!(ok(&["check"]), "killed at {sixth}/6: the repository is damaged");
-        assert!(ok(&["prune"]) && ok(&["check"]), "killed at {sixth}/6: the next prune failed");
     }
     assert!(stopped >= 3, "only {stopped} of 5 prunes were stopped before they ended");
 }
