@@ -3,7 +3,6 @@ name: Release PR
 # requirements: a token other than the repository's, whose PRs and tags start no workflow
 # - secret RELEASE_PLZ_TOKEN, a fine-grained PAT with read and write access to contents and
 #   pull requests of this repository
-# - secret CARGO_REGISTRY_TOKEN, a crates.io token that publishes rusticlone and rusticlone-macros
 
 on:
   push:
@@ -35,4 +34,3 @@ jobs:
         uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c # v0.5.147
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
