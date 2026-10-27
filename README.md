@@ -28,24 +28,11 @@
 
 # Rusticlone
 
-<div style='text-align: center;'>
-<img alt="PyPI Downloads" src="https://static.pepy.tech/badge/rusticlone">
-<img alt="Test Coverage" src="https://github.com/AlphaJack/rusticlone/raw/master/images/coverage.svg">
-</div>
+> ⚠️ **Rusticlone v1 (Python) is deprecated and no longer maintained.**
+> Rusticlone v2 is a rewrite in Rust with a different architecture: see <https://github.com/AlphaJack/rusticlone>.
+> The v1 source code lives in the [`v1` branch](https://github.com/AlphaJack/rusticlone/tree/v1).
 
-<p style='text-align: center;'>
-<strong>3-2-1 backups using Rustic and RClone</strong>
-</p>
-
-<div style='text-align: left;'>
-    <img alt="backup process divided in archive and upload" src="https://github.com/AlphaJack/rusticlone/raw/master/images/process-backup.png" style="width: 43%; vertical-align: top;"/>
-    <img alt="output of rusticlone backup parallel" src="https://github.com/AlphaJack/rusticlone/raw/master/images/parallel-backup.png" style="width: 40%; vertical-align: top;"/>
-    <img alt="output of rusticlone backup sequential" src="https://github.com/AlphaJack/rusticlone/raw/master/images/sequential-backup.png" style="width: 14%; vertical-align: top;"/>
-    <br/>
-    <img alt="restore process divided in download and extract" src="https://github.com/AlphaJack/rusticlone/raw/master/images/process-restore.png" style="width: 43%; vertical-align: top;"/>
-    <img alt="output of rusticlone restore parallel" src="https://github.com/AlphaJack/rusticlone/raw/master/images/parallel-restore.png" style="width: 40%; vertical-align: top;"/>
-    <img alt="output of rusticlone restore sequential" src="https://github.com/AlphaJack/rusticlone/raw/master/images/sequential-restore.png" style="width: 14%; vertical-align: top;"/>
-</div>
+**3-2-1 backups using Rustic and RClone**
 
 ## Motivation
 
@@ -202,8 +189,6 @@ rusticlone extract
 ### Push notifications
 
 Rusticlone can send a push notification with the operation results using Apprise:
-
-<img alt="Push Notification" src="https://github.com/AlphaJack/rusticlone/raw/master/images/notification.png">
 
 Just pass the [Apprise notification URL](https://github.com/caronc/apprise?tab=readme-ov-file#supported-notifications) via the `--apprise-url` argument or `APPRISE_URL` environment variable:
 
