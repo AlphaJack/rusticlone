@@ -1,0 +1,318 @@
+[package]
+name = "rusticlone"
+description = "3-2-1-1-0 backups using rustic profiles"
+# Also what desktop search matches: build.rs hands them to the code.
+keywords = ["backup", "restore", "snapshot"]
+version = "2.0.0"
+edition = "2024"
+rust-version = "1.95"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/AlphaJack/rusticlone"
+
+[features]
+default = ["desktop", "self-update"]
+# The scheduler and the web UI.
+server = [
+    "dep:askama",
+    "dep:axum",
+    "dep:futures-util",
+    "dep:nix",
+    "dep:open",
+    "dep:quick_cache",
+    "dep:sd-notify",
+    "dep:socket2",
+    "dep:tokio",
+    "dep:fluent-langneg",
+    "dep:tokio-util",
+]
+# What a computer with a user needs, and a container does not: the tray icon and starting the server at
+# login.
+desktop = [
+    "server",
+    "dep:tray-icon",
+    "dep:windows-service",
+    "dep:mslnk",
+    "dep:objc2",
+    "dep:objc2-app-kit",
+    "dep:objc2-core-graphics",
+    "dep:objc2-foundation",
+    "dep:dispatch2",
+    "dep:objc2-service-management",
+    "dep:ksni",
+    "dep:zbus",
+    "dep:winresource",
+]
+# Downloading rusticlone's and rustic's releases: `update`, `--auto-update`, and rustic when it is missing.
+self-update = [
+    "dep:flate2",
+    "dep:minisign-verify",
+    "dep:self-replace",
+    "dep:sigstore-verify",
+    "dep:tar",
+    "dep:zip",
+]
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = "1.0.104"
+bytesize = "2.7.0"
+clap = { version = "4.6.7", features = ["derive", "env", "wrap_help"] }
+clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
+ctrlc = { version = "3.5.2", features = ["termination"] }
+dunce = "1.0.5"
+etcetera = "0.11.0"
+jiff = { version = "0.2.38", features = ["serde"] }
+mercurio = { version = "0.2.4", default-features = false, features = [
+    "transport-blocking",
+    "bundle-certificates",
+    "service-appriseapi",
+    "service-dbus",
+    "service-discord",
+    "service-email",
+    "service-form",
+    "service-gotify",
+    "service-homeassistant",
+    "service-json",
+    "service-macosx",
+    "service-matrix",
+    "service-ntfy",
+    "service-pushover",
+    "service-signalapi",
+    "service-slack",
+    "service-telegram",
+    "service-windows",
+    "service-xml",
+] }
+redb = { version = "4.4.0", features = ["experimental-multiprocess"] }
+# kqueue on macOS: FSEvents reports another process's writes to the state late or not at all, so a
+# cancelled run kept waiting.
+notify = { version = "8.2.0", default-features = false, features = ["macos_kqueue"] }
+parking_lot = "0.12.5"
+quick_cache = { version = "0.7.0", optional = true }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+strum = { version = "0.28.0", features = ["derive"] }
+thiserror = "2.0.21"
+askama = { version = "0.16.1", optional = true }
+axum = { version = "0.8.9", optional = true }
+futures-util = { version = "0.3.34", default-features = false, optional = true }
+getrandom = "0.4.3"
+socket2 = { version = "0.6.5", optional = true }
+tokio = { version = "1.53.3", features = ["rt", "net", "sync", "time", "signal", "process", "macros", "io-util"], optional = true }
+tokio-util = { version = "0.7.20", features = ["io"], optional = true }
+open = { version = "5.4.5", optional = true }
+flate2 = { version = "1.1.10", optional = true }
+tar = { version = "0.4.46", optional = true }
+minisign-verify = { version = "0.3.0", optional = true }
+toml_edit = { version = "0.25.17", features = ["serde"] }
+dotenvy = "0.15.7"
+semver = { version = "1.0.28", features = ["serde"] }
+self-replace = { version = "1.5.0", optional = true }
+ring = "0.17.14"
+# GitHub's build attestations of rusticlone's releases.
+sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
+# Text for users, in the language the user prefers: i18n/<language>/rusticlone.ftl.
+i18n-embed = { version = "0.16.0", features = ["fluent-system"] }
+fluent = "0.17.0"
+# Picks a page's language from its Accept-Language header.
+fluent-langneg = { version = "0.13.1", optional = true }
+# The languages that macOS's and Windows's settings list, when no LANG or LC_* variable asks for one.
+sys-locale = "0.3.2"
+rusticlone-macros = { path = "macros" }
+# The catalogs, in debug builds too, which run on other computers than the one that builds them.
+rust-embed = { version = "8.13.0", features = ["debug-embed"] }
+
+[build-dependencies]
+# The executable's icon, name and manifest on Windows.
+winresource = { version = "0.1.34", optional = true }
+# Reads the keywords of this file.
+toml_edit = "0.25.17"
+
+[dev-dependencies]
+insta = { version = "1.49.0", features = ["json", "filters"] }
+scraper = "0.29.0"
+proc-macro2 = "1.0.107"
+syn = { version = "2.0.119", features = ["full", "visit"] }
+
+[target."cfg(unix)".dependencies]
+libc = "0.2.190"
+sd-notify = { version = "0.5.0", optional = true }
+
+[target."cfg(target_os = \"linux\")".dependencies]
+# The tray icon, over D-Bus.
+ksni = { version = "0.3.7", optional = true }
+# Whether the panel is light or dark, from the desktop portal: the bus that ksni uses.
+zbus = { version = "5.19.0", default-features = false, features = ["tokio"], optional = true }
+nix = { version = "0.31.3", features = ["time"], optional = true }
+
+# The tray icon in macOS's menu bar and Windows's taskbar.
+[target."cfg(any(target_vendor = \"apple\", windows))".dependencies]
+tray-icon = { version = "0.26.1", optional = true }
+
+[target."cfg(target_vendor = \"apple\")".dependencies]
+objc2 = { version = "0.6.5", optional = true }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = [
+    "std",
+    "NSApplication",
+    "NSBox",
+    "NSButton",
+    "NSColor",
+    "NSControl",
+    "NSEvent",
+    "NSGraphics",
+    "NSGraphicsContext",
+    "NSImage",
+    "NSResponder",
+    "NSRunningApplication",
+    "NSStatusBarButton",
+    "NSStatusItem",
+    "NSView",
+], optional = true }
+objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGSession"], optional = true }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSGeometry", "NSDate", "NSURL", "NSString"], optional = true }
+dispatch2 = { version = "0.3.1", optional = true }
+# Whether the user allowed the server to start at login.
+objc2-service-management = { version = "0.3.2", default-features = false, features = ["std", "SMAppService", "objc2", "objc2-foundation"], optional = true }
+
+[target."cfg(windows)".dependencies]
+zip = { version = "9.1.0", default-features = false, features = ["deflate-flate2"], optional = true }
+# The system service.
+windows-service = { version = "0.8.1", optional = true }
+# The Start menu entry.
+mslnk = { version = "0.1.8", optional = true }
+windows-sys = { version = "0.61.2", features = [
+    "Wdk_System_SystemServices",
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Console",
+    "Win32_System_EventLog",
+    "Win32_System_IO",
+    "Win32_System_Ioctl",
+    "Win32_System_Registry",
+    "Win32_System_SystemInformation",
+    "Win32_System_Threading",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[workspace]
+members = ["macros", "xtask"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dist]
+inherits = "release"
+
+[workspace.metadata.dist]
+cargo-dist-version = "0.33.0"
+ci = "github"
+installers = ["shell", "powershell"]
+targets = [
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+    "armv7-unknown-linux-musleabihf",
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-pc-windows-msvc",
+]
+install-path = "CARGO_HOME"
+install-updater = false
+checksum = "sha256"
+unix-archive = ".tar.gz"
+windows-archive = ".zip"
+github-attestations = true
+create-release = false
+include = [
+    "packaging/linux/rusticlone.service",
+    "packaging/rusticlone.env",
+    "packaging/linux/rusticlone.desktop",
+    "assets/images/logo.svg",
+]
+github-build-setup = "../build-setup.yml"
+post-announce-jobs = ["./docker", "./aur", "./nix"]
+github-custom-job-permissions = { "docker" = { contents = "read", packages = "write" }, "aur" = { contents = "read" }, "nix" = { contents = "read" } }
+
+[workspace.metadata.dist.github-custom-runners]
+global = "ubuntu-24.04"
+x86_64-unknown-linux-musl = "ubuntu-24.04"
+aarch64-unknown-linux-musl = "ubuntu-24.04-arm"
+armv7-unknown-linux-musleabihf = "ubuntu-24.04"
+aarch64-apple-darwin = "macos-14"
+x86_64-pc-windows-msvc = "windows-2022"
+
+[workspace.metadata.rustic]
+version = "v0.11.4"
+sha256 = "628b26785f3787fa1d52e61b3289493f483230a1ed6e86a84ae9c76d7a41a81e"
+
+# written by `cargo xtask vendor`: the npm package htmx.org, its checksum, and the files taken from it
+[workspace.metadata.htmx]
+version = "4.0.0"
+integrity = "sha512-T/171FUY93Kdfp8t+DnHdk45QvKRiBhVhhrwSzrXgUi4pHKvhp77dUA/qg8FAjsFWPIHNbmUuIdCrcVHuiZWng=="
+
+[workspace.metadata.htmx.sha256]
+"htmx.LICENSE" = "d3d2456f76414f2456104660ebd65aff1c04cd7966b942bdabd63f3cdb316a38"
+"htmx.min.js" = "e484d9171a9db30a39c8f16e3d709d4137f3211c659f8e6125816635033d593f"
+"hx-sse.min.js" = "8a834680c4000a9034d79228872372a92e140c810a075cb6d4a76690dfc13085"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+bare_urls = "deny"
+redundant_explicit_links = "deny"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+redundant_clone = "warn"
+needless_collect = "warn"
+str_to_string = "warn"
+equatable_if_let = "warn"
+branches_sharing_code = "warn"
+map_err_ignore = "warn"
+allow_attributes_without_reason = "deny"
+allow_attributes = "warn"
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+dbg_macro = "deny"
+let_underscore_must_use = "deny"
+wildcard_enum_match_arm = "warn"
+string_slice = "warn"
+ref_option = "deny"
+needless_for_each = "deny"
+must_use_candidate = "allow"
+# `write!` to a String returns a Result that every call would have to discard.
+format_push_string = "allow"
+format_collect = "allow"
+similar_names = "allow"
+# Views and profiles mirror the flags of the pages and of rustic.
+struct_excessive_bools = "allow"
+# Metrics are floats, and their values fit.
+cast_precision_loss = "allow"
+# Required by the trait: extractors are async.
+unused_async_trait_impl = "allow"
+# Matches on booleans read as tables of cases.
+match_bool = "allow"
+single_match_else = "allow"
+# Its suggestion, `assert_eq!(v, [] as [T; 0])`, is harder to read.
+assert_is_empty = "allow"
+missing_errors_doc = "allow"
+module_name_repetitions = "allow"

@@ -1,0 +1,88 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+{# the choice of a repository's kind, and the fields of each kind, of which only the chosen one shows #}
+{% macro location(setup, role) %}
+{% let rows = role.rows() %}
+<div class="kinds">{% for (group, kinds) in rows.iter() %}<span class="muted">{{ group }}</span><div class="choices">{% for kind in kinds %}<label><input type="radio" name="{{ role }}" value="{{ kind.id() }}"{% if *kind == setup.kind(*role) %} checked{% endif %}>{{ kind }}</label>{% endfor %}</div>{% endfor %}</div>
+{% for (_, kinds) in rows.iter() %}{% for kind in kinds %}{% let value = kind.id() %}{% if !kind.fields().is_empty() %}
+<div class="form-grid" data-choice="{{ role }}" data-value="{{ value }}"{% if *kind != setup.kind(*role) %} hidden{% endif %}>
+  {% if let Some(hint) = kind.hint() %}<p class="muted hint">{{ hint }}{% if let Some(docs) = kind.docs() %} <a href="{{ docs }}" target="_blank" rel="noreferrer">{{ Button::SeeHow }}</a>{% endif %}</p>{% endif %}
+  {% for f in kind.fields() %}
+  <label for="setup-{{ role }}-{{ value }}-{{ f.key }}">{{ f.text() }}</label>
+  {% if !f.choices.is_empty() %}
+  {% let chosen = setup.shown(*role, **kind, f) %}
+  <select name="{{ role }}.{{ value }}.{{ f.key }}" id="setup-{{ role }}-{{ value }}-{{ f.key }}">{% for choice in f.choices %}<option value="{{ choice }}"{% if *choice == chosen %} selected{% endif %}>{{ crate::first_run::Field::meaning(choice) }}</option>{% endfor %}</select>
+  {% elif *kind == Kind::Local %}
+  <div class="field-row">
+    <input type="text" name="{{ role }}.{{ value }}.{{ f.key }}" id="setup-{{ role }}-{{ value }}-{{ f.key }}" value="{{ setup.shown(*role, **kind, f) }}" placeholder="{{ f.example }}" autocomplete="off" hx-get="{{ base }}{{ Route::SetupFree }}" hx-trigger="load, input delay:600ms" hx-target="next .free" hx-swap="innerHTML">
+    <span class="muted free nowrap"></span>
+  </div>
+  {% else %}
+  <input type="{% if f.secret %}password{% else %}text{% endif %}" name="{{ role }}.{{ value }}.{{ f.key }}" id="setup-{{ role }}-{{ value }}-{{ f.key }}" value="{{ setup.shown(*role, **kind, f) }}" placeholder="{{ f.example }}" autocomplete="off">
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}{% endfor %}{% endfor %}
+<div class="form-grid password">
+  <label for="setup-{{ role }}-password">{{ crate::first_run::password() }}</label>
+  <input type="text" name="{{ role }}.password" id="setup-{{ role }}-password" value="{{ setup.password(*role) }}" autocomplete="off">
+</div>
+{% endmacro %}
+{# how often `step` runs, and its cron expression if custom #}
+{% macro schedule(step, every, label) %}
+<div class="field-row">
+  <select name="{{ step }}" aria-label="{{ label }}">{% for e in everies %}<option value="{{ e.id() }}"{% if *e == every %} selected{% endif %}>{{ e }}</option>{% endfor %}</select>
+  <span class="field-row" data-choice="{{ step }}" data-value="{{ Every::Custom.id() }}"{% if every != Every::Custom %} hidden{% endif %}><input type="text" name="{{ step }}.custom" placeholder="0 3 * * *" aria-label="{{ label }}"><a class="nowrap" href="{{ CRON_HELP }}" target="_blank" rel="noreferrer">{{ Button::CronSyntax }}</a></span>
+</div>
+{% endmacro %}
+<form class="setup" method="post" action="{{ base }}{{ Route::Setup }}" hx-post="{{ base }}{{ Route::Setup }}" hx-target="this" hx-swap="outerHTML">
+  <nav class="crumbs"><a href="{{ base }}{{ Route::Index }}">{{ Button::BackToCollections }}</a></nav>
+  <h1>{{ Heading::SetUp }}</h1>
+  <section class="card">
+    <h2>{{ Question::WhatToBackUp }}</h2>
+    <div class="form-grid">
+      <label for="setup-name">{{ Heading::CollectionName }}</label>
+      <input type="text" name="name" id="setup-name" value="{{ setup.name }}" required>
+      <label for="setup-source-0">{{ Heading::Folders }}</label>
+      <div class="sources" data-field="{{ crate::first_run::SOURCE }}">
+        {% let fields = setup.source_fields() %}
+        {% for (i, source) in fields.iter().enumerate() %}
+        <div class="field-row source">
+          <input type="text" name="{{ crate::first_run::SOURCE }}.{{ i }}" id="setup-source-{{ i }}" value="{{ source }}" aria-label="{{ Heading::Folders }}" autocomplete="off">
+          <button type="button" class="icon-btn small" data-remove title="{{ Button::RemoveFolder }}" aria-label="{{ Button::RemoveFolder }}">×</button>
+        </div>
+        {% endfor %}
+        <button type="button" class="btn" data-add>{{ Button::AddFolder }}</button>
+      </div>
+    </div>
+  </section>
+  <section class="card location">
+    <h2>{{ Question::WhereSaved }}</h2>
+    {% call location(setup, Role::Primary) %}{% endcall %}
+  </section>
+  <section class="card location">
+    <h2>{{ Question::WhereCopied }}</h2>
+    {% call location(setup, Role::Target) %}{% endcall %}
+  </section>
+  <section class="card">
+    <h2>{{ Question::WhenBackUp }}</h2>
+    {% call schedule("every", setup.every, Question::WhenBackUp) %}{% endcall %}
+  </section>
+  <section class="card">
+    <h2>{{ Question::HowLongKeep }}</h2>
+    <select name="keep" aria-label="{{ Question::HowLongKeep }}">{% for k in keeps %}<option value="{{ k.id() }}"{% if *k == setup.keep %} selected{% endif %}>{{ k }}</option>{% endfor %}</select>
+  </section>
+  <section class="card">
+    <h2>{{ Question::HowOftenCheck }}</h2>
+    {% call schedule("check", setup.check, Question::HowOftenCheck) %}{% endcall %}
+  </section>
+  <section class="card">
+    <h2>{{ Question::WhereNotify }}</h2>
+    <div class="choices">{% for n in notifiers %}<label><input type="checkbox" data-schemes="{{ n.schemes }}" data-template="{{ n.template }}"{% if n.on %} checked{% endif %}>{{ n.name }}</label>{% endfor %}</div>
+    <div class="field-row">
+      <input type="text" name="notify" value="{{ setup.notify }}" placeholder="{{ Hint::Notify }}" aria-label="{{ Question::WhereNotify }}">
+      <button type="button" class="btn" hx-post="{{ base }}{{ Route::SetupNotifications }}">{{ Button::TestNotification }}</button>
+    </div>
+  </section>
+  <div class="actions"><button class="btn primary">{{ m::icon("backup") }}{{ Button::Save }}</button></div>
+</form>

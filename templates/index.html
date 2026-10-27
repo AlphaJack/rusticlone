@@ -1,0 +1,21 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+{% if let Some(empty) = empty %}
+<section class="card">
+  <div class="card-head">
+    <div><h1>{{ Heading::Collections }}</h1></div>
+    {% if empty.writable %}<div class="actions"><a class="btn primary" href="{{ base }}{{ Route::Setup }}">{{ m::icon("backup") }}{{ Heading::SetUp }}</a></div>{% endif %}
+  </div>
+  {% if let Some(unconfigured) = unconfigured %}<div class="notice {{ unconfigured.level() }}">{{ unconfigured }}</div>{% endif %}
+  {% if empty.writable %}<p>{{ Hint::CreateProfilesIn { dir: empty.dir } }}</p>{% else %}<p>{{ Hint::WriteProfilesIn { dir: empty.dir } }}</p>{% endif %}
+</section>
+{% else %}
+<nav class="crumbs"></nav>
+{% if let Some(untested) = untested %}<div class="notice warning">{{ untested }}</div>{% endif %}
+{% if let Some(blocked) = blocked %}<div class="notice warning">{{ blocked }}</div>{% endif %}
+<section class="card">{% include "collections.html" %}</section>
+<section class="card" id="recent-runs">
+  <div class="card-head"><div><h2>{{ Heading::RecentRuns }}</h2></div></div>
+  {% include "runs.html" %}
+</section>
+{% endif %}

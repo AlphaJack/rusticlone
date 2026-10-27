@@ -1,0 +1,72 @@
+name: AUR
+
+# requirements:
+# - secret AUR_SSH_PRIVATE_KEY, of an AUR account maintaining rusticlone-bin
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v3.0.0)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+
+  aur:
+    name: Deploy to AUR
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      PLAN: ${{ inputs.plan }}
+      DISPATCH_TAG: ${{ inputs.tag }}
+    steps:
+
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      - name: Resolve tag and version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_TAG}" ]; then
+            tag="${DISPATCH_TAG}"
+          else
+            tag="$(jq -r '.announcement_tag' <<<"${PLAN}")"
+            prerelease="$(jq -r '.announcement_is_prerelease' <<<"${PLAN}")"
+          fi
+          {
+            echo "tag=${tag}"
+            echo "version=${tag#v}"
+            echo "prerelease=${prerelease:-false}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set pkgver
+        # pkgver can't contain `-`: prereleases (v3.1.0-rc.1) are skipped
+        if: steps.v.outputs.prerelease != 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: sed -i "s/^pkgver=.*/pkgver=${VERSION}/" packaging/linux/PKGBUILD
+
+      - name: Publish to AUR
+        if: steps.v.outputs.prerelease != 'true'
+        uses: KSXGitHub/github-actions-deploy-aur@084b0d9b15415bf9cdb65d44dad1efe37a354050 # v4.2.0
+        with:
+          pkgname: rusticlone-bin
+          pkgbuild: packaging/linux/PKGBUILD
+          updpkgsums: true
+          commit_username: AlphaJack
+          commit_email: 19962243+AlphaJack@users.noreply.github.com
+          commit_message: Update to ${{ steps.v.outputs.version }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}

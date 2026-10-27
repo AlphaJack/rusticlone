@@ -1,0 +1,6 @@
+{% let base = ("base"|value::<String>)? %}
+<section class="not-found">
+  <h1>404</h1>
+  <p class="muted">{% if what.is_empty() %}{{ Heading::NotFound }}{% else %}{{ what|capitalize }}{% endif %}</p>
+  <a class="btn" href="{{ base }}{{ Route::Index }}">{{ Button::BackToCollections }}</a>
+</section>

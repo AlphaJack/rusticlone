@@ -1,0 +1,56 @@
+{
+  "index": {
+    "blobs": [
+      {
+        "blob_type": "tree",
+        "count": 11,
+        "size": 1000,
+        "data_size": 1000
+      },
+      {
+        "blob_type": "data",
+        "count": 4,
+        "size": 1000,
+        "data_size": 1000
+      }
+    ],
+    "blobs_delete": [
+      {
+        "blob_type": "tree",
+        "count": 0,
+        "size": 1000,
+        "data_size": 1000
+      },
+      {
+        "blob_type": "data",
+        "count": 0,
+        "size": 1000,
+        "data_size": 1000
+      }
+    ],
+    "packs": [
+      {
+        "blob_type": "tree",
+        "count": 2,
+        "min_size": 1000,
+        "max_size": 1000
+      },
+      {
+        "blob_type": "data",
+        "count": 2,
+        "min_size": 1000,
+        "max_size": 1000
+      }
+    ],
+    "packs_delete": [
+      {
+        "blob_type": "tree",
+        "count": 0
+      },
+      {
+        "blob_type": "data",
+        "count": 0
+      }
+    ]
+  }
+}

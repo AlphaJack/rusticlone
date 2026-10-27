@@ -1,326 +1,454 @@
-<!--
-// ┌───────────────────────────────────────────────────────────────┐
-// │ Contents of README.md                                         │
-// ├───────────────────────────────────────────────────────────────┘
-// │
-// ├──┐Rusticlone
-// │  ├── Motivation
-// │  ├── Installation
-// │  └──┐Usage
-// │     ├── Backup
-// │     ├──┐Restore
-// │     │  ├── From the local Rustic repo
-// │     │  └── From the RClone remote
-// │     ├── Individual commands
-// │     ├── Push notifications
-// │     ├── Parallel processing
-// │     ├── Exclude profiles
-// ├──┐[...]
-// │  │  ├── Custom log file
-// │  │  └── Automatic system backups
-// │  ├── Testing
-// │  ├── Known limitations
-// │  ├── Contribute
-// │  └── License
-// │
-// └───────────────────────────────────────────────────────────────
--->
-
 # Rusticlone
 
-> ⚠️ **Rusticlone v1 (Python) is deprecated and no longer maintained.**
-> Rusticlone v2 is a rewrite in Rust with a different architecture: see <https://github.com/AlphaJack/rusticlone>.
-> The v1 source code lives in the [`v1` branch](https://github.com/AlphaJack/rusticlone/tree/v1).
+![Web UI collections](./screenshots/web-light-collections.png#gh-light-mode-only)
+![Web UI collections](./screenshots/web-dark-collections.png#gh-dark-mode-only)
 
-**3-2-1 backups using Rustic and RClone**
+Rusticlone backs up your computers and servers on a schedule, keeps copies in more than one place and warns you when something needs your attention.
 
-## Motivation
+## Philosophy
 
-[Rustic](https://rustic.cli.rs/) comes with [native support](https://rustic.cli.rs/docs/commands/init/rclone.html) for [RClone](https://rclone.org/)'s built-in [Restic server](https://rclone.org/commands/rclone_serve_restic/).
-After trying this feature, I experienced an abysmally low backup speed, much lower than my upload bandwidth: the bottleneck was the synchronous RClone server, as Rustic was waiting for a response before sending other data.
+- Zero lock-in: your backups are interoperable with [rustic](https://rustic.cli.rs/), [restic](https://restic.net/) and their [ecosystem](https://github.com/rubiojr/awesome-restic)
+- Simple mental model: back up (snapshot) your files to a repository, copy that snapshot to other repositories, and mark old snapshots for deletion
+- Lightweight and accessible: one small binary that you can run from the command line, from your desktop tray or as a web app
+- Minimal configuration: add a few lines to your existing rustic profiles and you are good to go
+- Quiet and reliable: it notifies you only when there are issues, not at every run
 
-Another side effect of this feature is that Rustic does not create a local repo, meaning I would have to restore directly from the cloud in case of a disaster.
+## Install
 
-Since I could not run Rustic once for all my profiles (Documents, Pictures, etc.) I came up with a tool to:
+One-line installer for Windows PowerShell:
 
-- run Rustic for all my profiles
-- archive them to local Rustic repos
-- upload local repos to a RClone remote
-
-When restoring, this tool would first download a copy of the RClone remote, and then restore from local Rustic repos.
-By decoupling these operations, I got:
-
-- three copies of my data, two of which are local and one is remote (3-2-1 backup strategy)
-- the bottlenecks are now the SSD speed (for archive and extract operations) and Internet bandwidth (for upload and download operations)
-
-If it sounds interesting, keep reading!
-
-## Installation
-
-Install [RClone](https://rclone.org/install/) >= 1.67, [Rustic](https://rustic.cli.rs/docs/installation.html) >= 0.10, [Python](https://www.python.org/downloads/) >= 3.11 and then `rusticlone`:
-
-```bash
-pip install rusticlone
+```powershell
+irm https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.ps1 | iex; & "$HOME\.cargo\bin\rusticlone.exe" install --auto-update
 ```
 
-[Configure RClone](https://rclone.org/commands/rclone_config/) by adding a remote.
+One-line installer for Linux and macOS:
 
-[Create your Rustic TOML profiles](https://github.com/rustic-rs/rustic/tree/main/config) under "/etc/rustic/" or "$HOME/.config/rustic/" on Linux and MacOS. On Windows, you can put them under "%PROGRAMDATA%/rustic/config" or "%APPDATA%/rustic/config".
-Configure your profiles to have one or more sources.
-They should also have a local repository destination, without specifying the RClone remote.
-You can take inspiration from the profiles in the [example](example/rustic) folder.
+```sh
+curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.sh | sh && $HOME/.cargo/bin/rusticlone install --auto-update
+```
 
-Include variables for the location (and password) of the RClone configuration:
+Arch Linux (AUR):
+
+```sh
+yay -S rusticlone-bin
+```
+
+Cargo bininstall:
+
+```sh
+cargo binstall --git https://github.com/AlphaJack/rusticlone rusticlone
+```
+
+Manual installation: [GitHub release binaries](https://github.com/AlphaJack/rusticlone/releases)
+
+Docker and Podman: see [Container image](#container-image)
+
+NixOS and Home Manager: see [Nix](#nix)
+
+## Getting started
+
+Run `rusticlone serve --open` to create your first rustic profiles from the web UI.
+Rusticlone will offer to download rustic from GitHub if it's not already installed on your system.
+Profiles are simple .toml files that contain the information about what folders you back up, where you back them up, and with which password.
+
+**Keep a copy of them away from the computer (e.g. password manager, cloud drive, private git repo), as you'll need them to restore your files in case of a disaster.**
+
+<img alt="Web UI setup" src="./screenshots/web-light-setup.png#gh-light-mode-only" width="500">
+<img alt="Web UI setup" src="./screenshots/web-dark-setup.png#gh-dark-mode-only" width="500">
+
+If you already use rustic, just add these environment variables to your profiles and launch the server with the same command:
 
 ```toml
 [global.env]
-RCLONE_CONFIG = "/home/user/.config/rclone/rclone.conf"
-RCLONE_CONFIG_PASS = "XXXXXX"
-#escape double quotes inside TOML strings
-#RCLONE_PASSWORD_COMMAND = "python -c \"print('YYYYYY')\""
+# when to take snapshots, copy them to other repositories, and mark old ones for deletion
+RUSTICLONE_BACKUP_CRON="@daily"
+# when to check data consistency and how much
+RUSTICLONE_CHECK_CRON="@weekly"
+RUSTICLONE_CHECK_SUBSETS="10"
+# when to remove old snapshots
+RUSTICLONE_PRUNE_CRON="@monthly"
+# where to notify about issues (Apprise format, space separated)
+RUSTICLONE_NOTIFY_URLS="dbus:// ntfy://ntfy.sh/mybackups"
 ```
+
+For scheduled backups, you need to start Rusticlone on boot or user login. You can do so by running `rusticlone install` as a admin or regular user.
+This will also make the app visible in the start menu or app library, and add a tray icon when it's running as regular user.
+It will also create a configuration file based on your system:
+
+| OS | admin user | regular user |
+|---|---|---|
+| Linux | `/etc/rusticlone/rusticlone.env` | `$HOME/.config/rusticlone/rusticlone.env` |
+| macOS | `/etc/rusticlone/rusticlone.env` | `$HOME/Library/Application Support/rusticlone/rusticlone.env` |
+| Windows | `%PROGRAMDATA%\rusticlone\config\rusticlone.env` | `%APPDATA%\rusticlone\config\rusticlone.env` |
 
 ## Usage
+
+`rusticlone --help` lists all commands and possible options.
+
+Under the hood, `rusticlone` launches rustic subcommands directly. From the web app, you can see which rustic command and arguments were used for each operation.
+
+Each step that `rusticlone` performs needs one or more resources: CPU, disk, upload or download bandwidth, or exclusive repository access.
+The internal scheduler ensures that each resource is used by one step at a time and released as soon as a step finishes.
+
+Rusticlone can be configured through environment variables ([reference list](packaging/rusticlone.env)).
+They are read at start: restart Rusticlone after editing its configuration file.
+
+Settings for individual collections or repositories are variables in the `[global.env]` section of rustic profiles.
+They can be shared across profiles by using the [`[global] use-profiles`](https://rustic.cli.rs/docs/commands/init/configuration_file.html#:~:text=use%2Dprofiles) feature.
+
 ### Backup
 
-Let's assume you want to backup your **PC Documents** to both an **external hard drive** (HDD) and **Google Drive**.
+Rusticlone groups rustic profiles in **collections**.
+A collection is made of a backup profile (the one with `[[backup.snapshots]]`) plus all the profiles it lists in `[copy] targets`.
 
-With RClone, you have configured your Google Drive as the <gdrive:/> remote.
+The repository of the backup profile (often located in a separate disk or LAN mount) is considered the primary: snapshots go there first, then they are copied to each target repository.
+This means that your source files are only read once, and that each repository contains a copy of them.
+Each repository is independent of the others and can autonomously restore your files to their original location.
 
-You have created the "/etc/rustic/Documents.toml" Rustic profile with:
+As an example, these two profiles make the collection `Documents`:
 
-- source "/home/user/Documents"
-- destination "/mnt/backup/Documents" (assuming your external HDD is mounted on "/mnt")
+`Documents-hdd.toml`
+```toml
+# files to back up
+[[backup.snapshots]]
+sources = ["/home/jack/Documents"]
 
-Launch Rusticlone specifying the RClone remote and the `backup` command:
+# primary backup destination
+[repository]
+repository = "/mnt/hdd/backups/Documents"
+password = "XXXXXX"
 
-```bash
-rusticlone -r "gdrive:/PC" backup
+# secondary backup destination(s)
+[copy]
+targets = ["Documents-b2"]
+
+# snapshots retention policy
+[forget]
+keep-last = 10
+keep-daily = 7
+keep-monthly = 12
+
+# schedules and notifications
+[global.env]
+RUSTICLONE_BACKUP_CRON="@daily"
+RUSTICLONE_CHECK_CRON="@weekly"
+RUSTICLONE_CHECK_SUBSETS="4"
+RUSTICLONE_PRUNE_CRON="@monthly"
+RUSTICLONE_NOTIFY_URLS="ntfy://my-secret-backup-topic"
 ```
 
-Great! You just backed up your documents to both "/mnt/backup/Documents" and <gdrive:/PC/Documents>!
+`Documents-b2.toml`
+```toml
+# secondary backup destination
+[repository]
+repository = "opendal:b2"
+password = "XXXXXX"
 
-Check the result with the following commands:
+[repository.options]
+bucket = "my-backups"
+bucket_id = "XXXXXX"
+application_key_id = "XXXXXX"
+application_key = "XXXXXX"
+root = "/Documents"
 
-```bash
-#size of all your documents
-du -sh "/home/users/Documents"
-
-#contents of local rustic repo 
-rustic -P "Documents" repoinfo
-tree "/mnt/backup/Documents"
-
-#contents of remote rustic repo
-rclone ncdu "gdrive:/PC/Documents"
+# limited check operations to reduce download costs
+[global.env]
+RUSTICLONE_CHECK_CRON="@weekly"
+RUSTICLONE_CHECK_SUBSETS="50"
 ```
+
+`rusticlone backup --collection Documents` snapshots the sources to the primary repository, copies the new snapshot to `Documents-b2`, then marks old snapshots for deletion in each repository according to its `[forget]` policy.
+For safety, the primary forgets only after every target has received the copy.
+
+![CLI backup progress](./screenshots/cli-light-backup-3.png#gh-light-mode-only)
+![CLI backup progress](./screenshots/cli-dark-backup-3.png#gh-dark-mode-only)
+
+For extra safety, one of your copy targets can be, like `Documents-b2`, a repository on an air-gapped device (unmounted HDD) or an immutable endpoint (blob storage with [Object Lock](https://www.backblaze.com/blog/object-lock-101-protecting-data-from-ransomware/), or an append-only [REST server](https://github.com/restic/rest-server)).
+This will give you the second 1 in the [3-2-1-1-0](https://www.backblaze.com/blog/whats-the-diff-3-2-1-vs-3-2-1-1-0-vs-4-3-2/#:~:text=What%20Is%203-2-1-1-0%3F) backup strategy.
+
+On Windows, Microsoft Defender scans every file that rustic reads, which can make backups 10 times slower.
+To avoid this, run this once in a PowerShell opened as administrator:
+
+```powershell
+Add-MpPreference -ExclusionProcess rustic.exe
+```
+
+#### Snapshots
+
+A snapshot is not a full copy of your files, but a record of what has changed since the last backup:
+
+![Web UI changes](./screenshots/web-light-changes.png#gh-light-mode-only)
+![Web UI changes](./screenshots/web-dark-changes.png#gh-dark-mode-only)
+
+That's why only the first snapshot is large, and backups are much faster from the second one onwards.
+
+### Consistency check
+
+`rusticlone check --collection Documents` runs a data consistency check on each repository of the collection.
+By default, 1/10th of each repo is checked every time and Rusticlone remembers which subset is due next, so with 10 runs it covers the entire repo.
+If a subset is failing, it will not advance to the next subset, and will notify you of the issue.
+
+![CLI check](./screenshots/cli-light-check-progress.png#gh-light-mode-only)
+![CLI check](./screenshots/cli-dark-check-progress.png#gh-dark-mode-only)
+
+The `RUSTICLONE_CHECK_SUBSETS` variable also accepts 0 for fast metadata-only checks, and values like "10MiB" or "10%" for random subsets.
+Repositories in the same collection can have separate check schedules.
+
+### Pruning old snapshots
+
+`rusticlone prune --collection Documents` deletes files of snapshots marked for deletion.
+
+![CLI prune](./screenshots/cli-light-prune.png#gh-light-mode-only)
+![CLI prune](./screenshots/cli-dark-prune.png#gh-dark-mode-only)
+
+As this can be a slow operation, its schedule is independent of the backup and check ones.
+Like checks, repositories in the same collection can have separate prune schedules.
+
+A repository without `keep-*` options in `[forget]` won't be pruned by Rusticlone (ideal for Object Lock or append-only repositories).
+
+### Run what is due
+
+`rusticlone due --collection Documents` runs whatever is past due for the collection according to its repo schedules.
+This means you can run overdue backups, checks and prunes without spinning up the server or running each command individually.
+
+![CLI due](./screenshots/cli-light-due.png#gh-light-mode-only)
+![CLI due](./screenshots/cli-dark-due.png#gh-dark-mode-only)
+
+### Notifications
+
+Notifications are only sent when a collection's status changes (like Uptime Kuma up/down), not at every run.
+
+<img alt="Notification" src="./screenshots/notification-light.png#gh-light-mode-only" width="503">
+<img alt="Notification" src="./screenshots/notification-dark.png#gh-dark-mode-only" width="503">
+
+If you'd rather receive a notification at every backup operation, you can use rustic [hooks](https://github.com/rustic-rs/rustic/blob/main/config/full.toml#L207) in your profiles.
+
+The `RUSTICLONE_NOTIFY_URLS` variable accepts space-delimited [Apprise](https://appriseit.com/services/) URLs.
+`rusticlone notify --all` sends the current status, so you can use it to test URLs.
 
 ### Restore
-#### From the local Rustic repo
 
-In case you lose your PC, but still have your external HDD, on your new PC you need:
+#### Disaster recovery
 
-- `rusticlone` and dependencies installed
-- your Rustic profiles in place
-- your external HDD mounted
+Don't panic! On a reinstalled computer:
 
-Then, run:
+1. download your rustic profiles to a folder. You kept a copy of them, right?
+2. download Rusticlone and move it to the folder with your profiles
+3. run `rusticlone restore --all`. Rusticlone offers to download rustic if it's missing. If you don't feel sure yet, append `--dry-run` to see what would happen, or restore one `--collection` at a time
 
-```bash
-rusticlone extract
-```
+![CLI restore](./screenshots/cli-light-restore.png#gh-light-mode-only)
+![CLI restore](./screenshots/cli-dark-restore.png#gh-dark-mode-only)
 
-Great! You just restored your documents from "/mnt/backup/Documents" to "/home/user/Documents".
+This will restore each collection from the latest snapshot of available repositories, giving preference to the primary.
+Rusticlone then offers to copy the profiles where it usually looks for them, so the backup server can use them too.
 
-#### From the RClone remote
+#### Partial restore
 
-In case you lose both your PC files and your external HDD, don't worry! You still have your data on the RClone remote.
-
-On your new PC you need:
-
-- `rusticlone` and dependencies installed
-- your RClone configuration
-- your Rustic profiles in place
-- a new external HDD mounted
-
-Then, run:
+For more granular control over file restore you can use flags:
 
 ```bash
-rusticlone -r "gdrive:/PC" restore
+# check how many files would be created or replaced in a real restore
+rusticlone restore --collection Documents --dry-run
+# extract one folder of a snapshot to /tmp/restored/Taxes
+rusticlone restore --collection Documents --snapshot 1a2b3c4d --snapshot-path /home/jack/Documents/Taxes --to /tmp/restored
+# restore documents as they were on the 1st of October, from the repository with the most recent snapshots before that date
+rusticlone restore --collection Documents --at-time 2026-10-01
 ```
 
-Fantastic! You downloaded a copy of your Google Drive backup to the external HDD,
-and you restored your documents from the HDD to their original location.
+More flags are available with `rusticlone restore --help`
 
-Check that everything went well:
+The web UI offers the same options:
+
+![Web UI restore](./screenshots/web-light-restore.png#gh-light-mode-only)
+![Web UI restore](./screenshots/web-dark-restore.png#gh-dark-mode-only)
+
+### Resuming backups after disaster recovery
+
+**After a disaster recovery, re-create the primary backup repository from an existing copy repository, never with a backup operation.**
+
+If the primary repository is lost too, a plain `rusticlone restore --all` or `rusticlone restore --collection NAME` does this for you: it re-creates the primary from an available copy target (e.g. `Documents-b2`), then extracts the files to their original location, so you only download once.
+
+The reason is the chunker: a fresh repository created by a backup gets a random chunker polynomial, incompatible with the existing copy targets.
+Snapshots would succeed, but copies to the targets would fail with a chunker polynomial mismatch.
+[At the moment](https://github.com/rustic-rs/rustic/pull/1954) a rustic profile cannot set the chunker polynomial.
+
+To re-create a compatible primary repository from an existing copy target (or vice-versa) by hand, run:
 
 ```bash
-#your remote backup files are still there
-rclone ncdu "gdrive:/PC/Documents"
-
-#your new external HDD contains a rustic repo
-ls -lah "/mnt/backups/Documents"
-rustic -P "Documents" repoinfo
-
-#your documents have been restored
-du -sh "/home/users/Documents"
-ls -lah "/home/users/Documents"
+rusticlone recreate --repo Documents-hdd
 ```
 
-You can now run `rusticlone -r "gdrive:/PC" backup` as always to keep your data safe.
+### Web UI
 
-### Individual commands
+`rusticlone serve` shows the status of your collections, live progress and logs.
+From there you can start and stop runs, browse and download snapshots, compare them, and restore files or folders.
 
-In alternative to `backup` and `restore`, you can also run individual `rusticlone` commands:
+![Web UI runs](./screenshots/web-light-runs.png#gh-light-mode-only)
+![Web UI runs](./screenshots/web-dark-runs.png#gh-dark-mode-only)
+
+If `RUSTICLONE_LISTEN` is not set, the server will listen on localhost on port 32110.
+If `RUSTICLONE_ADMIN_TOKEN` is not set, the server generates a random token in the state folder (see location below).
+
+#### Personal computer
+
+To access the web UI, open the desktop app, use the tray icon or run `rusticlone serve --open`.
+This way, the token will be automatically passed to the login page and you won't need to enter it manually.
+
+<img alt="Tray icon" src="./screenshots/tray-light.png#gh-light-mode-only" width="390">
+<img alt="Tray icon" src="./screenshots/tray-dark.png#gh-dark-mode-only" width="390">
+
+#### Remote server
+
+If you want to expose Rusticlone behind a reverse proxy, you have two options:
+
+- authenticate the reverse proxy as admin by passing the admin token itself on every request, then handle authentication/SSO via the reverse proxy
+- expose the app normally and have users enter the token manually
+
+See [`packaging/nginx.conf`](packaging/nginx.conf) for an example nginx configuration.
+
+Without a public IP address or open ports on your router you can use a VPN like [Tailscale](https://tailscale.com/) or a reverse tunneling service like [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/):
 
 ```bash
-#use rustic from source to local repo
-rusticlone archive
-
-#use rclone from local repo to remote
-rusticlone -r "gdrive:/PC" upload
-
-#use rclone from remote to local repo
-rusticlone -r "gdrive:/PC" download
-
-#use rustic from local repo to source
-rusticlone extract
+cloudflared tunnel run --url http://localhost:32110 my-backups
 ```
 
-### Push notifications
+#### Metrics
 
-Rusticlone can send a push notification with the operation results using Apprise:
+Most endpoints are meant to be used internally by the built-in [htmx](https://htmx.org/)-based UI, and require an admin token.
+Some can be accessed via a separate `RUSTICLONE_METRICS_TOKEN`:
 
-Just pass the [Apprise notification URL](https://github.com/caronc/apprise?tab=readme-ov-file#supported-notifications) via the `--apprise-url` argument or `APPRISE_URL` environment variable:
+- `/metrics` exposes Prometheus metrics
+- `/status` exposes the same output as `rusticlone collections --json`
+- `/health` can be used for the container health check, and doesn't need a token at all
 
-```bash
-rusticlone --apprise-url "tgram:/XXXXXX/YYYYYY/" archive
+### Smartphone backup
 
-#alternative
-APPRISE_URL="tgram:/XXXXXX/YYYYYY/" rusticlone archive
-```
+Rusticlone doesn't have a mobile app, but it can back up their files once they reach a computer or server:
 
-### Parallel processing
+- Android: sync the folders you care about with [Syncthing](https://syncthing.net/)
+- iPhone: sync folders with [Möbius Sync](https://www.mobiussync.com/), or turn on "Download Originals" for iCloud Photos on a Mac or Windows computer
+- Photos from both: upload them to a self-hosted [Immich](https://immich.app/) server
 
-You can specify the `--parallel` argument with any command to process all your profiles at the same time:
+Then back up the folder where they land, creating a new profile:
 
-```bash
-rusticlone --parallel -r "gdrive:/PC" backup
-```
-
-Beware that this may fill your RAM if you have many profiles or several GB of data to archive.
-
-Parallel processing is also not (yet) compatible with push notifications.
-
-### Exclude profiles
-
-Rustic has a handy feature: you can create additional profiles to store options shared between profiles.
-
-Let's assume this profile is called "common.toml" and contains the following:
-
+`Mobile-hdd.toml`
 ```toml
-[forget]
-prune = true
-keep-last = 1
-keep-daily = 7
-keep-weekly = 4
-keep-monthly = 3
-keep-quarter-yearly = 4
-keep-yearly = 1
+[[backup.snapshots]]
+sources = ["/home/jack/Sync/Mobile"]
+
+[repository]
+repository = "/mnt/hdd/backups/Mobile"
+password = "XXXXXX"
+
+[global.env]
+RUSTICLONE_BACKUP_CRON="@daily"
 ```
 
-As it doesn't contain a "\[repository]" section, it will not be treated as a standalone profile by Rusticlone.
+To check on your backups from your smartphone on the same network:
 
-This "common.toml" profile can be referenced from our documents by adding to "Documents.toml" the following:
+1. Set `RUSTICLONE_LISTEN=0.0.0.0:32110` in the configuration file, then restart Rusticlone
+2. Open `http://<computer ip address>:32110` on the phone and log in with the admin token (see [Web UI](#web-ui))
+3. Add the page to the home screen, where it opens as a progressive web app (PWA) in its own window
 
-```toml
-[global]
-use-profile = ["common"]
+To see backups from another network, see [remote server](#remote-server) for a reverse proxy or Cloudflare Tunnel setup.
 
-# [...]
+### State
+
+Rusticlone state is meant to be disposable, as the source of truth for your backups remains your repositories.
+CLI and server both write to the same shared folder, by default:
+
+| OS | admin user | regular user |
+|---|---|---|
+| Linux | `/var/lib/rusticlone` | `$HOME/.local/state/rusticlone` |
+| macOS | `/Library/Application Support/rusticlone` | `$HOME/Library/Application Support/rusticlone` |
+| Windows | `%PROGRAMDATA%\rusticlone\state` | `%LOCALAPPDATA%\rusticlone` |
+
+There you can find rustic logs, process locks and a [redb](https://www.redb.org/) database with historical run details and repository statistics.
+
+Commands, the server and its schedule can run at the same time: each run waits for the disk, network link or CPU that another holds.
+
+![CLI backups at the same time](./screenshots/cli-light-holds.png#gh-light-mode-only)
+![CLI backups at the same time](./screenshots/cli-dark-holds.png#gh-dark-mode-only)
+
+### Container image
+
+To use the container image, mount your rustic profiles, Rusticlone's state, the files you want to back up and their backup destination.
+Set `TZ` to your time zone, so that schedules such as `@daily` follow your clock rather than UTC.
+
+For the `Documents` collection above:
+
+```sh
+mkdir -p rustic/{profiles,state}
+docker run \
+  -e RUSTICLONE_ADMIN_TOKEN=XXXXXX \
+  -e TZ=Europe/Berlin \
+  -p 32110:32110 \
+  -v $PWD/rustic/profiles:/etc/rustic \
+  -v $PWD/rustic/state:/var/lib/rusticlone \
+  -v /home/jack/Documents:/home/jack/Documents \
+  -v /mnt/hdd/backups:/mnt/hdd/backups \
+  ghcr.io/alphajack/rusticlone:latest
 ```
 
+You can then access the web UI from port 32110.
 
-### Custom log file
+### Nix
 
-The default behavior is that, if present, both Rustic and RClone use the log file specified in the Rustic profile configuration.
+The flake's modules take your rustic profiles as Nix, keep them read-only, and start the server with rustic and rclone:
 
-A custom log file for both Rustic and RClone can be specified with `--log-file`.
-
-```bash
-rusticlone --log-file "/var/log/rusticlone.log" archive
+```nix
+# flake.nix
+inputs.rusticlone.url = "github:AlphaJack/rusticlone";
 ```
 
-If no argument is passed and no log file can be found in Rustic configuration, "rusticlone.log" in the current folder is used.
+#### NixOS
 
-### Automatic system backups
+The NixOS module writes the profiles to `/etc/rustic` and runs the server as root.
+On macOS, nix-darwin's `inputs.rusticlone.darwinModules.default` does the same.
 
-Place your profiles under "/etc/rustic".
-If you are storing the RClone password inside the profiles, make sure the folder is only readable by root.
-
-Create a Systemd timer unit "/etc/systemd/system/rusticlone.timer" and copy inside the following:
-
-```ini
-[Unit]
-Description=Rusticlone timer
-
-[Timer]
-#every day at midnight
-OnCalendar=*-*-* 00:00:00
-
-[Install]
-WantedBy=timers.target
+```nix
+imports = [ inputs.rusticlone.nixosModules.default ];
+# profile 1: secret passed via file
+programs.rustic.profiles.Documents-hdd = {
+  backup.snapshots = [ { sources = [ "/home/jack/Documents" ]; } ];
+  repository = {
+    repository = "/mnt/hdd/backups/Documents";
+    password-file = config.sops.secrets.documents.path;
+  };
+  copy.targets = [ "Documents-b2" ];
+  forget = { keep-last = 10; keep-daily = 7; keep-monthly = 12; };
+  global.env = {
+    RUSTICLONE_BACKUP_CRON = "@daily";
+    RUSTICLONE_CHECK_CRON = "@weekly";
+    RUSTICLONE_CHECK_SUBSETS = "4";
+    RUSTICLONE_PRUNE_CRON = "@monthly";
+  };
+};
+# profile 2: secrets in toml
+programs.rustic.profileFiles.Documents-b2 = config.sops.templates."Documents-b2.toml".path;
+services.rusticlone = {
+  enable = true;
+  # RUSTICLONE_ADMIN_TOKEN and RUSTICLONE_METRICS_TOKEN
+  environmentFile = config.sops.secrets.rusticlone.path;
+};
 ```
 
-Create a Systemd service unit "/etc/systemd/system/rusticlone.service" and copy inside the following:
+To [restore](#restore), run `sudo rusticlone restore` with the flags you need or use the web UI.
+After a disaster, reistall NixOS and run `sudo rusticlone restore --all` to bring back the files.
 
-```ini
-[Unit]
-Description=Rusticlone service
+#### Home Manager
 
-[Service]
-Type=oneshot
-ExecStart=rusticlone --remote "gdrive:/PC" backup
+The Home Manager module writes the profiles to the unprivileged folder and runs the server as your user at login with its tray icon.
+It takes the same `programs.rustic` and `services.rusticlone` options:
+
+```nix
+imports = [ inputs.rusticlone.homeModules.default ];
 ```
 
-Adjust your `--remote` as needed.
+Restore with `rusticlone restore` without `sudo`.
+macOS grants Full Disk Access to an executable by its path, so you need to grant it again to the new `rusticlone` afterwards.
 
-Apply your changes and enable the timer:
+## Contributions
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now rusticlone.timer
-```
-
-## Testing
-
-You can test Rusticlone with dummy files before using it for your precious data:
-
-```bash
-make install
-make test
-```
-
-You will need `bash`, `coreutils`, `rclone`, and `rustic` installed to run the test.
-Before running the test, make sure that you have no important files under "$HOME/.config/rustic".
-
-At the end, you can read a test coverage report with your browser, to see which lines of the source code were run during the test.
-
-## Known limitations
-
-- Rustic does not **save ownership and permission** for the source location, but **only for files and folders inside the source**. If you backup "/home/jack" with user "jack" and permission "0700", when you will restore it will have user "root" and permission "0755" ([intended rustic behavior](https://github.com/rustic-rs/rustic/issues/1108#issuecomment-2016584568))
-- Rustic does not recognize proper Windows paths ([bug](https://github.com/rustic-rs/rustic/issues/1104))
-- Rustic will not archive empty folders ([bug](https://github.com/rustic-rs/rustic/issues/1157))
-- Rustic may introduce [breaking changes](https://rustic.cli.rs/docs/breaking_changes.html)
-
-## Contribute
-
-Feel free to open an Issue to report bugs or request new features.
-
-Pull Requests are welcome, too!
-
-## License
-
-Licensed under [GPL-3.0](LICENSE) terms.
-
-Not affiliated with Rustic or RClone.
-
+- Something is not clear or found a bug? Please open a detailed [issue](../../issues)
+- [CONTRIBUTING.md](CONTRIBUTING.md): developer guidelines to submit PRs

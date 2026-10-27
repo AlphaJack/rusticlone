@@ -1,0 +1,4 @@
+# A test that hangs fails after 60 seconds instead of holding up the run. The slowest take about 36 with
+# every core busy.
+[profile.default]
+slow-timeout = { period = "20s", terminate-after = 3 }

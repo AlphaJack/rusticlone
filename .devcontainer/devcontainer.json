@@ -1,0 +1,13 @@
+{
+  "name": "rusticlone",
+  "image": "mcr.microsoft.com/devcontainers/rust:1-bookworm",
+  "postCreateCommand": "rustup component add rust-analyzer clippy rustfmt && cargo install --locked cargo-nextest cargo-insta cargo-binstall && cargo binstall --no-confirm \"rustic-rs@$(sed -n '/^\\[workspace.metadata.rustic\\]/,/^\\[/s/^version = \"v\\(.*\\)\"/\\1/p' Cargo.toml)\"",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml"
+      ]
+    }
+  }
+}

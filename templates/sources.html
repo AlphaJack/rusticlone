@@ -1,0 +1,30 @@
+{% import "macros.html" as m %}
+{% if !collection.sources.is_empty() %}
+<section class="card" id="sources">
+  <div class="card-head">
+    <div><h2>{{ Heading::Sources }}</h2></div>
+    {% if collection.configured %}<button class="btn primary" {{ m::run(base, Route::CollectionRuns(collection.name), "backup") }}>{{ m::icon("backup") }}{{ Button::BackUp }}</button>{% endif %}
+  </div>
+  <div class="table-wrap"><table class="table aligned" data-sort="sources">
+    <thead><tr><th class="name">{{ Heading::Source }}</th><td class="state"></td><th class="count right" title="{{ Hint::FilesBackedUp }}">{{ Heading::Files }}</th><th class="size right wide" title="{{ Hint::SizeBackedUp }}">{{ Heading::Size }}</th><td class="age"></td><td class="age wide"></td><td class="age wide"></td><th class="tools right">{{ Heading::Actions }}</th></tr></thead>
+    <tbody>
+    {% for group in collection.sources %}
+    <tr>
+      <td class="name">{% for source in group.sources %}{{ m::place(false, source) }}<code title="{{ source }}">{{ source }}</code> {% endfor %}</td>
+      <td></td>
+      <td class="right num">{{ group.files }}</td>
+      <td class="right num nowrap wide">{{ group.size }}</td>
+      <td></td>
+      <td class="wide"></td><td class="wide"></td>
+      <td class="right nowrap tools">
+        <span class="btn-group">
+          {% if let Some(why) = collection.restore_blocked %}<span title="{{ why }}"><button class="icon-btn" aria-label="{{ Button::Restore }}" disabled>{{ m::icon("restore") }}</button></span>{% else %}
+          <button class="icon-btn" title="{{ Button::Restore }}" hx-get="{{ base }}{{ Route::NewRun(collection.name) }}?kind=restore&amp;source={{ loop.index0 }}" hx-target="#dialog">{{ m::icon("restore") }}</button>{% endif %}
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endif %}

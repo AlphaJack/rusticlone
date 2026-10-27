@@ -1,0 +1,8 @@
+drwxr-xr-x        ?        ?         0                 ? "fixture" 
+drwxr-xr-x        ?        ?         0                 ? "fixture/src" 
+drwxr-xr-x        ?        ?         0                 ? "fixture/src/docs" 
+-rw-r--r--       me       me         5 15 Oct 2026 13:20 "fixture/src/docs/a \"x\"\tb\\c.txt" 
+drwxr-xr-x       me       me         0 15 Oct 2026 13:20 "fixture/src/docs/empty" 
+lrwxrwxrwx       me       me         9 15 Oct 2026 13:21 "fixture/src/docs/link" -> sub/b.txt
+drwxr-xr-x       me       me         0 15 Oct 2026 13:20 "fixture/src/docs/sub" 
+-rw-r--r--       me       me         3 15 Oct 2026 13:20 "fixture/src/docs/sub/b.txt" 

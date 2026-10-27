@@ -1,0 +1,55 @@
+---
+source: tests/integration/web.rs
+expression: "server.get(\"/metrics\").body"
+---
+# HELP process_start_time_seconds when the server started
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds [time]
+# HELP rusticlone_build_info always 1, with the version as a label
+# TYPE rusticlone_build_info gauge
+rusticlone_build_info{version="[version]"} 1
+# HELP rusticlone_collection_status 0 healthy, 1 degraded, 2 failing
+# TYPE rusticlone_collection_status gauge
+rusticlone_collection_status{collection="Docs"} 0
+# HELP rusticlone_collection_running 1 while the collection has a run in progress
+# TYPE rusticlone_collection_running gauge
+rusticlone_collection_running{collection="Docs"} 0
+# HELP rusticlone_newest_snapshot_timestamp_seconds the newest snapshot in the repository
+# TYPE rusticlone_newest_snapshot_timestamp_seconds gauge
+rusticlone_newest_snapshot_timestamp_seconds{collection="Docs",repository="Docs"} [time]
+rusticlone_newest_snapshot_timestamp_seconds{collection="Docs",repository="Docs-remote"} [time]
+# HELP rusticlone_repository_status 0 healthy, 1 degraded, 2 failing
+# TYPE rusticlone_repository_status gauge
+rusticlone_repository_status{collection="Docs",repository="Docs"} 0
+rusticlone_repository_status{collection="Docs",repository="Docs-remote"} 0
+# HELP rusticlone_snapshots the collection's snapshots in the repository
+# TYPE rusticlone_snapshots gauge
+rusticlone_snapshots{collection="Docs",repository="Docs"} 1
+rusticlone_snapshots{collection="Docs",repository="Docs-remote"} 1
+# HELP rusticlone_stored_bytes the repository's packed data
+# TYPE rusticlone_stored_bytes gauge
+rusticlone_stored_bytes{collection="Docs",repository="Docs"} [bytes]
+rusticlone_stored_bytes{collection="Docs",repository="Docs-remote"} [bytes]
+# HELP rusticlone_snapshot_files the files in the newest snapshot of each source
+# TYPE rusticlone_snapshot_files gauge
+rusticlone_snapshot_files{collection="Docs",repository="Docs"} 1
+rusticlone_snapshot_files{collection="Docs",repository="Docs-remote"} 1
+# HELP rusticlone_snapshot_processed_bytes the bytes the newest snapshot of each source read
+# TYPE rusticlone_snapshot_processed_bytes gauge
+rusticlone_snapshot_processed_bytes{collection="Docs",repository="Docs"} [bytes]
+rusticlone_snapshot_processed_bytes{collection="Docs",repository="Docs-remote"} [bytes]
+# HELP rusticlone_snapshot_added_bytes the packed data that the newest snapshot of each source added
+# TYPE rusticlone_snapshot_added_bytes gauge
+rusticlone_snapshot_added_bytes{collection="Docs",repository="Docs"} [bytes]
+rusticlone_snapshot_added_bytes{collection="Docs",repository="Docs-remote"} [bytes]
+# HELP rusticlone_snapshot_duration_seconds the time the newest snapshot of each source took
+# TYPE rusticlone_snapshot_duration_seconds gauge
+rusticlone_snapshot_duration_seconds{collection="Docs",repository="Docs"} [time]
+rusticlone_snapshot_duration_seconds{collection="Docs",repository="Docs-remote"} [time]
+# HELP rusticlone_last_success_timestamp_seconds the step's last success
+# TYPE rusticlone_last_success_timestamp_seconds gauge
+rusticlone_last_success_timestamp_seconds{collection="Docs",repository="Docs-remote",step="copy"} [time]
+# HELP rusticlone_consecutive_failures the step's failures since its last success
+# TYPE rusticlone_consecutive_failures gauge
+rusticlone_consecutive_failures{collection="Docs",repository="Docs",step="snapshot"} 0
+rusticlone_consecutive_failures{collection="Docs",repository="Docs-remote",step="copy"} 0

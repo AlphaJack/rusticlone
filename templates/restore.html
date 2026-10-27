@@ -1,0 +1,31 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<form method="post" action="{{ base }}{{ Route::CollectionRuns(collection) }}" hx-post="{{ base }}{{ Route::CollectionRuns(collection) }}" data-close-on-success>
+  <input type="hidden" name="kind" value="restore">
+  <div class="card-head"><div><h2>{{ Button::Restore }}</h2></div></div>
+  <div class="form-grid">
+    <label for="restore-from">{{ Heading::From }}</label>
+    {% if snapshot.is_empty() %}
+    <select name="repo" id="restore-from">
+      <option value="">{{ Label::Latest }}</option>
+      {% for name in repos %}<option value="{{ name }}"{% if name.as_str() == from.as_str() %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    </select>
+    {% else %}
+    <span><b>{{ from }}</b>, {{ Label::SnapshotWord }} <code>{{ short }}</code><input type="hidden" name="repo" value="{{ from }}"><input type="hidden" name="snapshot" value="{{ snapshot }}"></span>
+    {% endif %}
+    <label>{{ Heading::SnapshotPath }}</label>
+    <span>{% for w in what %}<code>{{ w }}</code> {% endfor %}<input type="hidden" name="path" value="{{ path }}">{% if let Some(source) = source %}<input type="hidden" name="source" value="{{ source }}">{% endif %}</span>
+    {% if snapshot.is_empty() %}
+    <label for="restore-at">{{ Heading::AtTime }}</label>
+    <input type="text" name="at" id="restore-at" placeholder="{{ Hint::Now }}">
+    {% endif %}
+    <label for="restore-to">{{ Heading::To }}</label>
+    <input type="text" name="to" id="restore-to" placeholder="{{ Hint::WhereItWas }}">
+    <label for="restore-dry-run">{{ Heading::DryRun }}</label>
+    <span><input type="checkbox" name="dry_run" id="restore-dry-run" value="true"{% if dry_run %} checked{% endif %}></span>
+  </div>
+  <div class="dialog-foot">
+    <span></span>
+    <span class="btn-group"><button type="button" class="btn" command="close" commandfor="dialog">{{ Button::Cancel }}</button><button class="btn primary">{{ m::icon("restore") }}{{ Button::Restore }}</button></span>
+  </div>
+</form>

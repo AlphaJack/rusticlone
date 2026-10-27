@@ -1,0 +1,359 @@
+{
+ "dist_version": "0.31.0",
+ "artifacts": {
+  "mercurio-cli-aarch64-apple-darwin.tar.xz": {
+   "name": "mercurio-cli-aarch64-apple-darwin.tar.xz",
+   "kind": "executable-zip",
+   "target_triples": [
+    "aarch64-apple-darwin"
+   ],
+   "assets": [
+    {
+     "name": "CHANGELOG.md",
+     "path": "CHANGELOG.md",
+     "kind": "changelog"
+    },
+    {
+     "name": "LICENSE",
+     "path": "LICENSE",
+     "kind": "license"
+    },
+    {
+     "name": "README.md",
+     "path": "README.md",
+     "kind": "readme"
+    },
+    {
+     "id": "mercurio-cli-aarch64-apple-darwin-exe-mercurio",
+     "name": "mercurio",
+     "path": "mercurio",
+     "kind": "executable"
+    },
+    {
+     "name": "mercurio.env",
+     "path": "mercurio.env",
+     "kind": "unknown"
+    },
+    {
+     "name": "mercurio.service",
+     "path": "mercurio.service",
+     "kind": "unknown"
+    }
+   ],
+   "checksum": "mercurio-cli-aarch64-apple-darwin.tar.xz.sha256",
+   "checksums": {
+    "sha256": "93b46b6b2a5f8976bb2ecb3e512570174e0b579cf5dbaab54b1d9ecc3b439466"
+   }
+  },
+  "mercurio-cli-aarch64-apple-darwin.tar.xz.sha256": {
+   "name": "mercurio-cli-aarch64-apple-darwin.tar.xz.sha256",
+   "kind": "checksum",
+   "target_triples": [
+    "aarch64-apple-darwin"
+   ]
+  },
+  "mercurio-cli-aarch64-pc-windows-msvc.zip": {
+   "name": "mercurio-cli-aarch64-pc-windows-msvc.zip",
+   "kind": "executable-zip",
+   "target_triples": [
+    "aarch64-pc-windows-msvc"
+   ],
+   "assets": [
+    {
+     "name": "CHANGELOG.md",
+     "path": "CHANGELOG.md",
+     "kind": "changelog"
+    },
+    {
+     "name": "LICENSE",
+     "path": "LICENSE",
+     "kind": "license"
+    },
+    {
+     "name": "README.md",
+     "path": "README.md",
+     "kind": "readme"
+    },
+    {
+     "id": "mercurio-cli-aarch64-pc-windows-msvc-exe-mercurio",
+     "name": "mercurio",
+     "path": "mercurio.exe",
+     "kind": "executable"
+    },
+    {
+     "name": "mercurio.env",
+     "path": "mercurio.env",
+     "kind": "unknown"
+    },
+    {
+     "name": "mercurio.service",
+     "path": "mercurio.service",
+     "kind": "unknown"
+    }
+   ],
+   "checksum": "mercurio-cli-aarch64-pc-windows-msvc.zip.sha256",
+   "checksums": {
+    "sha256": "2243f76b351736fe2888ececc0e7279b34def77fbb356f8999a7a8cea7a92539"
+   }
+  },
+  "mercurio-cli-aarch64-pc-windows-msvc.zip.sha256": {
+   "name": "mercurio-cli-aarch64-pc-windows-msvc.zip.sha256",
+   "kind": "checksum",
+   "target_triples": [
+    "aarch64-pc-windows-msvc"
+   ]
+  },
+  "mercurio-cli-aarch64-unknown-linux-musl.tar.xz": {
+   "name": "mercurio-cli-aarch64-unknown-linux-musl.tar.xz",
+   "kind": "executable-zip",
+   "target_triples": [
+    "aarch64-unknown-linux-musl"
+   ],
+   "assets": [
+    {
+     "name": "CHANGELOG.md",
+     "path": "CHANGELOG.md",
+     "kind": "changelog"
+    },
+    {
+     "name": "LICENSE",
+     "path": "LICENSE",
+     "kind": "license"
+    },
+    {
+     "name": "README.md",
+     "path": "README.md",
+     "kind": "readme"
+    },
+    {
+     "id": "mercurio-cli-aarch64-unknown-linux-musl-exe-mercurio",
+     "name": "mercurio",
+     "path": "mercurio",
+     "kind": "executable"
+    },
+    {
+     "name": "mercurio.env",
+     "path": "mercurio.env",
+     "kind": "unknown"
+    },
+    {
+     "name": "mercurio.service",
+     "path": "mercurio.service",
+     "kind": "unknown"
+    }
+   ],
+   "checksum": "mercurio-cli-aarch64-unknown-linux-musl.tar.xz.sha256",
+   "checksums": {
+    "sha256": "1384271b7067fa108e2bcb372b72271f63e0b9470b92359e44fe2fca88bf317b"
+   }
+  },
+  "mercurio-cli-aarch64-unknown-linux-musl.tar.xz.sha256": {
+   "name": "mercurio-cli-aarch64-unknown-linux-musl.tar.xz.sha256",
+   "kind": "checksum",
+   "target_triples": [
+    "aarch64-unknown-linux-musl"
+   ]
+  },
+  "mercurio-cli-armv7-unknown-linux-musleabihf.tar.xz": {
+   "name": "mercurio-cli-armv7-unknown-linux-musleabihf.tar.xz",
+   "kind": "executable-zip",
+   "target_triples": [
+    "armv7-unknown-linux-musleabihf"
+   ],
+   "assets": [
+    {
+     "name": "CHANGELOG.md",
+     "path": "CHANGELOG.md",
+     "kind": "changelog"
+    },
+    {
+     "name": "LICENSE",
+     "path": "LICENSE",
+     "kind": "license"
+    },
+    {
+     "name": "README.md",
+     "path": "README.md",
+     "kind": "readme"
+    },
+    {
+     "id": "mercurio-cli-armv7-unknown-linux-musleabihf-exe-mercurio",
+     "name": "mercurio",
+     "path": "mercurio",
+     "kind": "executable"
+    },
+    {
+     "name": "mercurio.env",
+     "path": "mercurio.env",
+     "kind": "unknown"
+    },
+    {
+     "name": "mercurio.service",
+     "path": "mercurio.service",
+     "kind": "unknown"
+    }
+   ],
+   "checksum": "mercurio-cli-armv7-unknown-linux-musleabihf.tar.xz.sha256",
+   "checksums": {
+    "sha256": "809d3dd02967d6b62c245a60ea0fb85681dca1f729f9797cd257760ea1be7cc1"
+   }
+  },
+  "mercurio-cli-armv7-unknown-linux-musleabihf.tar.xz.sha256": {
+   "name": "mercurio-cli-armv7-unknown-linux-musleabihf.tar.xz.sha256",
+   "kind": "checksum",
+   "target_triples": [
+    "armv7-unknown-linux-musleabihf"
+   ]
+  },
+  "mercurio-cli-installer.ps1": {
+   "name": "mercurio-cli-installer.ps1",
+   "kind": "installer",
+   "target_triples": [
+    "aarch64-pc-windows-gnu",
+    "aarch64-pc-windows-msvc",
+    "x86_64-pc-windows-gnu",
+    "x86_64-pc-windows-msvc"
+   ],
+   "install_hint": "powershell -ExecutionPolicy Bypass -c \"irm https://github.com/AlphaJack/mercurio/releases/download/v0.2.3/mercurio-cli-installer.ps1 | iex\"",
+   "description": "Install prebuilt binaries via powershell script"
+  },
+  "mercurio-cli-installer.sh": {
+   "name": "mercurio-cli-installer.sh",
+   "kind": "installer",
+   "target_triples": [
+    "aarch64-apple-darwin",
+    "aarch64-pc-windows-gnu",
+    "aarch64-unknown-linux-gnu",
+    "aarch64-unknown-linux-musl-dynamic",
+    "aarch64-unknown-linux-musl-static",
+    "armv7-unknown-linux-gnueabihf",
+    "armv7-unknown-linux-musl-dynamiceabihf",
+    "armv7-unknown-linux-musl-staticeabihf",
+    "x86_64-pc-windows-gnu",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl-dynamic",
+    "x86_64-unknown-linux-musl-static"
+   ],
+   "install_hint": "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/AlphaJack/mercurio/releases/download/v0.2.3/mercurio-cli-installer.sh | sh",
+   "description": "Install prebuilt binaries via shell script"
+  },
+  "mercurio-cli-x86_64-pc-windows-msvc.zip": {
+   "name": "mercurio-cli-x86_64-pc-windows-msvc.zip",
+   "kind": "executable-zip",
+   "target_triples": [
+    "x86_64-pc-windows-msvc"
+   ],
+   "assets": [
+    {
+     "name": "CHANGELOG.md",
+     "path": "CHANGELOG.md",
+     "kind": "changelog"
+    },
+    {
+     "name": "LICENSE",
+     "path": "LICENSE",
+     "kind": "license"
+    },
+    {
+     "name": "README.md",
+     "path": "README.md",
+     "kind": "readme"
+    },
+    {
+     "id": "mercurio-cli-x86_64-pc-windows-msvc-exe-mercurio",
+     "name": "mercurio",
+     "path": "mercurio.exe",
+     "kind": "executable"
+    },
+    {
+     "name": "mercurio.env",
+     "path": "mercurio.env",
+     "kind": "unknown"
+    },
+    {
+     "name": "mercurio.service",
+     "path": "mercurio.service",
+     "kind": "unknown"
+    }
+   ],
+   "checksum": "mercurio-cli-x86_64-pc-windows-msvc.zip.sha256",
+   "checksums": {
+    "sha256": "27fe2ac63575c88f2b3886e2a8244783627120ac146ddf3055dfb4a36634cf67"
+   }
+  },
+  "mercurio-cli-x86_64-pc-windows-msvc.zip.sha256": {
+   "name": "mercurio-cli-x86_64-pc-windows-msvc.zip.sha256",
+   "kind": "checksum",
+   "target_triples": [
+    "x86_64-pc-windows-msvc"
+   ]
+  },
+  "mercurio-cli-x86_64-unknown-linux-musl.tar.xz": {
+   "name": "mercurio-cli-x86_64-unknown-linux-musl.tar.xz",
+   "kind": "executable-zip",
+   "target_triples": [
+    "x86_64-unknown-linux-musl"
+   ],
+   "assets": [
+    {
+     "name": "CHANGELOG.md",
+     "path": "CHANGELOG.md",
+     "kind": "changelog"
+    },
+    {
+     "name": "LICENSE",
+     "path": "LICENSE",
+     "kind": "license"
+    },
+    {
+     "name": "README.md",
+     "path": "README.md",
+     "kind": "readme"
+    },
+    {
+     "id": "mercurio-cli-x86_64-unknown-linux-musl-exe-mercurio",
+     "name": "mercurio",
+     "path": "mercurio",
+     "kind": "executable"
+    },
+    {
+     "name": "mercurio.env",
+     "path": "mercurio.env",
+     "kind": "unknown"
+    },
+    {
+     "name": "mercurio.service",
+     "path": "mercurio.service",
+     "kind": "unknown"
+    }
+   ],
+   "checksum": "mercurio-cli-x86_64-unknown-linux-musl.tar.xz.sha256",
+   "checksums": {
+    "sha256": "e4864144000ce1e2012abf82bc53123cf1f14e27282149197131f2c84523c82f"
+   }
+  },
+  "mercurio-cli-x86_64-unknown-linux-musl.tar.xz.sha256": {
+   "name": "mercurio-cli-x86_64-unknown-linux-musl.tar.xz.sha256",
+   "kind": "checksum",
+   "target_triples": [
+    "x86_64-unknown-linux-musl"
+   ]
+  },
+  "sha256.sum": {
+   "name": "sha256.sum",
+   "kind": "unified-checksum"
+  },
+  "source.tar.gz": {
+   "name": "source.tar.gz",
+   "kind": "source-tarball",
+   "checksum": "source.tar.gz.sha256",
+   "checksums": {
+    "sha256": "c2958ef96aca522dfceac66db37372e621e51cd8a75d4898aaad873e4751133d"
+   }
+  },
+  "source.tar.gz.sha256": {
+   "name": "source.tar.gz.sha256",
+   "kind": "checksum"
+  }
+ }
+}

@@ -1,0 +1,125 @@
+---
+source: src/state/event.rs
+expression: a_day_of_events()
+---
+Ledger {
+    last_steps: {
+        Snapshot(
+            "Docs",
+        ): LastStep {
+            last_ok: Some(
+                2026-10-16T03:10:00Z,
+            ),
+            last_attempt: Some(
+                2026-10-16T03:10:00Z,
+            ),
+            failures: 0,
+            last_error: None,
+            note: Some(
+                ResultRecord {
+                    level: Success,
+                    subject: Some(
+                        "Docs",
+                    ),
+                    text: "backed up 22222222",
+                    values: {
+                        "kind": String("backed-up"),
+                        "new_repository": Bool(false),
+                        "repo": String("Docs"),
+                        "snapshots": Array [
+                            String("22222222"),
+                        ],
+                    },
+                },
+            ),
+            cancelled: false,
+            ok_started: Some(
+                2026-10-16T03:00:00Z,
+            ),
+            warnings: [
+                ResultRecord {
+                    level: Warning,
+                    subject: None,
+                    text: "the last backup could not read 1 item: /a (denied)",
+                    values: {
+                        "count": Number(1),
+                        "items": Array [
+                            Array [
+                                String("/a"),
+                                String("denied"),
+                            ],
+                        ],
+                        "kind": String("skipped"),
+                    },
+                },
+            ],
+            by: None,
+        },
+        Copy(
+            "Docs",
+            "usb",
+        ): LastStep {
+            last_ok: Some(
+                2026-10-16T03:21:00Z,
+            ),
+            last_attempt: Some(
+                2026-10-16T03:21:00Z,
+            ),
+            failures: 0,
+            last_error: None,
+            note: Some(
+                ResultRecord {
+                    level: Success,
+                    subject: Some(
+                        "usb",
+                    ),
+                    text: "copied 1 snapshot",
+                    values: {
+                        "kind": String("copied"),
+                        "snapshots": Number(1),
+                        "target": String("usb"),
+                    },
+                },
+            ),
+            cancelled: false,
+            ok_started: Some(
+                2026-10-16T03:20:00Z,
+            ),
+            warnings: [],
+            by: None,
+        },
+    },
+    checks: {},
+    lag: {
+        (
+            "Docs",
+            "usb",
+        ): Lag {
+            checked_at: 2026-10-16T03:21:00Z,
+            behind_since: None,
+            listed: true,
+        },
+    },
+    pending: {},
+    latest: {
+        "Docs": 2026-10-16T03:00:00Z,
+    },
+    scheduled: {
+        Snapshot(
+            "Docs",
+        ): 2026-10-15T12:00:00Z,
+    },
+    dropped: {
+        (
+            "Docs",
+            "usb",
+        ): [
+            (
+                SnapshotId(
+                    "11111111",
+                ),
+                2026-10-15T03:00:00Z,
+            ),
+        ],
+    },
+}

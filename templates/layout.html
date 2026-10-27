@@ -1,0 +1,37 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<!doctype html>
+<html lang="{{ crate::i18n::Language::current() }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="htmx-config" content='{"morphIgnore": ["data-htmx-powered", "open"]}'>
+<title>{{ title }}</title>
+<link rel="icon" href="{{ base }}{{ self::asset_url("logo.svg") }}">
+<link rel="apple-touch-icon" href="{{ base }}{{ self::asset_url("icon.png") }}">
+{% let [light, dark] = self::theme_colors() %}
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="{{ light }}">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="{{ dark }}">
+<link rel="manifest" href="{{ base }}{{ self::asset_url("manifest.webmanifest") }}">
+<link rel="stylesheet" href="{{ base }}{{ self::asset_url("style.css") }}">
+<script src="{{ base }}{{ self::asset_url("htmx.min.js") }}" defer></script>
+<script src="{{ base }}{{ self::asset_url("hx-sse.min.js") }}" defer></script>
+<script type="module" src="{{ base }}{{ self::asset_url("app.js") }}"></script>
+</head>
+<body data-copied="{{ Hint::Copied }}" data-cannot-copy="{{ Hint::CannotCopy }}" data-log-selected="{{ Hint::LogSelected }}">
+<div hidden>{{ self::ICONS|safe }}</div>
+<div class="page">
+<header class="topbar">
+  <a class="brand" href="{{ base }}{{ Route::Index }}"><img class="logo" src="{{ base }}{{ self::asset_url("logo.svg") }}" alt="">{{ self::APP_NAME }}</a>
+  <span class="host">{{ crate::sys::hostname() }}</span>
+  <span class="spacer"></span>
+  {% if logout %}<button class="btn" hx-post="{{ base }}{{ Route::Logout }}">{{ m::icon("logout") }}<span class="label">{{ Button::LogOut }}</span></button>{% endif %}
+</header>
+{# server-sent updates when what the page shows changes; hidden pages disconnect #}
+<main{% if let Some(l) = live %} hx-sse:connect="{{ base }}{{ Route::Events }}?v={{ l.v }}&amp;h={{ l.h }}{% if let Some(collection) = l.collection %}&amp;collection={{ collection|urlencode }}{% endif %}{% if let Some(repo) = l.repo %}&amp;repo={{ repo|urlencode }}{% endif %}{% if let Some(run) = l.run %}&amp;run={{ run }}{% endif %}{% if let Some((log, at)) = l.log %}&amp;log={{ log }}&amp;at={{ at }}{% endif %}" hx-swap="innerMorph"{% endif %}>{{ main|safe }}</main>
+<footer>{% if live.is_some() %}<span class="dot" id="live" title="{{ Label::Live }}" data-live="{{ Label::Live }}" data-connecting="{{ Label::Connecting }}" data-lost="{{ Label::Reconnecting }}"><span class="sr">{{ Label::Live }} </span></span>{% endif %}<a href="{{ self::SOURCE }}" title="{{ Hint::SourceCode }}">{{ self::APP_NAME }} {{ self::VERSION }}</a></footer>
+</div>
+<dialog id="dialog" class="card"></dialog>
+<div id="flash" aria-live="polite"></div>
+</body>
+</html>

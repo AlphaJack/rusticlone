@@ -1,0 +1,335 @@
+---
+source: src/engine/plan.rs
+expression: plans
+---
+[
+    (
+        "backup collection",
+        Ok(
+            [
+                (
+                    Snapshot {
+                        repo: "Docs",
+                    },
+                    [],
+                ),
+                (
+                    Copy {
+                        to: "usb",
+                    },
+                    [],
+                ),
+                (
+                    Forget {
+                        repo: "usb",
+                    },
+                    [
+                        1,
+                    ],
+                ),
+                (
+                    Copy {
+                        to: "cloud",
+                    },
+                    [],
+                ),
+                (
+                    Forget {
+                        repo: "Docs",
+                    },
+                    [
+                        1,
+                        3,
+                    ],
+                ),
+            ],
+        ),
+    ),
+    (
+        "copy to every target",
+        Ok(
+            [
+                (
+                    Copy {
+                        to: "usb",
+                    },
+                    [],
+                ),
+                (
+                    Forget {
+                        repo: "usb",
+                    },
+                    [
+                        0,
+                    ],
+                ),
+                (
+                    Copy {
+                        to: "cloud",
+                    },
+                    [],
+                ),
+                (
+                    Forget {
+                        repo: "Docs",
+                    },
+                    [
+                        0,
+                        2,
+                    ],
+                ),
+            ],
+        ),
+    ),
+    (
+        "copy to usb",
+        Ok(
+            [
+                (
+                    Copy {
+                        to: "usb",
+                    },
+                    [],
+                ),
+                (
+                    Forget {
+                        repo: "usb",
+                    },
+                    [
+                        0,
+                    ],
+                ),
+            ],
+        ),
+    ),
+    (
+        "prune cloud",
+        Ok(
+            [
+                (
+                    Prune {
+                        repo: "cloud",
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "prune collection",
+        Ok(
+            [
+                (
+                    Prune {
+                        repo: "Docs",
+                    },
+                    [],
+                ),
+                (
+                    Prune {
+                        repo: "usb",
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "check Docs",
+        Err(
+            "no data subset was taken for the check of Docs",
+        ),
+    ),
+    (
+        "check usb 3/10",
+        Ok(
+            [
+                (
+                    Check {
+                        repo: "usb",
+                        reading: Subset {
+                            n: 3,
+                            of: 10,
+                        },
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "check cloud structure",
+        Ok(
+            [
+                (
+                    Check {
+                        repo: "cloud",
+                        reading: Structure,
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "check collection",
+        Ok(
+            [
+                (
+                    Check {
+                        repo: "Docs",
+                        reading: Structure,
+                    },
+                    [],
+                ),
+                (
+                    Check {
+                        repo: "usb",
+                        reading: Structure,
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "restore (dry-run) from usb",
+        Ok(
+            [
+                (
+                    TestRestore {
+                        from: Some(
+                            "usb",
+                        ),
+                        tested: Newest(
+                            Some(
+                                0,
+                            ),
+                        ),
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "restore (dry-run)",
+        Ok(
+            [
+                (
+                    TestRestore {
+                        from: None,
+                        tested: Newest(
+                            None,
+                        ),
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "re-create Docs",
+        Ok(
+            [
+                (
+                    Recreate {
+                        repo: "Docs",
+                        from: None,
+                        requested: true,
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "re-create Docs",
+        Ok(
+            [
+                (
+                    Recreate {
+                        repo: "Docs",
+                        from: Some(
+                            "cloud",
+                        ),
+                        requested: true,
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "re-create cloud",
+        Ok(
+            [
+                (
+                    Recreate {
+                        repo: "Docs",
+                        from: None,
+                        requested: false,
+                    },
+                    [],
+                ),
+                (
+                    Recreate {
+                        repo: "cloud",
+                        from: None,
+                        requested: true,
+                    },
+                    [],
+                ),
+                (
+                    Copy {
+                        to: "cloud",
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "re-create cloud",
+        Ok(
+            [
+                (
+                    Recreate {
+                        repo: "Docs",
+                        from: None,
+                        requested: false,
+                    },
+                    [],
+                ),
+                (
+                    Recreate {
+                        repo: "cloud",
+                        from: Some(
+                            "usb",
+                        ),
+                        requested: true,
+                    },
+                    [],
+                ),
+                (
+                    Copy {
+                        to: "cloud",
+                    },
+                    [],
+                ),
+            ],
+        ),
+    ),
+    (
+        "re-create cloud",
+        Err(
+            "cannot re-create cloud from itself",
+        ),
+    ),
+    (
+        "check elsewhere structure",
+        Err(
+            "elsewhere is not a repository of Docs",
+        ),
+    ),
+]

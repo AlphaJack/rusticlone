@@ -1,0 +1,24 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+{# a command line to copy #}
+{% macro command(line) %}<div class="field-row"><input type="text" class="command" readonly value="{{ line }}" aria-label="{{ line }}">{{ m::copyable("copy", line) }}</div>{% endmacro %}
+<section class="card setup-saved">
+  <h1>{{ Heading::ProfilesSaved }}</h1>
+  {% if here %}
+  <p><button type="button" class="btn" hx-post="{{ base }}{{ Route::ProfileFolder }}" hx-swap="none">{{ m::icon("folder") }}{{ Button::OpenFolder }}</button></p>
+  {% else %}
+  <p><button type="button" class="btn" data-copy="{{ dir }}" title="{{ dir }}">{{ m::icon("folder") }}{{ Button::CopyFolderPath }}</button></p>
+  {% endif %}
+  <p>{{ Hint::KeepACopy }}</p>
+  <p>{{ Hint::NowVisible { app: crate::APP_NAME } }}</p>
+  <div>
+    <h2>{{ Heading::RestoreOnNewComputer }}</h2>
+    <ol>
+      <li>{{ Hint::ProfilesStep { dir: dir } }}</li>
+      <li>{{ Hint::InstallStep { app: crate::APP_NAME } }}{% call command(INSTALLER) %}{% endcall %}</li>
+      <li>{{ Hint::RestoreStep }}{% call command(restore) %}{% endcall %}</li>
+      <li>{{ Hint::ResumeStep }}{% call command(resume) %}{% endcall %}</li>
+    </ol>
+  </div>
+  <div class="actions"><a class="btn primary" href="{{ base }}{{ Route::Index }}">{{ Button::BackToCollections }}</a></div>
+</section>

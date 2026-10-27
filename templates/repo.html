@@ -1,0 +1,41 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<nav class="crumbs"><a href="{{ base }}{{ Route::Index }}">{{ Heading::Collections }}</a><span>/</span><a href="{{ base }}{{ Route::Collection(repo.collection) }}">{{ repo.title }}</a><span>/</span><span>{{ repo.name }}</span></nav>
+<section class="card">
+  <h1>{% if let Some(row) = repo.row %}{{ m::dot(row.class, row.status) }}{% endif %}{{ repo.name }}</h1>
+  {% if let Some(row) = repo.row %}<p class="path muted">{{ m::place(row.remote, row.location) }}<code>{{ row.location }}</code></p>{% endif %}
+  {% if let Some(error) = repo.error %}<div class="notice failure">{{ error }}</div>{% endif %}
+</section>
+<section class="card">
+  <div class="card-head">
+    <div><h2>{{ Heading::Snapshots }}{% if repo.listing %} <span class="spinner" title="{{ Label::ListingNow }}"></span>{% endif %}</h2></div>
+    <a class="btn" href="{{ base }}{{ Route::Find(repo.collection, repo.name) }}">{{ m::icon("search") }}{{ Button::FindAFile }}</a>
+  </div>
+  {% if repo.snapshots.is_empty() %}
+  {% if !repo.listing && repo.error.is_none() %}<p class="muted">{{ Hint::NoSnapshotHere { collection: repo.title } }}</p>{% endif %}
+  {% else %}
+  <div class="table-wrap"><table class="table" data-sort="snapshots">
+    <thead><tr><th>{{ Heading::Snapshot }}</th><th>{{ Heading::Time }}</th><th class="wide">{{ Heading::Host }}</th><th class="wide">{{ Heading::Paths }}</th><th class="right wide">{{ Heading::Files }}</th><th class="right wide" title="{{ Hint::SizeOfFiles }}">{{ Heading::Size }}</th><th class="right wide" title="{{ Hint::AddedOnDisk }}">{{ Heading::Added }}</th><th class="tools right">{{ Heading::Actions }}</th></tr></thead>
+    <tbody>
+    {% for s in repo.snapshots %}
+    {% let query = "repo={}&snapshot={}"|format(repo.name|urlencode, s.id) %}
+    <tr>
+      <td><a class="strong" href="{{ base }}{{ Route::Snapshot(repo.collection, repo.name, s.id.as_str()) }}"><code>{{ s.short }}</code></a></td>
+      <td class="nowrap">{{ s.at }}</td>
+      <td class="wide">{{ s.host }}</td>
+      <td class="ellipsis wide" title="{{ s.paths }}">{{ s.paths }}</td>
+      <td class="right num wide">{{ s.files }}</td>
+      <td class="right num nowrap wide">{{ s.size }}</td>
+      <td class="right num nowrap wide">{{ s.added }}</td>
+      <td class="right nowrap tools">
+        <span class="btn-group">
+          <button class="icon-btn" title="{{ Button::Restore }}" hx-get="{{ base }}{{ Route::NewRun(repo.collection) }}?kind=restore&amp;{{ query }}" hx-target="#dialog">{{ m::icon("restore") }}</button>
+          <a class="icon-btn" title="{{ Button::Download }}" href="{{ base }}{{ Route::Download(repo.collection, repo.name, s.id.as_str()) }}">{{ m::icon("download") }}</a>
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endif %}
+</section>

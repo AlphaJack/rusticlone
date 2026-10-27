@@ -1,0 +1,21 @@
+[INFO] using config ./a.toml
+[INFO] repository local:/fixture/repo: password is correct.
+[INFO] using no cache
+error: `rustic_core` experienced an error related to `the backend`.
+
+Message:
+Failed to read the contents of the file. Please check the file and try again.
+
+
+Some additional details ...
+
+Context:
+- path: /fixture/repo/snapshots/1111111111111111111111111111111111111111111111111111111111111111
+
+Caused by:
+Permission denied (os error 13)
+
+
+Backtrace:
+disabled backtrace (set 'RUST_BACKTRACE="1"' environment variable to enable)
+

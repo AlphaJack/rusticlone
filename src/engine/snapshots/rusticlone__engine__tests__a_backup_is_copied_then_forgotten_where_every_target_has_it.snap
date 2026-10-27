@@ -1,0 +1,290 @@
+---
+source: src/engine/tests.rs
+expression: "outcome(&replay, &report, &engine, &collections[0])"
+---
+{
+  "rustic": [
+    "-P Docs snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs cat config",
+    "-P Docs backup --json",
+    "-P Docs cat snapshot 2222222222222222222222222222222222222222222222222222222222222222",
+    "-P Docs snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs repoinfo --only-index --json",
+    "-P Docs-usb cat config",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs copy 2222222222222222222222222222222222222222222222222222222222222222 --target Docs-usb",
+    "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
+    "-P Docs-usb repoinfo --only-index --json",
+    "-P Docs-usb forget --json --filter-paths-exact /fixture/src/docs",
+    "-P Docs forget --json --filter-paths-exact /fixture/src/docs"
+  ],
+  "report": [
+    [
+      "success",
+      "Docs: backed up 22222222"
+    ],
+    [
+      "success",
+      "Docs-usb: copied 1 snapshot"
+    ],
+    [
+      "success",
+      "Docs-usb: forgot 1 snapshot"
+    ],
+    [
+      "success",
+      "Docs: forgot 1 snapshot"
+    ]
+  ],
+  "steps": [
+    {
+      "label": "snapshot to Docs",
+      "repo": "Docs",
+      "needs": [],
+      "status": "succeeded",
+      "started": "2026-10-16T12:00:00Z",
+      "finished": "2026-10-16T12:00:00Z",
+      "results": [
+        {
+          "level": "success",
+          "subject": "Docs",
+          "text": "backed up 22222222",
+          "kind": "backed-up",
+          "new_repository": false,
+          "repo": "Docs",
+          "snapshots": [
+            "22222222"
+          ]
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    },
+    {
+      "label": "copy to Docs-usb",
+      "repo": "Docs-usb",
+      "needs": [],
+      "status": "succeeded",
+      "started": "2026-10-16T12:00:00Z",
+      "finished": "2026-10-16T12:00:00Z",
+      "results": [
+        {
+          "level": "success",
+          "subject": "Docs-usb",
+          "text": "copied 1 snapshot",
+          "kind": "copied",
+          "snapshots": 1,
+          "target": "Docs-usb"
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    },
+    {
+      "label": "forget on Docs-usb",
+      "repo": "Docs-usb",
+      "needs": [
+        1
+      ],
+      "status": "succeeded",
+      "started": "2026-10-16T12:00:00Z",
+      "finished": "2026-10-16T12:00:00Z",
+      "results": [
+        {
+          "level": "success",
+          "subject": "Docs-usb",
+          "text": "forgot 1 snapshot",
+          "held": 0,
+          "kind": "forgot",
+          "repo": "Docs-usb",
+          "shrunk": 0,
+          "snapshots": 1
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    },
+    {
+      "label": "forget on Docs",
+      "repo": "Docs",
+      "needs": [
+        1
+      ],
+      "status": "succeeded",
+      "started": "2026-10-16T12:00:00Z",
+      "finished": "2026-10-16T12:00:00Z",
+      "results": [
+        {
+          "level": "success",
+          "subject": "Docs",
+          "text": "forgot 1 snapshot",
+          "held": 0,
+          "kind": "forgot",
+          "repo": "Docs",
+          "shrunk": 0,
+          "snapshots": 1
+        }
+      ],
+      "holds": {
+        "using": [],
+        "waiting_for": null
+      },
+      "waited": 0
+    }
+  ],
+  "status": {
+    "title": "Docs",
+    "level": "success",
+    "issues": [],
+    "last_backup": "2026-10-16T12:00:00Z",
+    "backup_schedule": null,
+    "snapshot": {
+      "last_ok": "2026-10-16T12:00:00Z",
+      "last_attempt": "2026-10-16T12:00:00Z",
+      "failures": 0,
+      "last_error": null,
+      "note": {
+        "level": "success",
+        "subject": "Docs",
+        "text": "backed up 22222222",
+        "kind": "backed-up",
+        "new_repository": false,
+        "repo": "Docs",
+        "snapshots": [
+          "22222222"
+        ]
+      },
+      "cancelled": false,
+      "ok_started": "2026-10-16T12:00:00Z",
+      "warnings": [],
+      "by": {
+        "collection": "Docs",
+        "run": 1792152000000,
+        "step": 0,
+        "scheduled": false
+      }
+    },
+    "primary": {
+      "name": "Docs",
+      "prune_schedule": null,
+      "check_schedule": null,
+      "repository": "rest:http://backup/docs",
+      "latest_snapshot": "2026-10-16T09:00:00Z",
+      "next_subset": null,
+      "check_subsets": "10",
+      "prune": null,
+      "check": null,
+      "forget": {
+        "last_ok": "2026-10-16T12:00:00Z",
+        "last_attempt": "2026-10-16T12:00:00Z",
+        "failures": 0,
+        "last_error": null,
+        "note": {
+          "level": "success",
+          "subject": "Docs",
+          "text": "forgot 1 snapshot",
+          "held": 0,
+          "kind": "forgot",
+          "repo": "Docs",
+          "shrunk": 0,
+          "snapshots": 1
+        },
+        "cancelled": false,
+        "ok_started": "2026-10-16T12:00:00Z",
+        "warnings": [],
+        "by": {
+          "collection": "Docs",
+          "run": 1792152000000,
+          "step": 3,
+          "scheduled": false
+        }
+      },
+      "missing": false,
+      "stale_at": "2026-10-23T12:00:00Z",
+      "status": {
+        "kind": "in-sync"
+      }
+    },
+    "targets": [
+      {
+        "name": "Docs-usb",
+        "prune_schedule": null,
+        "check_schedule": null,
+        "repository": "rest:http://usb/docs",
+        "latest_snapshot": "2026-10-16T09:00:00Z",
+        "next_subset": null,
+        "check_subsets": "10",
+        "prune": null,
+        "check": null,
+        "forget": {
+          "last_ok": "2026-10-16T12:00:00Z",
+          "last_attempt": "2026-10-16T12:00:00Z",
+          "failures": 0,
+          "last_error": null,
+          "note": {
+            "level": "success",
+            "subject": "Docs-usb",
+            "text": "forgot 1 snapshot",
+            "held": 0,
+            "kind": "forgot",
+            "repo": "Docs-usb",
+            "shrunk": 0,
+            "snapshots": 1
+          },
+          "cancelled": false,
+          "ok_started": "2026-10-16T12:00:00Z",
+          "warnings": [],
+          "by": {
+            "collection": "Docs",
+            "run": 1792152000000,
+            "step": 2,
+            "scheduled": false
+          }
+        },
+        "copy": {
+          "last_ok": "2026-10-16T12:00:00Z",
+          "last_attempt": "2026-10-16T12:00:00Z",
+          "failures": 0,
+          "last_error": null,
+          "note": {
+            "level": "success",
+            "subject": "Docs-usb",
+            "text": "copied 1 snapshot",
+            "kind": "copied",
+            "snapshots": 1,
+            "target": "Docs-usb"
+          },
+          "cancelled": false,
+          "ok_started": "2026-10-16T12:00:00Z",
+          "warnings": [],
+          "by": {
+            "collection": "Docs",
+            "run": 1792152000000,
+            "step": 1,
+            "scheduled": false
+          }
+        },
+        "lag": {
+          "checked_at": "2026-10-16T12:00:00Z",
+          "behind_since": null,
+          "listed": true
+        },
+        "missing": false,
+        "stale_at": "2026-10-23T12:00:00Z",
+        "status": {
+          "kind": "in-sync"
+        }
+      }
+    ],
+    "running": []
+  }
+}

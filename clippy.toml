@@ -1,0 +1,43 @@
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
+too-many-lines-threshold = 80
+disallowed-methods = [
+  { path = "rusticlone::sys::presence", reason = "a source is read through rustic, whose hooks may mount or fill it" },
+  { path = "std::thread::sleep", reason = "use condition-based waits or a clock abstraction" },
+  { path = "std::process::Command::new", reason = "rustic runs through rustic::Runner" },
+  { path = "jiff::Timestamp::now", reason = "time comes from clock::Clock (Store::now)" },
+  { path = "std::time::SystemTime::now", reason = "time comes from clock::Clock (Store::now)" },
+  { path = "std::env::var", reason = "settings are read through settings::Setting" },
+  { path = "std::env::var_os", reason = "settings are read through settings::Setting" },
+  { path = "std::fs::read", reason = "only the edge touches files" },
+  { path = "std::fs::read_to_string", reason = "only the edge touches files" },
+  { path = "std::fs::write", reason = "only the edge touches files" },
+  { path = "std::fs::metadata", reason = "only the edge touches files" },
+  { path = "std::fs::symlink_metadata", reason = "only the edge touches files" },
+  { path = "std::fs::create_dir_all", reason = "only the edge touches files" },
+  { path = "std::fs::remove_file", reason = "only the edge touches files" },
+  { path = "std::fs::remove_dir_all", reason = "only the edge touches files" },
+  { path = "std::fs::rename", reason = "only the edge touches files" },
+  { path = "std::fs::read_dir", reason = "only the edge touches files" },
+  { path = "std::fs::File::open", reason = "only the edge touches files" },
+  { path = "std::fs::File::create", reason = "only the edge touches files" },
+  { path = "std::fs::OpenOptions::open", reason = "only the edge touches files" },
+  { path = "std::path::Path::is_file", reason = "only the edge touches files" },
+  { path = "std::path::Path::is_dir", reason = "only the edge touches files" },
+  { path = "std::path::Path::exists", reason = "only the edge touches files" },
+  { path = "std::path::Path::symlink_metadata", reason = "only the edge touches files" },
+  { path = "anyhow::Context::context", reason = "an error enum's variant, not a string" },
+  { path = "anyhow::Context::with_context", reason = "an error enum's variant, not a string" },
+]
+disallowed-macros = [
+  { path = "anyhow::bail", reason = "an error enum's variant" },
+  { path = "anyhow::anyhow", reason = "an error enum's variant" },
+  { path = "anyhow::ensure", reason = "an error enum's variant" },
+]
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "use BTreeMap or Vec for deterministic ordering" },
+  { path = "std::sync::Mutex", reason = "parking_lot's: no poisoning to handle" },
+  { path = "std::sync::RwLock", reason = "parking_lot's: no poisoning to handle" },
+  { path = "std::sync::Condvar", reason = "parking_lot's, with its locks" },
+]

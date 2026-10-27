@@ -1,0 +1,7 @@
+{
+  "name": "Rusticlone",
+  "start_url": "../",
+  "display": "standalone",
+  "background_color": "#f2f2f2",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }]
+}

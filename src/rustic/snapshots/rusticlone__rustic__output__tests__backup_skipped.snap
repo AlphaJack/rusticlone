@@ -1,0 +1,14 @@
+---
+source: src/rustic/output.rs
+expression: "output(\"backup\", &stderr, true).skipped()"
+---
+[
+    (
+        "/fixture/src/docs/sub",
+        "Permission denied",
+    ),
+    (
+        "/fixture/src/docs/secret",
+        "Permission denied",
+    ),
+]

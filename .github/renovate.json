@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":semanticCommits",
+    ":automergeMinor"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "lockFileMaintenance": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    },
+    {
+      "description": "dist generates release.yml; update it with `dist init` instead",
+      "matchFileNames": [
+        ".github/workflows/release.yml"
+      ],
+      "enabled": false
+    }
+  ],
+  "ignorePaths": [
+    ".github/workflows/release.yml"
+  ],
+  "customManagers": [
+    {
+      "description": "the rustic the tests and the container run, and its archive's checksum",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Cargo\\.toml$/"
+      ],
+      "matchStrings": [
+        "\\[workspace\\.metadata\\.rustic\\]\\s+version = \"(?<currentValue>[^\"]+)\"\\s+sha256 = \"(?<currentDigest>[^\"]+)\""
+      ],
+      "depNameTemplate": "rustic-rs/rustic",
+      "datasourceTemplate": "github-release-attachments"
+    },
+    {
+      "description": "actionlint, and its archive's checksum",
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^\\.github/workflows/ci\\.yml$/"
+      ],
+      "matchStrings": [
+        "ACTIONLINT: (?<currentValue>\\S+)\\s+ACTIONLINT_SHA256: (?<currentDigest>\\S+)"
+      ],
+      "depNameTemplate": "rhysd/actionlint",
+      "datasourceTemplate": "github-release-attachments"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{% import "macros.html" as m %}
+{% let base = ("base"|value::<String>)? %}
+<nav class="crumbs"><a href="{{ base }}{{ Route::Index }}">{{ Heading::Collections }}</a><span>/</span><a href="{{ base }}{{ Route::Collection(collection) }}">{{ title }}</a><span>/</span><a href="{{ base }}{{ Route::Repo(collection, repo) }}">{{ repo }}</a><span>/</span><span>{{ Label::FindCrumb }}</span></nav>
+<section class="card">
+  <div class="card-head">
+    <div>
+      <h1>{{ m::icon("search") }}{{ Heading::FindIn { repo: repo } }}</h1>
+      <form class="actions" method="get"><input type="text" name="name" value="{{ name }}" placeholder="{{ Hint::NameOrPath }}" aria-label="{{ Heading::Name }}" autofocus><button class="btn primary">{{ m::icon("search") }}{{ Button::Find }}</button></form>
+    </div>
+  </div>
+  {% if let Some(error) = error %}<div class="notice failure">{{ error }}</div>{% endif %}
+  {% if found.is_empty() && error.is_none() && !name.is_empty() %}<p class="muted">{{ Hint::FoundNowhere { collection: title } }}</p>{% endif %}
+  {% for f in found %}
+  <div class="meta"><span><a href="{{ base }}{{ Route::Snapshot(collection, repo, f.id) }}"><code>{{ f.id }}</code></a>&nbsp;{{ f.time }}</span>{% if f.more > 0 %}<span class="muted">{{ Hint::MoreHolding { more: *f.more } }}</span>{% endif %}</div>
+  <div class="table-wrap"><table class="table" data-sort="found">
+    <thead><tr><th>{{ Heading::Path }}</th><th>{{ Heading::FileInfo }}</th><th class="tools right">{{ Heading::Actions }}</th></tr></thead>
+    <tbody>
+    {% for (info, path) in f.files %}
+    <tr>
+      <td><code>{{ path }}</code></td>
+      <td class="nowrap"><code>{{ info }}</code></td>
+      <td class="right nowrap tools">
+        <span class="btn-group">
+          <a class="icon-btn" title="{{ Button::Download }}" href="{{ base }}{{ Route::Download(collection, repo, f.id) }}?path={{ path|urlencode }}{% if info.starts_with('d') %}&amp;dir=true{% endif %}">{{ m::icon("download") }}</a>
+          <button class="icon-btn" title="{{ Button::Restore }}" hx-get="{{ base }}{{ Route::NewRun(collection) }}?kind=restore&amp;repo={{ repo|urlencode }}&amp;snapshot={{ f.id }}&amp;path={{ path|urlencode }}" hx-target="#dialog">{{ m::icon("restore") }}</button>
+        </span>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endfor %}
+</section>
