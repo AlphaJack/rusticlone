@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 
 [[package]]
@@ -446,7 +446,7 @@ wheels = [
 
 [[package]]
 name = "rusticlone"
-version = "1.6.0"
+version = "1.6.1.post1"
 source = { editable = "." }
 dependencies = [
     { name = "configargparse" },
