@@ -29,6 +29,12 @@ One-line installer for Linux and macOS:
 curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.sh | sh && $HOME/.cargo/bin/rusticlone install --auto-update
 ```
 
+Homebrew:
+
+```sh
+brew install AlphaJack/tap/rusticlone
+```
+
 Arch Linux (AUR):
 
 ```sh

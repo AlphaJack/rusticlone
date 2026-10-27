@@ -8,6 +8,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage = "https://github.com/AlphaJack/rusticlone"
 exclude = [".*", "flake.*", "packaging", "screenshots", "xtask"]
 
 [features]
@@ -219,7 +220,9 @@ inherits = "release"
 [workspace.metadata.dist]
 cargo-dist-version = "0.33.0"
 ci = "github"
-installers = ["shell", "powershell"]
+installers = ["shell", "powershell", "homebrew"]
+tap = "AlphaJack/homebrew-tap"
+publish-jobs = ["homebrew"]
 targets = [
     "x86_64-unknown-linux-musl",
     "aarch64-unknown-linux-musl",
@@ -252,6 +255,9 @@ aarch64-unknown-linux-musl = "ubuntu-24.04-arm"
 armv7-unknown-linux-musleabihf = "ubuntu-24.04"
 aarch64-apple-darwin = "macos-14"
 x86_64-pc-windows-msvc = "windows-2022"
+
+[workspace.metadata.dist.dependencies.homebrew]
+rustic = { stage = ["run"] }
 
 [workspace.metadata.rustic]
 version = "v0.11.4"
