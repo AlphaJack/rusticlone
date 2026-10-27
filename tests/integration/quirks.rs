@@ -138,7 +138,7 @@ fn a_repository_reached_two_ways_is_locked_as_one() {
         "Slow",
         &format!(
             "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '{}'\n\n\
-             [[backup.snapshots]]\nsources = ['-']\nstdin-command = 'sleep 6'\n",
+             [[backup.snapshots]]\nsources = ['-']\nstdin-command = 'sleep 3'\n",
             shared.display()
         ),
     );

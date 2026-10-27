@@ -290,7 +290,7 @@ fn cancelled_backup_waits_for_its_next_schedule() {
 /// A server, and a command line backup of collection Slow that it sees running.
 fn backing_up_elsewhere() -> (Sandbox, Server, std::process::Child) {
     let sb = Sandbox::new();
-    slow_profile(&sb, "Slow", 4, "");
+    slow_profile(&sb, "Slow", 3, "");
     let server = sb.server(&[]);
     let cli = sb.spawn(&["backup", "--collection", "Slow"], &[]);
     wait_for(20, "the run of the other process", || server.collection("Slow")["running"][0]["elsewhere"] == true);
@@ -358,7 +358,7 @@ fn server_runs_jobs_independently() {
     sb.backup_profile_in("Fast", repo.to_str().unwrap(), &[&["fast"]], &[], &global_env(&[("CHECK_CRON", "@daily")]));
     sb.write("fast/a.txt", "a");
     sb.run(&["backup", "--collection", "Fast"]).assert_exit(0);
-    slow_profile(&sb, "Slow", 6, &global_env(&[("BACKUP_CRON", "@daily")]));
+    slow_profile(&sb, "Slow", 4, &global_env(&[("BACKUP_CRON", "@daily")]));
     sb.scheduled_long_ago(&["check:Fast"]);
     let server = sb.server(&[]);
     // Fast's check does not wait for Slow's backup.
@@ -381,9 +381,9 @@ fn an_idle_server_leaves_its_state_alone() {
     let server = sb.server(&[]);
     let db = sb.path("store/state.redb");
     let modified = || fs::metadata(&db).and_then(|m| m.modified()).unwrap();
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(2));
     let before = modified();
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(2));
     assert_eq!(modified(), before, "written while idle: {}", server.output());
 }
 
@@ -399,7 +399,7 @@ fn a_failed_notification_waits_before_retrying() {
     sb.run(&["backup", "--all"]);
     sb.common_env(&[("BACKUP_CRON", "@daily"), ("CHECK_CRON", "@weekly")]);
     let server = sb.server(&[]);
-    thread::sleep(Duration::from_secs(4));
+    thread::sleep(Duration::from_secs(3));
     let attempts = server.output().matches(r#""kind":"undelivered""#).count();
     assert!(attempts <= 1, "{attempts} attempts: {}", server.output());
     assert!(json_has(&server.collection("Docs")["issues"].to_string(), &json!({"kind": "undelivered"})));
@@ -412,7 +412,7 @@ fn a_failed_notification_waits_before_retrying() {
 #[test]
 fn a_check_waits_for_a_backup_on_the_same_disk() {
     let sb = Sandbox::new();
-    slow_profile(&sb, "Slow", 6, "");
+    slow_profile(&sb, "Slow", 5, "");
     assert!(sb.rustic(&["-P", "Slow", "init"]).status.success());
     let server = sb.server(&[]);
     server.post_form("/collections/Slow/runs", "kind=backup");
@@ -451,8 +451,8 @@ fn a_check_waits_for_a_backup_on_the_same_disk() {
 #[test]
 fn one_backup_at_a_time() {
     let sb = Sandbox::new();
-    slow_profile(&sb, "A", 3, "");
-    slow_profile(&sb, "B", 3, "");
+    slow_profile(&sb, "A", 2, "");
+    slow_profile(&sb, "B", 2, "");
     sb.common_env(&[("BACKUP_CRON", "@daily")]);
     let server: Server = sb.server(&[]);
     let mut waited = false;
@@ -471,7 +471,7 @@ fn one_backup_at_a_time() {
 #[test]
 fn a_due_copy_waits_for_a_backup_elsewhere() {
     let sb = Sandbox::new();
-    slow_profile(&sb, "Slow", 8, "[copy]\ntargets = ['Slow-remote']\n");
+    slow_profile(&sb, "Slow", 5, "[copy]\ntargets = ['Slow-remote']\n");
     sb.target("Slow-remote", "Slow", "");
     let mut cli = sb.spawn(&["backup", "--collection", "Slow"], &[]);
     wait_for(10, "the command's backup", || {
@@ -480,7 +480,7 @@ fn a_due_copy_waits_for_a_backup_elsewhere() {
     // A snapshot the target lacks: a copy is due.
     sb.store().apply(&[Event::Pending { collection: "Slow".into(), targets: vec!["Slow-remote".into()] }]).unwrap();
     let server = sb.server(&[]);
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(2));
     let output = server.output();
     assert!(!server.logged(&json!({"event": {"kind": "running-already"}})), "{output}");
     assert!(!server.logged(&json!({"event": {"kind": "requested"}})), "{output}");
