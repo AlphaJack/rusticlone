@@ -138,9 +138,14 @@ fn a_stopped_prune_leaves_the_repository_whole() {
     let prune = || {
         sb.command("rustic").args(["-P", "Docs", "prune"]).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap()
     };
-    let started = Instant::now();
-    assert!(prune().wait().unwrap().success());
-    let whole = started.elapsed();
+    // The faster of two: the first can be slowed by a cold disk cache that the stopped ones no longer meet.
+    let timed = || {
+        copy(&kept, &repo);
+        let started = Instant::now();
+        assert!(prune().wait().unwrap().success());
+        started.elapsed()
+    };
+    let whole = timed().min(timed());
     let mut stopped = 0;
     for sixth in 1..6 {
         copy(&kept, &repo);

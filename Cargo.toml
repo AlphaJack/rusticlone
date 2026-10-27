@@ -4,6 +4,7 @@ description = "3-2-1-1-0 backups using rustic profiles"
 # Also what desktop search matches: build.rs hands them to the code.
 keywords = ["backup", "restore", "snapshot"]
 version = "2.0.0"
+publish = false
 edition = "2024"
 rust-version = "1.95"
 license = "AGPL-3.0-or-later"
