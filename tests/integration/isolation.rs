@@ -132,24 +132,28 @@ fn json_logs_are_one_object_per_line() {
 fn silent_rustic_is_killed() {
     let sb = Sandbox::new();
     slow_profile(&sb, "Sleepy", 10, "");
-    let envs: &[(&str, &str)] = &[(&var("STALL_TIMEOUT"), "2s")];
+    let envs: &[(&str, &str)] = &[(&var("STALL_TIMEOUT"), "1s")];
     sb.run_with(&["backup", "--all"], envs).assert_exit(1).assert_result("failed", json!({}));
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "observe external processes over a bounded interval")]
 fn a_killed_run_leaves_its_locks_with_rustic() {
     let sb = Sandbox::new();
-    slow_profile(&sb, "Sleepy", 6, "");
+    slow_profile(&sb, "Sleepy", 4, "");
     let mut first = sb.spawn(&["backup", "--all"], &[]);
-    thread::sleep(Duration::from_secs(2));
+    wait_for(10, "rustic to start", || {
+        let store = sb.store();
+        let started = |id| store.run_log_tail("Sleepy", id, None).0.iter().any(|l| l.text.contains("rustic backup"));
+        store.unfinished(Some("Sleepy")).iter().any(|r| started(r.id))
+    });
     first.kill().unwrap();
     first.wait().unwrap();
     // Rustic still runs and holds the collection's lock.
     sb.common_env(&[("BACKUP_CRON", "@daily")]);
     sb.run(&["due", "--all"]).assert_exit(0).assert_result("running-already", json!({}));
-    // Once it ends, the collection runs again.
+    // Once it ends, the collection runs again, and quickly: the parent snapshot, if any, is not read.
     sb.kill_leftovers();
+    slow_profile(&sb, "Sleepy", 0, "");
     sb.run(&["backup", "--all"]).assert_exit(0);
     // The interrupted run's log was saved as it went, and the run stays unfinished.
     let (store, records) = (sb.store(), sb.store().runs("Sleepy", 2));
