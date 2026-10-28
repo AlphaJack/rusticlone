@@ -102,11 +102,8 @@ impl Overview {
     }
 
     fn state(&self, r: &RepoOverview, primary: bool) -> String {
-        let label = r.status.to_string();
-        let label = match r.status.level() {
-            Level::Success => label,
-            level @ (Level::Warning | Level::Failure) => log::paint(level, &label.to_uppercase()),
-        };
+        // Its dot and color carry the level.
+        let label = format!("{} {}", r.status.tone().dot(), log::paint(r.status.level(), &r.status.to_string()));
         match (r.status, &r.lag) {
             (RepoStatus::Stale { behind_since: Some(since) } | RepoStatus::Behind { since }, _) => {
                 Text::Behind { status: &label, age: &self.age(since) }.to_string()
@@ -157,7 +154,8 @@ impl Overview {
             self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned),
         ];
         below.push(Tree { line: section(Text::Schedules), below: schedules });
-        Tree { line: log::bold(&r.name), below }
+        let role = if primary { Text::Primary } else { Text::CopyTarget };
+        Tree { line: format!("{} ({role})", log::bold(&r.name)), below }
     }
 
     /// `check: @weekly, last 2 days ago`, `prune: manual, no prune yet`.
@@ -173,7 +171,7 @@ impl Overview {
                 Text::Scheduled { cron: &cron, ran: &self.last(last) }.to_string()
             }
         };
-        field(capitalized(&kind.label()), &when)
+        field(log::capitalized(&kind.label()), &when)
     }
 
     fn collection(&self, c: &CollectionOverview) -> Vec<Tree> {
@@ -200,24 +198,23 @@ impl Overview {
 
 impl std::fmt::Display for Overview {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.profiles.is_empty() {
-            let dirs = self.directories.clone();
-            writeln!(f, "{}", crate::engine::Error::NoCollections { dirs })?;
-        } else {
-            let folders: Vec<Tree> = self.folders.iter().cloned().map(Tree::leaf).collect();
-            writeln!(f, "{}", section(Text::Directories))?;
-            f.write_str(&tree(&folders))?;
-        }
+        let folders: Vec<Tree> = self.folders.iter().cloned().map(Tree::leaf).collect();
+        writeln!(f, "{}", section(Text::Directories))?;
+        f.write_str(&tree(&folders))?;
         if let Some(untested) = &self.status.untested {
             writeln!(f, "{} {}", Level::Warning.dot(), log::paint(Level::Warning, &untested.to_string()))?;
         }
         // Broken profiles are listed with the other profiles that are not collections.
         let readable = |c: &&CollectionOverview| self.profile(&c.primary.name).is_some_and(|i| i.error.is_none());
-        for c in self.status.collections.iter().filter(readable) {
+        let mut collections = self.status.collections.iter().filter(readable).peekable();
+        if collections.peek().is_none() {
+            writeln!(f, "\n{} {}", Level::Warning.dot(), log::paint(Level::Warning, &Text::NoCollections.to_string()))?;
+        }
+        for c in collections {
             writeln!(f, "\n{}  {} {}", log::bold(&c.title), c.level.dot(), log::paint(c.level, &c.level.word()))?;
             f.write_str(&tree(&self.collection(c)))?;
         }
-        for kind in [Kind::Fragment, Kind::Unused, Kind::Broken] {
+        for kind in [Kind::NoSources, Kind::Fragment, Kind::Unused, Kind::Broken] {
             let profiles: Vec<Tree> = (self.profiles.iter().filter(|p| p.kind == kind))
                 .map(|p| {
                     let reason = p.error.as_deref().map(|e| field(Text::Reason, &log::paint(Level::Failure, e)));
@@ -241,12 +238,6 @@ fn section(text: impl std::fmt::Display) -> String {
 /// `key: value`, with the key in bold.
 fn field(key: impl std::fmt::Display, value: &str) -> Tree {
     Tree::leaf(format!("{}: {value}", section(key)))
-}
-
-/// `backup` as a heading: `Backup`.
-fn capitalized(text: &str) -> String {
-    let mut chars = text.chars();
-    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
 fn unknown() -> String {
@@ -278,6 +269,7 @@ fn profile_info(engine: &Engine, p: &profile::RusticProfile) -> ProfileInfo {
         engine.rustic_profiles.values().filter(|j| j.is_backup_profile() && j.targets.contains(&p.name)).collect();
     let kind = match (p.is_backup_profile(), copying.is_empty(), &p.repository) {
         (true, ..) => Kind::BackupProfile,
+        (false, true, _) if p.sourceless => Kind::NoSources,
         (false, false, _) => Kind::CopyTarget,
         (false, true, Some(_)) => Kind::Unused,
         (false, true, None) => Kind::Fragment,

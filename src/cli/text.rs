@@ -24,6 +24,10 @@ pub(super) enum Text<'a> {
     Snapshots,
     Status,
     Schedules,
+    Primary,
+    CopyTarget,
+    /// Where no profile is a collection.
+    NoCollections,
     Unknown,
     Failing {
         failures: u32,
@@ -65,6 +69,8 @@ pub(super) enum Kind {
     BackupProfile,
     CopyTarget,
     Unused,
+    /// `[[backup.snapshots]]` without sources.
+    NoSources,
     Fragment,
     #[default]
     Broken,

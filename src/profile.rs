@@ -40,6 +40,11 @@ pub(crate) struct RusticProfile {
     /// `skip-if-unchanged`: a backup of unchanged sources makes no snapshot.
     pub skip_unchanged: bool,
     pub env: BTreeMap<String, String>,
+    /// `[[backup.snapshots]]` entries, none with a source: meant as a backup profile, which backs up nothing.
+    pub sourceless: bool,
+    /// A password, its file or command, or a key, as rustic shows its config, environment included. Without
+    /// one, rustic asks for it, which fails without a terminal.
+    pub has_password: bool,
     /// `[repository]` hooks run whenever rustic opens the repository, also as a copy's target; `[global]` ones
     /// only when it opens it with `-P`. Either may mount it.
     repository_hooks: bool,
@@ -375,6 +380,7 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         .map(|(k, v)| (k.clone(), v.as_str().map_or_else(|| v.to_string(), str::to_owned)))
         .collect();
     let local = repository.and_then(|r| local_repo(r, &options, dir));
+    let sourceless = !snapshots.is_empty() && sources.is_empty();
     RusticProfile {
         name: name.to_owned(),
         dir: dir.to_owned(),
@@ -397,6 +403,10 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         skip_unchanged: set(config, &["backup", "skip-if-unchanged"])
             || snapshots.iter().any(|s| set(s, &["skip-if-unchanged"])),
         env: table(&["global", "env"]).filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned()))).collect(),
+        sourceless,
+        has_password: ["password", "password-file", "password-command", "key"]
+            .iter()
+            .any(|k| get(&["repository", k]).is_some()),
         repository_hooks: runs_before(config, &["repository", "hooks"]),
         global_hooks: runs_before(config, &["global", "hooks"]),
     }

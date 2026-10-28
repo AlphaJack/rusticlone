@@ -93,7 +93,14 @@ impl Engine {
     pub(crate) fn refresh(&self, collection: &Collection<'_>) -> RunResults {
         let run = Run::new(collection, None);
         self.list_repos(collection, &collection.repos().collect::<Vec<_>>(), |_| {});
-        for repo in collection.repos() {
+        // Not yet created, as before the first backup: its status says so, and it is not unavailable.
+        let overview = self.status_of(collection);
+        let created = |name: &str| {
+            std::iter::once(&overview.primary)
+                .chain(&overview.targets)
+                .all(|r| r.name != name || r.status != RepoStatus::NotCreated)
+        };
+        for repo in collection.repos().filter(|r| created(&r.name)) {
             let Some(Err(error)) = self.store.inventory(collection.name(), &repo.name).map(|i| i.result) else {
                 continue;
             };
@@ -272,6 +279,8 @@ impl Engine {
         issues.extend(
             collection.repos().filter(|r| r.prunes_on_forget).map(|r| Issue::PrunesOnForget { repo: r.name.clone() }),
         );
+        issues
+            .extend(collection.repos().filter(|r| !r.has_password).map(|r| Issue::NoPassword { repo: r.name.clone() }));
         // An unknown setting is likely a typo, which leaves a step unscheduled.
         issues.extend(collection.repos().flat_map(|r| {
             settings::ignored(r, &[p])
@@ -418,7 +427,6 @@ impl RepoStatus {
     }
 
     /// Without an outcome yet: muted.
-    #[cfg(feature = "server")]
     pub(crate) fn tone(self) -> crate::log::Tone {
         match self {
             Self::NotCreated | Self::NotChecked | Self::NotBackedUp | Self::Unknown => crate::log::Tone::Muted,
@@ -527,6 +535,10 @@ pub(crate) enum Issue {
     SettingIgnored {
         repo: String,
         setting: Ignored,
+    },
+    /// Rustic would ask for the password, which fails without a terminal.
+    NoPassword {
+        repo: String,
     },
     #[fluent(transparent = error)]
     Failed {
@@ -646,6 +658,7 @@ impl Message for Issue {
         match self {
             Self::Unreadable { .. }
             | Self::CopyTargetUnusable(_)
+            | Self::NoPassword { .. }
             | Self::Failed { .. }
             | Self::Missing { primary: true, .. }
             | Self::InvalidSchedule { .. } => Level::Failure,

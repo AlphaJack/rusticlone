@@ -83,8 +83,14 @@ collections-location = Location
 collections-snapshots = Snapshots
 collections-status = Status
 collections-schedules = Schedules
+collections-primary = primary
+collections-copy-target = copy target
+collections-no-collections = No collections yet: no profile has both a [repository] and [[backup.snapshots]] with sources. Add them to a profile in one of the folders above, or run `{ -name } serve --open` to create one
 collections-unknown = { repo-status-unknown }
-collections-failing = FAILING { $failures }
+collections-failing = { $failures ->
+    [one] failed
+   *[other] failed { $failures } times in a row
+}
 # A schedule and when its step last ran: `@weekly, last 2 days ago`.
 collections-scheduled = { $cron }, last { $ran }
 collections-not-yet = { $cron }, no { $step } yet
@@ -97,6 +103,7 @@ collections-listed = { $status } (listed { $age } ago)
 collections-kind-backup-profile = Backup profiles
 collections-kind-copy-target = Copy targets
 collections-kind-unused = Unused profiles (no backup profile uses their repository)
+collections-kind-no-sources = Backup profiles without sources (their [[backup.snapshots]] list none)
 collections-kind-fragment = Fragment profiles
 collections-kind-broken = Broken profiles
 collections-warning-hidden = { $read } hides { $hidden }: rustic reads only the first file with a profile's name. Rename or delete { $hidden }
@@ -285,6 +292,7 @@ change-type = type changed
 # Rustic's cause when it cannot resolve a source's path, as a user reads it.
 output-unresolved = it does not exist or cannot be reached
 # Why a file that another program holds open was left out: Windows says it in the user's language, without what to do.
+output-no-password = rustic asked for the repository's password, with no terminal to type it. Set password, password-file or password-command in the profile's [repository]
 output-in-use = another program has it open and locked. Close that program before the backup
 
 ## A collection's health
@@ -300,6 +308,7 @@ level-word = { $level ->
 fix-missing-repo = if its disk is unplugged, connect it; if it was deleted, re-create it with `{ -name } recreate --repo { $repo }`
 issue-prunes-on-forget = { $repo } prunes at every forget: slow and unscheduled. Remove `prune = true` from [forget] and set { $key } instead
 issue-setting-ignored = { $repo } { $setting }
+issue-no-password = { $repo } has no password, so rustic would ask for one with no one to type it. Set password, password-file or password-command in its [repository]
 issue-never-backed-up = never backed up
 issue-no-disk-access = macOS does not let rustic read { $source }. In System Settings, give Full Disk Access to { $exe }, or to the terminal that runs it
 issue-missing = { $repo } is missing: { fix-missing-repo }
