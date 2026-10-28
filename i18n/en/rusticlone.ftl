@@ -662,6 +662,7 @@ autostart-installed-at-login = the server starts now and at login: { $file }
 autostart-uninstalled = the server is stopped and no longer starts automatically: { $file } deleted
 autostart-uninstalled-running = the server no longer starts at login: { $file } deleted. The running one stops at logout
 autostart-auto-update = the server updates itself at each start: { $file } sets { $key }=true
+autostart-app-refreshed = the app now runs { -name } { $version }, which the package manager installed
 autostart-not-installed = the server was not installed
 autostart-deleted = { $dir } deleted
 autostart-error-cannot-run = cannot run { $program }

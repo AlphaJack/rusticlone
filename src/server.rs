@@ -254,6 +254,11 @@ pub(crate) fn serve(
     crate::sys::release_own_console();
     let listen = listen.to_owned();
     let serve = move |tray| {
+        // Homebrew updated the executable that the app is a copy of.
+        #[cfg(all(target_vendor = "apple", feature = "desktop", feature = "self-update"))]
+        if crate::install::autostart::refresh_app()? {
+            return restart(&std::env::current_exe()?);
+        }
         #[cfg(feature = "self-update")]
         if settings::AUTO_UPDATE.enabled()? {
             // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
