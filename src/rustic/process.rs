@@ -16,6 +16,33 @@ pub(super) fn work(_: u32) -> Option<u64> {
     None
 }
 
+/// Ends `process`, and what it starts, with this process. Windows releases locks with the process that took
+/// them, so rustic cannot inherit the run's locks as on Unix: a killed run leaves no rustic running without them.
+#[cfg(windows)]
+#[expect(unsafe_code, reason = "puts a process in a job object that ends with this process")]
+pub(crate) fn tie(process: std::os::windows::io::RawHandle) {
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation, SetInformationJobObject,
+    };
+    static JOB: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    let job = *JOB.get_or_init(|| {
+        // SAFETY: a new unnamed job, never closed here: it closes as this process ends, ending what is in it.
+        unsafe {
+            let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+            let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            let size = u32::try_from(size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>()).unwrap_or_default();
+            SetInformationJobObject(job, JobObjectExtendedLimitInformation, (&raw const limits).cast(), size);
+            job as usize
+        }
+    });
+    if job != 0 {
+        // SAFETY: the job above, and a process that this one started.
+        unsafe { AssignProcessToJobObject(job as _, process as _) };
+    }
+}
+
 /// Kills rustic. On Unix, also the processes it started, which share its process group.
 #[expect(unsafe_code, reason = "signal or terminate a process by its id")]
 pub(crate) fn kill(pid: u32) {
