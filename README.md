@@ -125,9 +125,9 @@ Rusticlone looks for rustic profiles in these folders, then in the working direc
 
 | OS | admin user | regular user |
 |---|---|---|
-| Linux | `/etc/rustic` | `$HOME/.config/rustic` |
-| macOS | `/etc/rustic` | `$HOME/Library/Application Support/rustic` |
-| Windows | `%PROGRAMDATA%\rustic\config` | `%APPDATA%\rustic\config` |
+| Linux | `/root/.config/rustic`<br>`/etc/rustic` | `$HOME/.config/rustic` |
+| macOS | `/var/root/Library/Application Support/rustic`<br>`/etc/rustic` | `$HOME/Library/Application Support/rustic` |
+| Windows | `%APPDATA%\rustic\config`<br>`%PROGRAMDATA%\rustic\config` | `%APPDATA%\rustic\config` |
 
 ### Backup
 
