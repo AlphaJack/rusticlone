@@ -108,7 +108,9 @@ jobs:
           tool: cargo-binstall
       # The rustic pinned in Cargo.toml, which the tests run.
       - name: Install rustic
-        run: cargo binstall --no-confirm "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
 
       - name: Clippy
         if: runner.os == 'macOS'
@@ -154,8 +156,12 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
   test-windows:
-    name: test (windows-latest)
+    name: test (windows-latest, ${{ matrix.partition }})
     if: github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1/3, 2/3, 3/3]
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -173,7 +179,8 @@ jobs:
         if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          shared-key: test-windows
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.partition == '1/3' }}
       - name: Turn off Defender's real-time scanning
         shell: pwsh
         run: Set-MpPreference -DisableRealtimeMonitoring $true
@@ -187,12 +194,14 @@ jobs:
           tool: cargo-binstall
       - name: Install rustic
         shell: bash
-        run: cargo binstall --no-confirm "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
       - name: Test
         env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
-        run: cargo nextest run --workspace --locked
+        run: cargo nextest run --workspace --locked --partition hash:${{ matrix.partition }}
 
   nix:
     runs-on: ubuntu-latest
