@@ -22,9 +22,11 @@ pub(crate) enum Keeper {
     Chocolatey,
     WinGet,
     Nix,
-    /// A Docker or Podman container, whose image is pulled again.
+    /// A container, whose image is pulled again.
     #[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "containers run Linux"))]
-    Container,
+    Docker,
+    #[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "containers run Linux"))]
+    Podman,
     /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy put there as root.
     System,
 }
@@ -44,8 +46,11 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
     use std::path::Path;
     #[cfg(target_os = "linux")]
-    if ["/.dockerenv", "/run/.containerenv"].iter().any(|marker| Path::new(marker).exists()) {
-        return Some(Keeper::Container);
+    // The file that each puts in its containers.
+    for (marker, keeper) in [("/.dockerenv", Keeper::Docker), ("/run/.containerenv", Keeper::Podman)] {
+        if Path::new(marker).exists() {
+            return Some(keeper);
+        }
     }
     #[cfg(all(target_vendor = "apple", feature = "desktop"))]
     if let Some(source) = autostart::app_source(exe) {

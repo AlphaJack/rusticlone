@@ -84,8 +84,11 @@ enum How {
     #[fluent(id = format!("{}.{}", owner(), crate::APP_NAME))]
     Winget,
     Nix,
-    #[fluent(image = format!("ghcr.io/{}/{}", owner().to_lowercase(), crate::NAME))]
-    Container,
+    /// `tool`: `docker` or `podman`.
+    #[fluent(image = format!("ghcr.io/{}/{}:latest", owner().to_lowercase(), crate::NAME))]
+    Container {
+        tool: String,
+    },
     /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy that root put there.
     System,
 }
@@ -104,7 +107,8 @@ impl How {
             Some(Keeper::Chocolatey) => Self::Chocolatey,
             Some(Keeper::WinGet) => Self::Winget,
             Some(Keeper::Nix) => Self::Nix,
-            Some(Keeper::Container) => Self::Container,
+            Some(Keeper::Docker) => Self::Container { tool: "docker".into() },
+            Some(Keeper::Podman) => Self::Container { tool: "podman".into() },
             Some(Keeper::System) | None => Self::System,
         }
     }
@@ -280,8 +284,9 @@ mod tests {
         assert_eq!(How::of(Path::new("/opt/homebrew/Cellar/rusticlone/2.0.1/bin/rusticlone")), How::Homebrew);
         assert_eq!(How::of(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), How::Nix);
         assert!(How::Winget.to_string().contains("AlphaJack.Rusticlone"), "{}", How::Winget);
-        assert!(How::Container.to_string().contains("ghcr.io/alphajack/rusticlone"), "{}", How::Container);
-        for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::Container, How::System] {
+        let podman = How::Container { tool: "podman".into() }.to_string();
+        assert!(podman.contains("podman pull ghcr.io/alphajack/rusticlone:latest"), "{podman}");
+        for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::System] {
             assert!(!how.to_string().is_empty());
         }
     }
