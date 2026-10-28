@@ -38,7 +38,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
-  clippy:
+  clippy-ubuntu:
     name: clippy (ubuntu-latest)
     runs-on: ubuntu-latest
     steps:
