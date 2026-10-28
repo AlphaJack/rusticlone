@@ -16,11 +16,17 @@ pub(crate) mod update;
 /// Whether a package manager keeps `exe` where it is, and updates it there: one that the user runs keeps it
 /// in a folder of its own, wherever its root is (Homebrew's `Cellar`, `WinGet`'s `Packages`, Scoop's `apps`
 /// beside its `shims`, Chocolatey's `lib` beside `choco.exe`); the system's, in a folder that is not the
-/// user's, as `/usr/bin` or `/nix/store`; the macOS app's copy of one of those. A copy elsewhere is the user's.
+/// user's, as `/usr/bin` or `/nix/store`; the macOS app's copy of one of those; any in a Docker or Podman
+/// container, whose image is pulled again. A copy elsewhere is the user's.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
 #[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
 pub(crate) fn managed(exe: &std::path::Path) -> bool {
     use std::path::Path;
+    // A container's image: a newer one is pulled.
+    #[cfg(target_os = "linux")]
+    if ["/.dockerenv", "/run/.containerenv"].iter().any(|marker| Path::new(marker).exists()) {
+        return true;
+    }
     // The macOS app's copy of one.
     #[cfg(all(target_vendor = "apple", feature = "desktop"))]
     if autostart::app_source(exe).is_some() {
