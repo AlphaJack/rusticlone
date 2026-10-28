@@ -3,7 +3,7 @@
 
 #![expect(clippy::disallowed_methods, reason = "writes the new executable beside the temporary files")]
 
-use std::{collections::BTreeMap, env::consts::EXE_SUFFIX};
+use std::{collections::BTreeMap, env::consts::EXE_SUFFIX, path::Path};
 
 use anyhow::Result;
 use semver::Version;
@@ -52,7 +52,7 @@ pub(crate) enum Logged {
         from: String,
         to: String,
     },
-    /// Not downloaded: this executable's folder is not the user's, as `/usr/bin` of a package.
+    /// Not downloaded: a package manager updates this executable, or its folder is not the user's.
     Packaged {
         from: String,
         to: String,
@@ -166,10 +166,21 @@ pub(crate) fn at_start() -> bool {
     false
 }
 
-/// Whether this executable can replace itself, as the new one is written beside it: not when its folder
-/// is not the user's, as `/usr/bin` of a package, which its package manager updates.
+/// Whether this executable can replace itself, as the new one is written beside it: not when a package
+/// manager updates it, nor when its folder is not the user's, as `/usr/bin` of a package.
 pub(crate) fn replaceable() -> bool {
-    std::env::current_exe().is_ok_and(|exe| exe.parent().is_some_and(crate::sys::writable))
+    std::env::current_exe().is_ok_and(|exe| !managed(&exe) && exe.parent().is_some_and(crate::sys::writable))
+}
+
+/// Whether a package manager that the user runs keeps `exe` where it is: Homebrew in its `Cellar`, WinGet in
+/// its `Packages`, Scoop in its `apps` beside its `shims`, wherever its root is. A copy elsewhere is the user's.
+fn managed(exe: &Path) -> bool {
+    let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
+    exe.ancestors().any(|dir| {
+        named(dir, "Cellar")
+            || (named(dir, "Packages") && dir.parent().is_some_and(|p| named(p, "WinGet")))
+            || (named(dir, "apps") && dir.parent().is_some_and(|p| p.join("shims").is_dir()))
+    })
 }
 
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
@@ -201,7 +212,7 @@ fn replace(dry_run: bool) -> Result<Logged> {
     }
     super::attest::verify(REPOSITORY, &tag, &archive, &data)?;
     let new = std::env::temp_dir().join(format!("{}-{newest}{EXE_SUFFIX}", crate::NAME));
-    let executable = std::path::Path::new(executable).file_name().unwrap_or_default().to_string_lossy();
+    let executable = Path::new(executable).file_name().unwrap_or_default().to_string_lossy();
     install(&unpack(&archive, &data, &executable)?, &new)?;
     let replaced = self_replace::self_replace(&new);
     std::fs::remove_file(&new)?;
@@ -216,8 +227,42 @@ fn replace(dry_run: bool) -> Result<Logged> {
 mod tests {
     use std::path::Path;
 
-    use super::{Manifest, archive};
+    use super::{Manifest, archive, managed};
     use crate::sys::writable;
+
+    #[test]
+    fn a_copy_in_the_users_folder_is_not_managed() {
+        assert!(!managed(&std::env::temp_dir().join(".local").join("bin").join(crate::NAME)));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn homebrews_cellar_is_managed() {
+        for prefix in ["/opt/homebrew", "/usr/local", "/home/linuxbrew/.linuxbrew"] {
+            assert!(managed(&Path::new(prefix).join("Cellar/rusticlone/2.0.1/bin/rusticlone")), "{prefix}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn wingets_packages_are_managed() {
+        let user = r"C:\Users\me\AppData\Local\Microsoft\WinGet\Packages\AlphaJack.Rusticlone_Source\rusticlone.exe";
+        let machine = r"C:\Program Files\WinGet\Packages\AlphaJack.Rusticlone_Source\rusticlone.exe";
+        assert!(managed(Path::new(user)) && managed(Path::new(machine)));
+    }
+
+    /// Found by its layout, as `SCOOP` may move its root anywhere.
+    #[cfg(windows)]
+    #[test]
+    fn scoops_apps_are_managed_wherever_its_root_is() {
+        let root = std::env::temp_dir().join(format!("{}-scoop-{}", crate::NAME, std::process::id()));
+        let exe = root.join(r"apps\rusticlone\current\rusticlone.exe");
+        assert!(!managed(&exe));
+        std::fs::create_dir_all(root.join("shims")).unwrap();
+        let found = managed(&exe);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(found);
+    }
 
     #[test]
     fn the_temporary_folder_is_replaceable() {
