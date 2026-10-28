@@ -156,17 +156,38 @@ jobs:
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
   bench:
-    name: bench (windows, ${{ matrix.partition }})
+    name: bench (windows, ${{ matrix.partition }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
     strategy:
       fail-fast: false
       matrix:
-        partition: [1/1, 1/2, 2/2, 1/3, 2/3, 3/3]
+        include:
+          - partition: 1/1
+          - partition: 1/2
+          - partition: 2/2
+          - partition: 1/3
+          - partition: 2/3
+          - partition: 3/3
+          - partition: 1/1
+            variant: lld-d-lines
     runs-on: windows-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Link with rust-lld, keep Cargo on D:, line tables only
+        if: matrix.variant == 'lld-d-lines'
+        shell: bash
+        run: |
+          cp -r ~/.cargo /d/.cargo
+          {
+            echo 'CARGO_HOME=D:\.cargo'
+            echo 'RUSTUP_HOME=D:\.rustup'
+            echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld"
+            echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only"
+            echo "CARGO_PROFILE_TEST_DEBUG=line-tables-only"
+          } >> "$GITHUB_ENV"
+          echo 'D:\.cargo\bin' >> "$GITHUB_PATH"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
