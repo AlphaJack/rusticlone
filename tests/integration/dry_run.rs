@@ -10,7 +10,10 @@ use crate::common::{Sandbox, docs_with_remote};
 fn files(sb: &Sandbox) -> BTreeMap<String, (u64, SystemTime)> {
     fn walk(dir: &Path, locks: &Path, into: &mut BTreeMap<String, (u64, SystemTime)>) {
         for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
-            let (path, meta) = (entry.path(), entry.metadata().unwrap());
+            // Not the entry's metadata: on Windows, that is the folder listing's copy, which NTFS updates
+            // late.
+            let path = entry.path();
+            let meta = fs::metadata(&path).unwrap();
             if path == locks {
                 continue;
             }
