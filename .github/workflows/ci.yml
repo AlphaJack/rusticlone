@@ -39,6 +39,7 @@ jobs:
         run: cargo fmt --all --check
 
   clippy:
+    name: clippy (ubuntu-latest)
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
