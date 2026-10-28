@@ -102,7 +102,7 @@ collections-behind = { $status }, { since-behind }
 collections-listed = { $status } (elencato { $age } fa)
 collections-kind-backup-profile = Profili di backup
 collections-kind-copy-target = Destinazioni di copia
-collections-kind-inherited = Ereditati da altri profili
+collections-kind-inherited = Ereditati
 collections-kind-unused = Inutilizzati
 collections-kind-no-sources = Senza sorgenti (il loro [[backup.snapshots]] non ne elenca)
 collections-kind-broken = Non validi
@@ -816,7 +816,7 @@ rustic-error-cannot-run = impossibile eseguire rustic: esegui { -name } in un te
 rustic-error-no-version = impossibile leggere la versione di rustic da { $output }
 rustic-error-too-old = rustic { $found } è troppo vecchio: installa { $major }.{ $minor } o successivo
 rustic-error-no-snapshot = impossibile leggere lo snapshot { $id } di { $profile }
-rustic-error-invalid-profile = il profilo { $name } non è valido: { $error }
+rustic-error-invalid-profile = { $error }
 rustic-error-unreadable = impossibile leggere l'output di `rustic { $command }` (rustic { $version }): installa la versione di rustic testata
 rustic-error-stalled = rustic { $command } ucciso: nessun output né attività su disco per { $silent }. Per un archivio lento, aumenta { $key }
 rustic-error-no-status = rustic è uscito senza uno stato
@@ -833,9 +833,9 @@ state-error-newer = un { -name } più recente ha scritto { $path }: aggiorna { -
 profile-here = cartella corrente
 profile-dirs-or-here = { $dirs } o nella cartella corrente
 profile-error-not-found = profilo { $name } non trovato in { $dirs }
-profile-error-dry-run = il profilo { $name } imposta dry-run = true, quindi i suoi backup non salvano nulla: togli dry-run dal profilo
-profile-error-slashed-drive = profilo { $name }: rustic legge { $location } come un backend con il nome della sua unità. Scrivi { $native }
-profile-error-backslash-after-scheme = profilo { $name }: su Windows, rustic legge { $location } come percorso locale a causa della sua barra rovesciata. Scrivi barre normali dopo { $scheme }:
+profile-error-dry-run = imposta dry-run = true, quindi i suoi backup non salvano nulla: togli dry-run dal profilo
+profile-error-slashed-drive = rustic legge { $location } come un backend con il nome della sua unità. Scrivi { $native }
+profile-error-backslash-after-scheme = su Windows, rustic legge { $location } come percorso locale a causa della sua barra rovesciata. Scrivi barre normali dopo { $scheme }:
 
 ## Tempi
 

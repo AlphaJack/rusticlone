@@ -102,10 +102,10 @@ collections-behind = { $status }, { since-behind }
 collections-listed = { $status } (listed { $age } ago)
 collections-kind-backup-profile = Backup profiles
 collections-kind-copy-target = Copy targets
-collections-kind-inherited = Inherited by other profiles
+collections-kind-inherited = Inherited
 collections-kind-unused = Unused
 collections-kind-no-sources = Without sources (their [[backup.snapshots]] list none)
-collections-kind-broken = Broken
+collections-kind-broken = Invalid
 collections-warning-hidden = { $read } hides { $hidden }: rustic reads only the first file with a profile's name. Rename or delete { $hidden }
 
 ## Runs and steps: what they do and what they did
@@ -819,7 +819,7 @@ rustic-error-cannot-run = cannot run rustic: run { -name } in a terminal and let
 rustic-error-no-version = cannot read the rustic version from { $output }
 rustic-error-too-old = rustic { $found } is too old: install { $major }.{ $minor } or newer
 rustic-error-no-snapshot = cannot read snapshot { $id } of { $profile }
-rustic-error-invalid-profile = profile { $name } is invalid: { $error }
+rustic-error-invalid-profile = { $error }
 rustic-error-unreadable = cannot read the output of `rustic { $command }` (rustic { $version }): install the tested rustic version
 rustic-error-stalled = rustic { $command } killed: no output or disk activity for { $silent }. For a slow repository, raise { $key }
 rustic-error-no-status = rustic exited without a status
@@ -836,9 +836,9 @@ state-error-newer = a newer { -name } wrote { $path }: update { -name }, or move
 profile-here = current folder
 profile-dirs-or-here = { $dirs } or current folder
 profile-error-not-found = profile { $name } not found in { $dirs }
-profile-error-dry-run = profile { $name } sets dry-run = true, so its backups save nothing: remove dry-run from the profile
-profile-error-slashed-drive = profile { $name }: rustic reads { $location } as a backend named after its drive. Write { $native }
-profile-error-backslash-after-scheme = profile { $name }: on Windows, rustic reads { $location } as a local path because of its backslash. Write forward slashes after { $scheme }:
+profile-error-dry-run = it sets dry-run = true, so its backups save nothing: remove dry-run from the profile
+profile-error-slashed-drive = rustic reads { $location } as a backend named after its drive. Write { $native }
+profile-error-backslash-after-scheme = on Windows, rustic reads { $location } as a local path because of its backslash. Write forward slashes after { $scheme }:
 
 ## Times
 

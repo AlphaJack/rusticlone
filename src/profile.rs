@@ -229,16 +229,12 @@ pub(crate) enum Error {
         name: String,
         dirs: Vec<PathBuf>,
     },
-    DryRun {
-        name: String,
-    },
+    DryRun,
     #[fluent(native = native_drive(location))]
     SlashedDrive {
-        name: String,
         location: String,
     },
     BackslashAfterScheme {
-        name: String,
         location: String,
         scheme: String,
     },
@@ -296,18 +292,18 @@ fn searched(dirs: &[PathBuf]) -> String {
 /// read as a backend named after a drive.
 pub(crate) fn load(name: &str, dir: &Path, config: &Config) -> Result<RusticProfile, Error> {
     if set(config, &["global", "dry-run"]) {
-        return Err(Error::DryRun { name: name.to_owned() });
+        return Err(Error::DryRun);
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
         && slashed_drive(repository)
     {
-        return Err(Error::SlashedDrive { name: name.to_owned(), location: repository.to_owned() });
+        return Err(Error::SlashedDrive { location: repository.to_owned() });
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
         && let Some(scheme) = backslash_after_scheme(repository, cfg!(windows))
     {
-        let (name, location, scheme) = (name.to_owned(), repository.to_owned(), scheme.to_owned());
-        return Err(Error::BackslashAfterScheme { name, location, scheme });
+        let (location, scheme) = (repository.to_owned(), scheme.to_owned());
+        return Err(Error::BackslashAfterScheme { location, scheme });
     }
     Ok(from_config(name, dir, config))
 }

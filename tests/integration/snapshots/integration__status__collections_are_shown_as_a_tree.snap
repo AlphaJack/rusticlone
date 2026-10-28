@@ -33,9 +33,9 @@ Docs  ● healthy
          └── Prune: manual, no prune yet
 
 Other profiles
-├──┐Inherited by other profiles
+├──┐Inherited
 │  └── common
 ├──┐Unused
 │  └── unused
-└──┐Broken
-   └── broken: profile broken is invalid: rustic show-config failed (exit 1): rustic-rs fatal error: parse error: TOML parse error at line 1, column 12
+└──┐Invalid
+   └── broken: rustic show-config failed (exit 1): rustic-rs fatal error: parse error: TOML parse error at line 1, column 12
