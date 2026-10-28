@@ -158,7 +158,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [base, devdrive, threads, lld, all]
+        variant: [base, lld]
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -211,6 +211,9 @@ jobs:
     name: test (windows-latest)
     if: github.event_name != 'pull_request'
     runs-on: windows-latest
+    env:
+      # Its tests start rusticlone hundreds of times: linked by rust-lld, they ran in half the time.
+      CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER: rust-lld
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
