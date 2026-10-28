@@ -93,12 +93,13 @@ Set `read_by_previous` when the previous release already reads the new shape. A 
 ## Tools
 
 ```sh
-cargo xtask generate    # rewrite the generated files: env file, Linux packages and the logo's renderings
-cargo xtask fixtures    # record the installed rustic's output into tests/fixtures/rustic-MAJOR.MINOR
-cargo insta review      # check changed snapshots and accept them
-cargo xtask vendor      # download htmx
-cargo xtask acyclic     # find dependency cycles between modules and between items
-cargo xtask screenshots # take the README's screenshots anew, in Docker, in about 25 minutes
+cargo xtask generate     # rewrite the generated files: env file, Linux packages and the logo's renderings
+cargo xtask fixtures     # record the installed rustic's output into tests/fixtures/rustic-MAJOR.MINOR
+cargo insta review       # check changed snapshots and accept them
+cargo xtask vendor       # download htmx
+cargo xtask acyclic      # find dependency cycles between modules and between items
+cargo xtask translations # list the messages each translation lacks, shown in English
+cargo xtask screenshots  # take the README's screenshots anew, in Docker, in about 25 minutes
 cargo xtask screenshots --setup              # or keep the computer they show running,
 cargo xtask screenshots --only web prune     # take some of them again on it,
 cargo xtask screenshots --teardown           # and remove it
