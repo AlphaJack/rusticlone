@@ -320,7 +320,7 @@ fn a_backup_profile_without_sources_is_not_unused() {
     sb.profile("Docs", "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '/nowhere'\n\n[[backup.snapshots]]\nsources = []\n");
     sb.run(&["collections"]).assert_exit(2).assert_json(&json!({"name": "Docs", "kind": "no-sources"}));
     let text = sb.run_text(&["collections"]).stdout;
-    assert!(text.contains("Backup profiles without sources") && !text.contains("Unused profiles"), "{text}");
+    assert!(text.contains("Other profiles\n├──┐Without sources") && !text.contains("Unused"), "{text}");
 }
 
 /// Profiles, but none a collection: what is missing is said, as without any profile.
@@ -331,7 +331,7 @@ fn profiles_without_a_collection_say_what_is_missing() {
     assert!(text.starts_with("Profile folders\n") && text.contains("No collections yet"), "{text}");
     sb.target("Docs-remote", "Docs", "");
     let text = sb.run_text(&["collections"]).stdout;
-    assert!(text.contains("No collections yet") && text.contains("Unused profiles"), "{text}");
+    assert!(text.contains("No collections yet") && text.contains("Other profiles"), "{text}");
 }
 
 /// What a person reads after a backup: a line of its own starts with a capital, and a result about the

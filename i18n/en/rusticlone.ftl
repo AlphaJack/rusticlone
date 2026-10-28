@@ -75,7 +75,6 @@ collections-here = { $dir } ({ profile-here })
 collections-sources = Sources
 collections-repositories = Repositories
 collections-issues = Issues
-collections-reason = Reason
 collections-size = Size
 collections-files = Files
 collections-profile = Profile
@@ -86,6 +85,7 @@ collections-schedules = Schedules
 collections-primary = primary
 collections-copy-target = copy target
 collections-no-collections = No collections yet: no profile has both a [repository] and [[backup.snapshots]] with sources. Add them to a profile in one of the folders above, or run `{ -name } serve --open` to create one
+collections-other = Other profiles
 collections-unknown = { repo-status-unknown }
 collections-failing = { $failures ->
     [one] failed
@@ -102,10 +102,10 @@ collections-behind = { $status }, { since-behind }
 collections-listed = { $status } (listed { $age } ago)
 collections-kind-backup-profile = Backup profiles
 collections-kind-copy-target = Copy targets
-collections-kind-unused = Unused profiles (no backup profile uses their repository)
-collections-kind-no-sources = Backup profiles without sources (their [[backup.snapshots]] list none)
-collections-kind-fragment = Fragment profiles
-collections-kind-broken = Broken profiles
+collections-kind-inherited = Inherited by other profiles
+collections-kind-unused = Unused
+collections-kind-no-sources = Without sources (their [[backup.snapshots]] list none)
+collections-kind-broken = Broken
 collections-warning-hidden = { $read } hides { $hidden }: rustic reads only the first file with a profile's name. Rename or delete { $hidden }
 
 ## Runs and steps: what they do and what they did
@@ -309,6 +309,7 @@ fix-missing-repo = if its disk is unplugged, connect it; if it was deleted, re-c
 issue-prunes-on-forget = { $repo } prunes at every forget: slow and unscheduled. Remove `prune = true` from [forget] and set { $key } instead
 issue-setting-ignored = { $repo } { $setting }
 issue-no-password = { $repo } has no password, so rustic would ask for one with no one to type it. Set password, password-file or password-command in its [repository]
+issue-same-repository = { $target } is the same repository as { $primary }, so copying to it keeps no second copy, and its [forget] policy deletes the primary's snapshots. Give { $target } a repository of its own
 issue-never-backed-up = never backed up
 issue-no-disk-access = macOS does not let rustic read { $source }. In System Settings, give Full Disk Access to { $exe }, or to the terminal that runs it
 issue-missing = { $repo } is missing: { fix-missing-repo }

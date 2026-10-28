@@ -32,12 +32,10 @@ Docs  ● healthy
          ├── Check: manual, no check yet
          └── Prune: manual, no prune yet
 
-Fragment profiles
-└── common
-
-Unused profiles (no backup profile uses their repository)
-└── unused
-
-Broken profiles
-└──┐broken
-   └── Reason: profile broken is invalid: rustic show-config failed (exit 1): rustic-rs fatal error: parse error: TOML parse error at line 1, column 12
+Other profiles
+├──┐Inherited by other profiles
+│  └── common
+├──┐Unused
+│  └── unused
+└──┐Broken
+   └── broken: profile broken is invalid: rustic show-config failed (exit 1): rustic-rs fatal error: parse error: TOML parse error at line 1, column 12

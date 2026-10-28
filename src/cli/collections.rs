@@ -1,6 +1,6 @@
 //! `collections`: each collection's status, with what its profiles configure, as a tree.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use jiff::Timestamp;
 use serde::Serialize;
@@ -43,7 +43,10 @@ pub(super) fn show(engine: &Engine, refresh: bool) -> Level {
     } else {
         Level::Success
     };
-    let mut profiles: Vec<ProfileInfo> = engine.rustic_profiles.values().map(|p| profile_info(engine, p)).collect();
+    let inherited: BTreeSet<&str> =
+        engine.rustic_profiles.values().flat_map(|p| p.uses.iter().map(String::as_str)).collect();
+    let mut profiles: Vec<ProfileInfo> =
+        engine.rustic_profiles.values().map(|p| profile_info(engine, p, &inherited)).collect();
     profiles.extend(engine.broken.iter().map(|(name, err)| ProfileInfo {
         name: name.clone(),
         error: Some(err.clone()),
@@ -214,17 +217,19 @@ impl std::fmt::Display for Overview {
             writeln!(f, "\n{}  {} {}", log::bold(&c.title), c.level.dot(), log::paint(c.level, &c.level.word()))?;
             f.write_str(&tree(&self.collection(c)))?;
         }
-        for kind in [Kind::NoSources, Kind::Fragment, Kind::Unused, Kind::Broken] {
+        let kinds = [Kind::NoSources, Kind::Inherited, Kind::Unused, Kind::Broken].map(|kind| {
             let profiles: Vec<Tree> = (self.profiles.iter().filter(|p| p.kind == kind))
-                .map(|p| {
-                    let reason = p.error.as_deref().map(|e| field(Text::Reason, &log::paint(Level::Failure, e)));
-                    Tree { line: log::bold(&p.name), below: reason.into_iter().collect() }
+                .map(|p| match &p.error {
+                    Some(e) => Tree::leaf(format!("{}: {}", log::bold(&p.name), log::paint(Level::Failure, e))),
+                    None => Tree::leaf(log::bold(&p.name)),
                 })
                 .collect();
-            if !profiles.is_empty() {
-                writeln!(f, "\n{}", section(kind))?;
-                f.write_str(&tree(&profiles))?;
-            }
+            Tree { line: section(kind), below: profiles }
+        });
+        let other: Vec<Tree> = kinds.into_iter().filter(|k| !k.below.is_empty()).collect();
+        if !other.is_empty() {
+            writeln!(f, "\n{}", section(Text::Other))?;
+            f.write_str(&tree(&other))?;
         }
         Ok(())
     }
@@ -264,15 +269,16 @@ struct ProfileInfo {
     error: Option<String>,
 }
 
-fn profile_info(engine: &Engine, p: &profile::RusticProfile) -> ProfileInfo {
+/// `inherited`: the profiles that others name in `use-profiles`.
+fn profile_info(engine: &Engine, p: &profile::RusticProfile, inherited: &BTreeSet<&str>) -> ProfileInfo {
     let copying: Vec<&profile::RusticProfile> =
         engine.rustic_profiles.values().filter(|j| j.is_backup_profile() && j.targets.contains(&p.name)).collect();
-    let kind = match (p.is_backup_profile(), copying.is_empty(), &p.repository) {
-        (true, ..) => Kind::BackupProfile,
-        (false, true, _) if p.sourceless => Kind::NoSources,
-        (false, false, _) => Kind::CopyTarget,
-        (false, true, Some(_)) => Kind::Unused,
-        (false, true, None) => Kind::Fragment,
+    let kind = match (p.is_backup_profile(), copying.is_empty()) {
+        (true, _) => Kind::BackupProfile,
+        (false, false) => Kind::CopyTarget,
+        (false, true) if p.sourceless => Kind::NoSources,
+        (false, true) if inherited.contains(p.name.as_str()) => Kind::Inherited,
+        (false, true) => Kind::Unused,
     };
     let files = p.files();
     let mut warnings = Vec::new();

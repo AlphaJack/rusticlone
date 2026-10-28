@@ -54,7 +54,7 @@ fn profiles_are_classified() {
         .assert_exit(1)
         .assert_result("backup-profile", json!({"name": "Docs"}))
         .assert_result("copy-target", json!({"name": "Docs-remote", "copy_target_of": ["Docs"]}))
-        .assert_result("fragment", json!({"name": "common"}))
+        .assert_result("inherited", json!({"name": "common"}))
         .assert_result("broken", json!({"name": "broken"}))
         .assert_result("broken", json!({"name": "dry"}));
     // Its repository is not inspected: unknown, not in sync.
@@ -208,4 +208,32 @@ fn a_backup_joins_the_same_one_queued() {
         running.wait_with_output().unwrap().status.success() && queued.wait_with_output().unwrap().status.success()
     );
     assert_eq!(sb.snapshots("Sleepy").len(), 2);
+}
+
+/// A copy target that reads its repository from the same `use-profiles` as its primary is that repository:
+/// nothing is copied anywhere. The profiles that others use are inherited, not unused.
+#[test]
+fn a_target_sharing_its_primarys_repository_is_an_issue() {
+    let sb = Sandbox::new();
+    let repo = |dir: &str| {
+        format!("[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '{}'\n", sb.path(dir).display())
+    };
+    sb.profile("disk", &repo("local/disk"));
+    sb.profile("other-disk", &repo("local/other"));
+    let source = sb.path("source/docs").display().to_string();
+    sb.profile(
+        "Docs",
+        &format!("[global]\nuse-profiles = ['disk']\n\n[[backup.snapshots]]\nsources = ['{source}']\n\n[copy]\ntargets = ['Docs-usb']\n"),
+    );
+    sb.profile("Docs-usb", "[global]\nuse-profiles = ['disk']\n\n[forget]\nkeep-last = 2\n");
+    sb.profile("Music", "[global]\nuse-profiles = ['other-disk']\n\n[forget]\nkeep-last = 2\n");
+    sb.write("docs/a.txt", "a");
+    sb.run(&["collections"])
+        .assert_exit(1)
+        .assert_json(&json!({"kind": "same-repository", "target": "Docs-usb", "primary": "Docs"}))
+        .assert_result("copy-target", json!({"name": "Docs-usb"}))
+        .assert_result("inherited", json!({"name": "disk"}))
+        .assert_result("inherited", json!({"name": "other-disk"}))
+        .assert_result("inherited", json!({"name": "common"}))
+        .assert_result("unused", json!({"name": "Music"}));
 }

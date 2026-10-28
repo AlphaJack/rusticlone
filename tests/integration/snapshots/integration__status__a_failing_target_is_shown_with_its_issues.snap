@@ -44,5 +44,6 @@ Docs  ● degraded
          ├── Check: manual, no check yet
          └── Prune: manual, no prune yet
 
-Fragment profiles
-└── common
+Other profiles
+└──┐Inherited by other profiles
+   └── common

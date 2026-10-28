@@ -40,6 +40,8 @@ pub(crate) struct RusticProfile {
     /// `skip-if-unchanged`: a backup of unchanged sources makes no snapshot.
     pub skip_unchanged: bool,
     pub env: BTreeMap<String, String>,
+    /// The profiles it reads through `use-profiles`, as rustic resolves them.
+    pub uses: Vec<String>,
     /// `[[backup.snapshots]]` entries, none with a source: meant as a backup profile, which backs up nothing.
     pub sourceless: bool,
     /// A password, its file or command, or a key, as rustic shows its config, environment included. Without
@@ -403,6 +405,7 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         skip_unchanged: set(config, &["backup", "skip-if-unchanged"])
             || snapshots.iter().any(|s| set(s, &["skip-if-unchanged"])),
         env: table(&["global", "env"]).filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned()))).collect(),
+        uses: strings(get(&["global", "use-profiles"])).into_iter().filter(|p| p != name).collect(),
         sourceless,
         has_password: ["password", "password-file", "password-command", "key"]
             .iter()

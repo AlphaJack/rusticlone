@@ -75,7 +75,6 @@ collections-here = { $dir } ({ profile-here })
 collections-sources = Sorgenti
 collections-repositories = Archivi
 collections-issues = Problemi
-collections-reason = Motivo
 collections-size = Dimensione
 collections-files = File
 collections-profile = Profilo
@@ -86,6 +85,7 @@ collections-schedules = Pianificazioni
 collections-primary = principale
 collections-copy-target = destinazione di copia
 collections-no-collections = Ancora nessuna raccolta: nessun profilo ha sia un [repository] sia [[backup.snapshots]] con sorgenti. Aggiungili a un profilo in una delle cartelle sopra, o esegui `{ -name } serve --open` per crearne una
+collections-other = Altri profili
 collections-unknown = { repo-status-unknown }
 collections-failing = { $failures ->
     [one] non riuscita
@@ -102,10 +102,10 @@ collections-behind = { $status }, { since-behind }
 collections-listed = { $status } (elencato { $age } fa)
 collections-kind-backup-profile = Profili di backup
 collections-kind-copy-target = Destinazioni di copia
-collections-kind-unused = Profili inutilizzati (nessun profilo di backup usa il loro archivio)
-collections-kind-no-sources = Profili di backup senza sorgenti (il loro [[backup.snapshots]] non ne elenca)
-collections-kind-fragment = Profili frammento
-collections-kind-broken = Profili non validi
+collections-kind-inherited = Ereditati da altri profili
+collections-kind-unused = Inutilizzati
+collections-kind-no-sources = Senza sorgenti (il loro [[backup.snapshots]] non ne elenca)
+collections-kind-broken = Non validi
 collections-warning-hidden = { $read } nasconde { $hidden }: rustic legge solo il primo file con il nome di un profilo. Rinomina o elimina { $hidden }
 
 ## Esecuzioni e passaggi: cosa fanno e cosa hanno fatto
@@ -309,6 +309,7 @@ fix-missing-repo = se il suo disco è scollegato, collegalo; se è stato elimina
 issue-prunes-on-forget = { $repo } pulisce a ogni rimozione: lento e non pianificato. Togli `prune = true` da [forget] e imposta invece { $key }
 issue-setting-ignored = { $repo } { $setting }
 issue-no-password = { $repo } non ha una password, quindi rustic la chiederebbe senza che nessuno possa digitarla. Imposta password, password-file o password-command nel suo [repository]
+issue-same-repository = { $target } è lo stesso archivio di { $primary }, quindi copiarvi non conserva una seconda copia, e la sua politica [forget] elimina gli snapshot del principale. Dai a { $target } un archivio suo
 issue-never-backed-up = nessun backup finora
 issue-no-disk-access = macOS non lascia che rustic legga { $source }. In Impostazioni di Sistema, concedi Accesso completo al disco a { $exe }, o al terminale che lo esegue
 issue-missing = { $repo } manca: { fix-missing-repo }

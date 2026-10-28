@@ -281,6 +281,10 @@ impl Engine {
         );
         issues
             .extend(collection.repos().filter(|r| !r.has_password).map(|r| Issue::NoPassword { repo: r.name.clone() }));
+        issues.extend(
+            (collection.targets.iter().filter(|t| t.repo_key() == p.repo_key()))
+                .map(|t| Issue::SameRepository { target: t.name.clone(), primary: p.name.clone() }),
+        );
         // An unknown setting is likely a typo, which leaves a step unscheduled.
         issues.extend(collection.repos().flat_map(|r| {
             settings::ignored(r, &[p])
@@ -540,6 +544,12 @@ pub(crate) enum Issue {
     NoPassword {
         repo: String,
     },
+    /// A copy target that is the primary's repository, as through the same `use-profiles`: its copies keep no
+    /// second copy, and its `[forget]` policy applies to the primary.
+    SameRepository {
+        target: String,
+        primary: String,
+    },
     #[fluent(transparent = error)]
     Failed {
         step: StepKey,
@@ -659,6 +669,7 @@ impl Message for Issue {
             Self::Unreadable { .. }
             | Self::CopyTargetUnusable(_)
             | Self::NoPassword { .. }
+            | Self::SameRepository { .. }
             | Self::Failed { .. }
             | Self::Missing { primary: true, .. }
             | Self::InvalidSchedule { .. } => Level::Failure,

@@ -16,7 +16,6 @@ pub(super) enum Text<'a> {
     Sources,
     Repositories,
     Issues,
-    Reason,
     Size,
     Files,
     Profile,
@@ -28,6 +27,8 @@ pub(super) enum Text<'a> {
     CopyTarget,
     /// Where no profile is a collection.
     NoCollections,
+    /// The profiles that are not collections.
+    Other,
     Unknown,
     Failing {
         failures: u32,
@@ -68,10 +69,11 @@ pub(super) enum Text<'a> {
 pub(super) enum Kind {
     BackupProfile,
     CopyTarget,
-    Unused,
     /// `[[backup.snapshots]]` without sources.
     NoSources,
-    Fragment,
+    /// Named in another profile's `use-profiles`.
+    Inherited,
+    Unused,
     #[default]
     Broken,
 }
