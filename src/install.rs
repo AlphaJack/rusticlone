@@ -40,7 +40,8 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 /// Who keeps `exe` where it is: a package manager that the user runs keeps it in a folder of its own, wherever
 /// its root is (Homebrew's `Cellar`, `WinGet`'s `Packages`, Scoop's `apps` beside its `shims`, Chocolatey's
 /// `lib` beside `choco.exe`); Nix in its read-only store; the system in its packages' folders and in any that
-/// is not the user's; a container's image any. The macOS app's copy of one is kept by the same. `None` for the user's own copy.
+/// is not the user's; a container's image any. The macOS app's copy of one is kept by the same. `None` for the
+/// user's own copy.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
 #[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
 pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
