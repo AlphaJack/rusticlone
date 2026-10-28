@@ -37,9 +37,17 @@ pub(crate) enum Logged {
     AutoUpdate {
         file: String,
     },
+    /// `install --auto-update` of an executable that its package manager updates.
+    #[cfg(feature = "self-update")]
+    AutoUpdateManaged,
     NotInstalled,
     Deleted {
         dir: String,
+    },
+    /// The macOS app copied the executable that the package manager updated.
+    #[cfg(all(target_vendor = "apple", feature = "self-update"))]
+    AppRefreshed {
+        version: String,
     },
 }
 
@@ -106,6 +114,22 @@ pub(crate) fn answers_soon(listen: &str) -> bool {
         std::thread::sleep(POLL);
     }
     true
+}
+
+/// The package manager's executable that the macOS app holding `exe` is a copy of: the package manager
+/// updates that one.
+#[cfg(target_vendor = "apple")]
+pub(crate) fn app_source(exe: &Path) -> Option<PathBuf> {
+    imp::app_source(exe)
+}
+
+/// Copies the package manager's executable into the macOS app again when it updated it, and says so.
+/// Whether it did: the app then starts again.
+#[cfg(all(target_vendor = "apple", feature = "self-update"))]
+pub(crate) fn refresh_app() -> Result<bool> {
+    let Some(version) = imp::refresh_app()? else { return Ok(false) };
+    log::event(None, &Logged::AppRefreshed { version });
+    Ok(true)
 }
 
 /// Writes the macOS app again around this executable, which an update replaced with `version`: its version,
@@ -435,6 +459,15 @@ mod imp {
             std::fs::copy(exe, &partial)?;
             _ = std::fs::remove_file(&bundled);
             std::fs::rename(&partial, &bundled)?;
+            // A package manager's executable, which it updates, is copied again at start when it no longer is
+            // the one copied: see `refresh_app`. Named with its SHA-256, as signing the app changes the copy.
+            let source = source_file(&contents);
+            if crate::install::managed(exe) {
+                let copied = sys::sha256(std::fs::read(exe)?);
+                std::fs::write(&source, format!("{}\n{copied}\n", exe.display()))?;
+            } else {
+                _ = std::fs::remove_file(&source);
+            }
         }
         std::fs::write(
             contents.join("Resources").join(format!("{NAME}.icns")),
@@ -458,6 +491,48 @@ mod imp {
             run("xattr", &["-wx", "com.apple.metadata:kMDItemKeywords", &hex, &app.to_string_lossy()])?;
         }
         Ok(bundled)
+    }
+
+    /// Where the app names the package manager's executable that it is a copy of, and that one's SHA-256.
+    fn source_file(contents: &Path) -> PathBuf {
+        contents.join("Resources").join("source")
+    }
+
+    /// The package manager's executable that the app holding `exe` copied, and the SHA-256 it had then.
+    fn source(exe: &Path) -> Option<(PathBuf, String)> {
+        if !exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) {
+            return None;
+        }
+        let text = std::fs::read_to_string(source_file(exe.parent()?.parent()?)).ok()?;
+        let mut lines = text.lines();
+        Some((PathBuf::from(lines.next()?), lines.next().unwrap_or_default().to_owned()))
+    }
+
+    pub(super) fn app_source(exe: &Path) -> Option<PathBuf> {
+        source(exe).map(|(path, _)| path)
+    }
+
+    /// The package manager's executable when it changed since the app that holds `exe` copied it: not when the
+    /// app's signature changed the copy, else each start would copy it again.
+    #[cfg(any(feature = "self-update", test))]
+    pub(super) fn stale(exe: &Path) -> Option<PathBuf> {
+        let (source, copied) = source(exe)?;
+        let new = std::fs::read(&source).ok()?;
+        (sys::sha256(new) != copied).then_some(source)
+    }
+
+    /// The package manager's executable, copied into the app that holds this one when it changed since the
+    /// last copy: its version, or `None` when it is the same, or gone.
+    #[cfg(feature = "self-update")]
+    #[expect(clippy::disallowed_methods, reason = "asks the package manager's rusticlone its version")]
+    pub(super) fn refresh_app() -> Result<Option<String>> {
+        let exe = std::env::current_exe()?;
+        let Some(source) = stale(&exe) else { return Ok(None) };
+        let out = std::process::Command::new(&source).arg("--version").output()?;
+        let version = String::from_utf8_lossy(&out.stdout).split_whitespace().last().unwrap_or_default().to_owned();
+        let app = exe.parent().and_then(Path::parent).and_then(Path::parent).unwrap_or(&exe);
+        write_app(app, &source, &version)?;
+        Ok(Some(version))
     }
 
     /// The app that holds this executable, written again with `version`.
@@ -1011,6 +1086,8 @@ mod tests {
             &[
                 (format!("packaging/chocolatey/{}.nuspec", crate::NAME), &nuspec),
                 ("packaging/chocolatey/tools/chocolateyinstall.ps1".into(), &chocolatey_install),
+                ("packaging/chocolatey/tools/chocolateyBeforeModify.ps1".into(), &chocolatey_before_modify),
+                ("packaging/chocolatey/tools/chocolateyUninstall.ps1".into(), &chocolatey_uninstall),
             ],
         );
     }
@@ -1062,7 +1139,8 @@ mod tests {
         let targets = crate::tests::dist_targets("windows");
         let target = targets.iter().find(|t| t.starts_with("x86_64")).map_or("", String::as_str);
         format!(
-            r"$ErrorActionPreference = 'Stop'
+            r#"$ErrorActionPreference = 'Stop'
+$restart = Join-Path $env:TEMP '{name}-restart.txt'
 
 # url64bit and checksum64: set by .github/workflows/chocolatey.yml at each release.
 $packageArgs = @{{
@@ -1074,8 +1152,65 @@ $packageArgs = @{{
 }}
 
 Install-ChocolateyZipPackage @packageArgs
-",
+
+# The {name} that chocolateyBeforeModify.ps1 stopped, started again for its users: in their session and without
+# this one's elevation, as at their login. A launcher that exits starts it, as removing a running task stops it.
+if (Test-Path $restart) {{
+  $exe = Join-Path $packageArgs.unzipLocation '{name}.exe'
+  foreach ($user in Get-Content $restart) {{
+    $task = "{name}-restart-$([guid]::NewGuid())"
+    $launch = "Start-Process -FilePath '$exe' -ArgumentList serve -WindowStyle Hidden"
+    $action = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless powershell.exe -NoProfile -Command `"$launch`""
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings | Out-Null
+    Start-ScheduledTask -TaskName $task
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-ScheduledTask -TaskName $task).State -eq 'Running' -and (Get-Date) -lt $deadline) {{ Start-Sleep 1 }}
+    Unregister-ScheduledTask -TaskName $task -Confirm:$false
+    Write-Host "Started {name} again for $user"
+  }}
+  Remove-Item $restart
+}}
+"#,
             url = env!("CARGO_PKG_REPOSITORY"),
+            name = crate::NAME,
+        )
+    }
+
+    /// The script that Chocolatey runs before an upgrade or uninstall: it stops the rusticlone that runs from the
+    /// package, as Windows keeps a running executable from being replaced, and notes its users, for whom the
+    /// install script starts the new one.
+    fn chocolatey_before_modify() -> String {
+        format!(
+            r#"$ErrorActionPreference = 'Stop'
+$restart = Join-Path $env:TEMP '{name}-restart.txt'
+
+# Windows keeps a running executable from being replaced: {name} started from this package is stopped.
+$tools = Split-Path -Parent $MyInvocation.MyCommand.Definition
+$users = Get-CimInstance Win32_Process -Filter "Name = '{name}.exe'" |
+  Where-Object {{ $_.ExecutablePath -like "$tools\*" }} |
+  ForEach-Object {{
+    $owner = Invoke-CimMethod -InputObject $_ -MethodName GetOwner
+    Stop-Process -Id $_.ProcessId -Force
+    "$($owner.Domain)\$($owner.User)"
+  }}
+if ($users) {{
+  $users | Sort-Object -Unique | Set-Content $restart
+}}
+"#,
+            name = crate::NAME,
+        )
+    }
+
+    /// The script that Chocolatey runs to uninstall: no install follows to start rusticlone again.
+    fn chocolatey_uninstall() -> String {
+        format!(
+            r"$ErrorActionPreference = 'Stop'
+
+# Noted by chocolateyBeforeModify.ps1 for an upgrade's install script, which does not follow an uninstall.
+Remove-Item (Join-Path $env:TEMP '{name}-restart.txt') -ErrorAction SilentlyContinue
+",
             name = crate::NAME,
         )
     }
@@ -1152,6 +1287,26 @@ mod apple_tests {
             plist.starts_with(b"bplist00")
                 && keywords.iter().all(|k| plist.windows(k.len()).any(|w| w == k.as_bytes()))
         );
+    }
+
+    /// The app copies Homebrew's executable and signs the copy, which changes it: the app is not stale then, else
+    /// each start would copy it again and restart. It is once Homebrew upgrades its executable.
+    #[test]
+    fn the_app_copies_homebrews_executable_again_only_once_it_changed() {
+        let dir = std::env::temp_dir().join(format!("{}-brew-app-{}", crate::NAME, std::process::id()));
+        let (app, cellar) = (dir.join(format!("{}.app", crate::APP_NAME)), dir.join("Cellar/rusticlone/2.0.1/bin"));
+        std::fs::create_dir_all(&cellar).unwrap();
+        let source = cellar.join(crate::NAME);
+        std::fs::copy("/usr/bin/true", &source).unwrap();
+        let exe = super::imp::bundle(&app, &source, "2.0.1").unwrap();
+        let signed_copy_differs = std::fs::read(&exe).unwrap() != std::fs::read(&source).unwrap();
+        let after_install = super::imp::stale(&exe);
+        std::fs::copy("/usr/bin/false", &source).unwrap();
+        let after_upgrade = super::imp::stale(&exe);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert!(signed_copy_differs, "codesign no longer changes the copy: the test proves less");
+        assert_eq!(after_install, None);
+        assert_eq!(after_upgrade, Some(source));
     }
 
     /// An update replaces the executable inside the app, which breaks its signature: written again, the app

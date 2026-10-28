@@ -3,7 +3,7 @@
 
 #![expect(clippy::disallowed_methods, reason = "writes the new executable beside the temporary files")]
 
-use std::{collections::BTreeMap, env::consts::EXE_SUFFIX};
+use std::{collections::BTreeMap, env::consts::EXE_SUFFIX, path::Path};
 
 use anyhow::Result;
 use semver::Version;
@@ -52,6 +52,13 @@ pub(crate) enum Logged {
         from: String,
         to: String,
     },
+    /// Not downloaded: a package manager updates this executable, or its folder is not the user's. `how`: the
+    /// [`Keeper`](crate::install::Keeper)'s command.
+    Packaged {
+        from: String,
+        to: String,
+        how: String,
+    },
     /// At start, which goes on with the executable and rustic as they are.
     #[cfg_attr(not(feature = "server"), expect(dead_code, reason = "only the server updates at start"))]
     NotUpdated {
@@ -62,7 +69,7 @@ pub(crate) enum Logged {
 impl Message for Logged {
     fn level(&self) -> Level {
         match self {
-            Self::NotUpdated { .. } => Level::Warning,
+            Self::NotUpdated { .. } | Self::Packaged { .. } => Level::Warning,
             Self::Current { .. } | Self::Available { .. } | Self::Updated { .. } => Level::Success,
         }
     }
@@ -130,14 +137,16 @@ fn system(target: &str) -> impl Iterator<Item = &str> {
 /// Updates this executable, then rustic if it was downloaded: the new executable does, since it knows
 /// the rustic it is tested with. A dry run only says whether there is a newer release.
 pub(crate) fn update(dry_run: bool) -> Result<()> {
+    // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
+    let exe = std::env::current_exe()?;
     let logged = replace(dry_run)?;
     crate::log::event(None, &logged);
     match logged {
         Logged::Updated { .. } => {
-            std::process::Command::new(std::env::current_exe()?).arg("update").status()?;
+            std::process::Command::new(exe).arg("update").status()?;
         }
         Logged::Current { .. } if !dry_run => super::rustic::download(true)?,
-        Logged::Current { .. } | Logged::Available { .. } | Logged::NotUpdated { .. } => {}
+        Logged::Current { .. } | Logged::Available { .. } | Logged::Packaged { .. } | Logged::NotUpdated { .. } => {}
     }
     Ok(())
 }
@@ -161,6 +170,32 @@ pub(crate) fn at_start() -> bool {
     false
 }
 
+/// Whether this executable can replace itself: not when a package manager keeps it.
+pub(crate) fn replaceable() -> bool {
+    std::env::current_exe().is_ok_and(|exe| !super::managed(&exe))
+}
+
+/// What is logged without downloading: this release is the newest, or a dry run, or a package manager keeps
+/// this executable, which `how` says how to update. `None` to download the newest.
+fn without_download(
+    current: &Version,
+    newest: &Version,
+    dry_run: bool,
+    replaceable: bool,
+    how: impl FnOnce() -> String,
+) -> Option<Logged> {
+    let (from, to) = (current.to_string(), newest.to_string());
+    if newest <= current {
+        Some(Logged::Current { current: from })
+    } else if dry_run {
+        Some(Logged::Available { from, to })
+    } else if !replaceable {
+        Some(Logged::Packaged { from, to, how: how() })
+    } else {
+        None
+    }
+}
+
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
 /// executable with it.
 fn replace(dry_run: bool) -> Result<Logged> {
@@ -168,13 +203,14 @@ fn replace(dry_run: bool) -> Result<Logged> {
     let api = REPOSITORY.replace("://github.com/", "://api.github.com/repos/");
     let Release { tag_name: tag, assets } = serde_json::from_slice(&fetch(&format!("{api}/releases/latest"))?)?;
     let newest = Version::parse(tag.trim_start_matches('v'))?;
-    if newest <= current {
-        return Ok(Logged::Current { current: current.to_string() });
+    let how = || {
+        let keeper = std::env::current_exe().ok().and_then(|exe| crate::install::keeper(&exe));
+        keeper.unwrap_or(crate::install::Keeper::System).to_string()
+    };
+    if let Some(logged) = without_download(&current, &newest, dry_run, replaceable(), how) {
+        return Ok(logged);
     }
     let (from, to) = (current.to_string(), newest.to_string());
-    if dry_run {
-        return Ok(Logged::Available { from, to });
-    }
     let url = |name: &str| assets.iter().find(|a| a.name == name).map(|a| a.browser_download_url.clone());
     let manifest: Manifest =
         serde_json::from_slice(&fetch(&url(MANIFEST).ok_or_else(|| Error::NoManifest { tag: tag.clone() })?)?)?;
@@ -187,7 +223,7 @@ fn replace(dry_run: bool) -> Result<Logged> {
     }
     super::attest::verify(REPOSITORY, &tag, &archive, &data)?;
     let new = std::env::temp_dir().join(format!("{}-{newest}{EXE_SUFFIX}", crate::NAME));
-    let executable = std::path::Path::new(executable).file_name().unwrap_or_default().to_string_lossy();
+    let executable = Path::new(executable).file_name().unwrap_or_default().to_string_lossy();
     install(&unpack(&archive, &data, &executable)?, &new)?;
     let replaced = self_replace::self_replace(&new);
     std::fs::remove_file(&new)?;
@@ -200,7 +236,22 @@ fn replace(dry_run: bool) -> Result<Logged> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Manifest, archive};
+    use semver::Version;
+
+    use super::{Logged, Manifest, archive, without_download};
+
+    /// A package manager's executable is not downloaded, even with a newer release; the user's is.
+    #[test]
+    fn a_package_managers_executable_is_left_to_it() {
+        let (old, new) = (Version::new(2, 0, 0), Version::new(2, 0, 1));
+        let how = || String::from("brew");
+        assert!(
+            matches!(without_download(&old, &new, false, false, how), Some(Logged::Packaged { how, .. }) if how == "brew")
+        );
+        assert!(without_download(&old, &new, false, true, how).is_none());
+        assert!(matches!(without_download(&old, &new, true, false, how), Some(Logged::Available { .. })));
+        assert!(matches!(without_download(&new, &new, false, false, how), Some(Logged::Current { .. })));
+    }
 
     /// A real manifest, of mercurio's release: its artifacts are listed as rusticlone's are.
     #[test]

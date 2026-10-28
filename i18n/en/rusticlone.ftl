@@ -266,8 +266,8 @@ output-in-use = another program has it open and locked. Close that program befor
 
 ## A collection's health
 
-unconfigured-new = nothing to back up yet: set up a backup
-unconfigured-gone = nothing to back up: the profiles of the collections that ran before are missing. Put them back in the profile folder, or set up a new backup
+unconfigured-new = No collection found: open Rusticlone to create your first one
+unconfigured-gone = No collection found: place your profiles back to the folder or create a new one 
 level-word = { $level ->
     [success] healthy
     [warning] degraded
@@ -662,6 +662,8 @@ autostart-installed-at-login = the server starts now and at login: { $file }
 autostart-uninstalled = the server is stopped and no longer starts automatically: { $file } deleted
 autostart-uninstalled-running = the server no longer starts at login: { $file } deleted. The running one stops at logout
 autostart-auto-update = the server updates itself at each start: { $file } sets { $key }=true
+autostart-auto-update-managed = auto-update stays off: the package manager updates { -name }
+autostart-app-refreshed = the app now runs { -name } { $version }, which the package manager installed
 autostart-not-installed = the server was not installed
 autostart-deleted = { $dir } deleted
 autostart-error-cannot-run = cannot run { $program }
@@ -673,11 +675,21 @@ autostart-unit-description = { -app } server
 # What desktops and the Windows start menu say of the app. Translations replace it.
 app-description = { -description }
 tray-quit = Quit (pause automatic backups)
+switch-at-boot = Start at boot
 switch-at-login = Start at login
 switch-auto-update = Update automatically
 update-current = { -name } { $current } is up to date
 update-available = { -name } { $to } is available, this is { $from }
 update-updated = { -name } updated from { $from } to { $to }
+update-packaged = { -name } { $to } is available, this is { $from }: { $how }
+update-with-homebrew = update it with `brew upgrade { -name }`
+update-with-scoop = quit it from the tray and update it with `scoop update { -name }`
+update-with-chocolatey = update it as administrator with `choco upgrade { -name }`
+update-with-win-get = update it with `winget upgrade { $id }`
+update-with-nix = update the flake input or the package in your Nix configuration
+update-with-docker = pull the image again with `docker pull { $image }`
+update-with-podman = pull the image again with `podman pull { $image }`
+update-with-system = update it with your package manager or with `sudo { -name } update`
 update-not-updated = not updated: { $error }
 update-error-checksum = { $file } does not match its checksum: download it again
 update-error-no-manifest = release { $tag } has no { $manifest }

@@ -125,7 +125,7 @@ impl ksni::Tray for Shown {
         let switches = self.switches.iter().map(|&(switch, state)| {
             let activate = Box::new(move |_: &mut Self| switch.toggle());
             let (enabled, checked) = (state.is_some(), state == Some(true));
-            CheckmarkItem { label: switch.to_string(), enabled, checked, activate, ..CheckmarkItem::default() }.into()
+            CheckmarkItem { label: switch.label(), enabled, checked, activate, ..CheckmarkItem::default() }.into()
         });
         [item(version_label(), None), item(open_label(), Some(&self.login)), MenuItem::Separator]
             .into_iter()

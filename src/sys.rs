@@ -54,10 +54,9 @@ pub(crate) fn config_dirs(app: &str) -> Result<Vec<PathBuf>, etcetera::HomeDirEr
     Ok([user].into_iter().chain(system).collect())
 }
 
-/// Where the installer script puts rusticlone, on `PATH`: `$CARGO_HOME/bin`, else `~/.cargo/bin`. For root
-/// or an administrator, whose server is the system's, a system folder. `install` places rusticlone there,
-/// and a downloaded rustic goes beside it.
-#[expect(clippy::disallowed_methods, reason = "the installer script's folder is in the environment")]
+/// Where `install` places rusticlone, on `PATH`, unless it runs from [`installer_dir`] already: that folder,
+/// or for root or an administrator, whose server is the system's, a system folder. A downloaded rustic goes
+/// there too.
 pub(crate) fn bin_dir() -> Result<PathBuf, etcetera::HomeDirError> {
     if is_root() {
         #[cfg(windows)]
@@ -66,6 +65,12 @@ pub(crate) fn bin_dir() -> Result<PathBuf, etcetera::HomeDirError> {
         #[cfg(not(windows))]
         return Ok(PathBuf::from("/usr/local/bin"));
     }
+    installer_dir()
+}
+
+/// Where the installer script puts rusticlone, for root too: `$CARGO_HOME/bin`, else `~/.cargo/bin`.
+#[expect(clippy::disallowed_methods, reason = "the installer script's folder is in the environment")]
+pub(crate) fn installer_dir() -> Result<PathBuf, etcetera::HomeDirError> {
     let cargo = std::env::var_os("CARGO_HOME").filter(|h| !h.is_empty()).map(PathBuf::from);
     Ok(cargo.map_or_else(|| etcetera::home_dir().map(|h| h.join(".cargo")), Ok)?.join("bin"))
 }
@@ -78,7 +83,7 @@ pub(crate) fn own_config_dir(app: &str) -> Option<PathBuf> {
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.
 /// Unix asks the kernel, which also counts read-only mounts and ACLs. Windows's own folders are writable
 /// by whom they belong to, so it assumes they are.
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", feature = "self-update"))]
 #[cfg_attr(unix, expect(unsafe_code, reason = "faccessat reads the NUL-terminated path it is given"))]
 pub(crate) fn writable(dir: &std::path::Path) -> bool {
     #[cfg(unix)]

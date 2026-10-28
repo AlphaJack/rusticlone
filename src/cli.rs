@@ -96,10 +96,15 @@ fn without_state(command: &Command) -> Result<Option<Level>> {
         if let Command::Install { auto_update } = command {
             crate::install::rustic::download(!auto_update)?;
         }
+        // A package manager's executable is updated by it instead.
         #[cfg(feature = "self-update")]
         if matches!(command, Command::Install { auto_update: true }) {
-            let file = settings::write_env_file(&settings::AUTO_UPDATE, "true")?;
-            log::event(None, &autostart::Logged::AutoUpdate { file: file.display().to_string() });
+            if crate::install::update::replaceable() {
+                let file = settings::write_env_file(&settings::AUTO_UPDATE, "true")?;
+                log::event(None, &autostart::Logged::AutoUpdate { file: file.display().to_string() });
+            } else {
+                log::event(None, &autostart::Logged::AutoUpdateManaged);
+            }
         }
         let done = if install { autostart::install(listen) } else { autostart::uninstall() };
         log::event(None, &done?);
