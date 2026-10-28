@@ -8,7 +8,7 @@ semver_check = false
 # crates.yml publishes once dist has built every target.
 publish = false
 # Chores and docs alone open no release PR.
-release_commits = "^(feat|fix|perf)"
+release_commits = "^(feat|fix|perf|i18n)"
 # Without a scope, which pr-title.yml would reject.
 pr_name = "chore: release v{{ version }}"
 
@@ -71,6 +71,7 @@ commit_parsers = [
     { message = "^feat", group = "added" },
     { message = "^fix", group = "fixed" },
     { message = "^perf", group = "performance" },
+    { message = "^i18n", group = "translated" },
     # Other types are invisible to users, unless they break something.
     { message = "^[a-z]+(\\([^)]*\\))?!:", group = "changed" },
     { message = ".*", skip = true },
