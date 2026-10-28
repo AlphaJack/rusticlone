@@ -105,6 +105,11 @@ jobs:
         with:
           tool: cargo-binstall
       # The rustic pinned in Cargo.toml, which the tests run.
+      - name: Turn off Defender's real-time scanning
+        if: runner.os == 'Windows'
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, IsTamperProtected, AMRunningMode
       - name: Install rustic
         shell: bash
         run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
