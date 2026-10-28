@@ -1025,7 +1025,7 @@ pub(crate) fn place() -> Result<PathBuf> {
     Ok(exe)
 }
 
-/// Installs the server that runs `exe`, from [`place`]. Installing again restarts it.
+/// Installs the server that runs `exe`, from [`place()`]. Installing again restarts it.
 pub(crate) fn install(listen: &str, exe: &Path) -> Result<Logged> {
     let file = imp::install(listen, exe, &serve_args())?.display().to_string();
     Ok(if with_computer() { Logged::Installed { file } } else { Logged::InstalledAtLogin { file } })
