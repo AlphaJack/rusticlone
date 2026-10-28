@@ -129,7 +129,7 @@ Rusticlone looks for profiles in the same folders as rustic:
 | macOS | `$HOME/Library/Application Support/rustic` | `/var/root/Library/Application Support/rustic`<br>`/etc/rustic` |
 | Windows | `%APPDATA%\rustic\config` | `%WINDIR%\System32\config\systemprofile\AppData\Roaming\rustic\config`<br>`%PROGRAMDATA%\rustic\config` |
 
-Profiles in the working directory are also considered.
+Profiles in the working directory are also considered, so it's easy to run one-off commands without moving files.
 
 ### Backup
 
