@@ -60,6 +60,10 @@ pub(crate) fn config_dirs(app: &str) -> Result<Vec<PathBuf>, etcetera::HomeDirEr
 /// Where `install` places rusticlone, on `PATH`, unless it runs from [`installer_dir`] already: that folder,
 /// or for root or an administrator, whose server is the system's, a system folder. A downloaded rustic goes
 /// there too.
+#[cfg_attr(
+    windows,
+    expect(clippy::disallowed_methods, reason = "the system's program folder on Windows is in the environment")
+)]
 pub(crate) fn bin_dir() -> Result<PathBuf, etcetera::HomeDirError> {
     if is_root() {
         #[cfg(windows)]

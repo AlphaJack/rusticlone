@@ -97,7 +97,7 @@ fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
 mod tests {
     use std::path::{Path, PathBuf};
 
-    use super::{kept, linked};
+    use super::kept;
 
     /// A folder of its own in the temporary one, removed with its contents.
     struct Folder(PathBuf);
@@ -156,7 +156,7 @@ mod tests {
         std::fs::create_dir_all(&bin).unwrap();
         std::os::unix::fs::symlink(&exe, bin.join(crate::NAME)).unwrap();
         let on_path = path(&[&folder.0.join("elsewhere"), &bin]);
-        assert_eq!(linked(&exe, &on_path), Some(bin.join(crate::NAME)));
+        assert_eq!(super::linked(&exe, &on_path), Some(bin.join(crate::NAME)));
         assert_eq!(kept(&exe, &on_path, None), Some(bin.join(crate::NAME)));
         // Started through the link, as macOS then names it.
         assert_eq!(kept(&bin.join(crate::NAME), &on_path, None), Some(bin.join(crate::NAME)));
