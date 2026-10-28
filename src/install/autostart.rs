@@ -1070,6 +1070,7 @@ mod tests {
             &[
                 (format!("packaging/chocolatey/{}.nuspec", crate::NAME), &nuspec),
                 ("packaging/chocolatey/tools/chocolateyinstall.ps1".into(), &chocolatey_install),
+                ("packaging/chocolatey/tools/chocolateyBeforeModify.ps1".into(), &chocolatey_before_modify),
             ],
         );
     }
@@ -1135,6 +1136,26 @@ $packageArgs = @{{
 Install-ChocolateyZipPackage @packageArgs
 ",
             url = env!("CARGO_PKG_REPOSITORY"),
+            name = crate::NAME,
+        )
+    }
+
+    /// The script that Chocolatey runs before an upgrade or uninstall: it stops the rusticlone that runs from the
+    /// package, as Windows keeps a running executable from being replaced. The `Run` key starts the new one at
+    /// the next login.
+    fn chocolatey_before_modify() -> String {
+        format!(
+            r#"$ErrorActionPreference = 'Stop'
+
+# Windows keeps a running executable from being replaced: rusticlone started from this package is stopped.
+$tools = Split-Path -Parent $MyInvocation.MyCommand.Definition
+Get-CimInstance Win32_Process -Filter "Name = '{name}.exe'" |
+  Where-Object {{ $_.ExecutablePath -like "$tools\*" }} |
+  ForEach-Object {{
+    Stop-Process -Id $_.ProcessId -Force
+    Write-Host "Stopped {name} ($($_.ProcessId)) to replace it: it starts again at the next login, or from the Start menu"
+  }}
+"#,
             name = crate::NAME,
         )
     }
