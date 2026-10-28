@@ -21,7 +21,6 @@ pub(super) enum Text<'a> {
     Profile,
     Location,
     Snapshots,
-    Status,
     Schedules,
     Primary,
     CopyTarget,
@@ -46,19 +45,6 @@ pub(super) enum Text<'a> {
     Unscheduled,
     Unschedulable {
         error: &'a str,
-    },
-    /// A repository's status, with what its last listing found.
-    Newest {
-        status: &'a str,
-        taken: &'a str,
-    },
-    Behind {
-        status: &'a str,
-        age: &'a str,
-    },
-    Listed {
-        status: &'a str,
-        age: &'a str,
     },
 }
 

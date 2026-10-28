@@ -295,7 +295,7 @@ fn a_refresh_before_the_first_backup_is_not_a_failure() {
     let sb = hdd_and_remote(&["Docs-remote"]);
     let run = sb.run_text(&["collections", "--refresh"]);
     run.assert_exit(2);
-    assert!(!run.stdout.contains("unavailable") && run.stdout.contains("● not created"), "{}", run.stdout);
+    assert!(!run.stdout.contains("unavailable") && run.stdout.contains("● never backed up"), "{}", run.stdout);
 }
 
 /// Rustic would ask for it, with no one to type it. The repository is not created, so that rustic, which

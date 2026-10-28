@@ -24,9 +24,9 @@ use record::behind;
 pub(crate) use restore::parse_at;
 pub(crate) use schedule::Schedule;
 use snapshots::{each, newest, newest_by_source, pick, shrunk};
-pub(crate) use status::{CollectionOverview, Last, RepoOverview, RepoStatus, StatusReport};
+pub(crate) use status::{CollectionOverview, Last, RepoOverview, StatusReport};
 #[cfg(feature = "server")]
-pub(crate) use status::{Issue, Unconfigured};
+pub(crate) use status::{Issue, RepoStatus, Unconfigured};
 
 use std::{
     collections::{BTreeMap, BTreeSet},

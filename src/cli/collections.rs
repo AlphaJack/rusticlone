@@ -2,7 +2,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use jiff::Timestamp;
 use serde::Serialize;
 
 use super::{
@@ -11,7 +10,7 @@ use super::{
     tree::{Tree, tree},
 };
 use crate::{
-    engine::{CollectionOverview, Engine, Last, RepoOverview, RepoStatus, Schedule, StatusReport},
+    engine::{CollectionOverview, Engine, Last, RepoOverview, Schedule, StatusReport},
     fmt,
     i18n::t,
     log::{self, Level, Message},
@@ -91,33 +90,12 @@ impl Overview {
         self.listings.get(&(collection.primary.name.clone(), repo.to_owned()))
     }
 
-    fn age(&self, t: Timestamp) -> String {
-        fmt::human_age(t, self.status.time)
-    }
-
     fn last(&self, last: Last) -> String {
         match last {
             Last::At(t) => fmt::human_ago(t, self.status.time),
             Last::Never => Last::never(),
             Last::Unknown => unknown(),
             Last::Failing(n) => Text::Failing { failures: n }.to_string(),
-        }
-    }
-
-    fn state(&self, r: &RepoOverview, primary: bool) -> String {
-        // Its dot and color carry the level.
-        let label = format!("{} {}", r.status.tone().dot(), log::paint(r.status.level(), &r.status.to_string()));
-        match (r.status, &r.lag) {
-            (RepoStatus::Stale { behind_since: Some(since) } | RepoStatus::Behind { since }, _) => {
-                Text::Behind { status: &label, age: &self.age(since) }.to_string()
-            }
-            (RepoStatus::InSync, Some(lag)) => {
-                Text::Listed { status: &label, age: &self.age(lag.checked_at) }.to_string()
-            }
-            _ => match r.latest_snapshot.filter(|_| primary) {
-                Some(at) => Text::Newest { status: &label, taken: &self.last(Last::At(at)) }.to_string(),
-                None => label,
-            },
         }
     }
 
@@ -146,7 +124,6 @@ impl Overview {
             field(Text::Location, r.repository.as_deref().unwrap_or_default()),
             field(Text::Snapshots, &count),
             field(Text::Size, &size),
-            field(Text::Status, &self.state(r, primary)),
         ];
         // Every repository is backed up on the collection's schedule, a target by a copy; checks and prunes
         // have the repository's own.

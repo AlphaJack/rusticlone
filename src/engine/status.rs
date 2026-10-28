@@ -416,6 +416,7 @@ pub(crate) enum RepoStatus {
 }
 
 impl RepoStatus {
+    #[cfg(feature = "server")]
     pub(crate) fn level(self) -> Level {
         match self {
             Self::Missing { primary: true } => Level::Failure,
@@ -431,6 +432,7 @@ impl RepoStatus {
     }
 
     /// Without an outcome yet: muted.
+    #[cfg(feature = "server")]
     pub(crate) fn tone(self) -> crate::log::Tone {
         match self {
             Self::NotCreated | Self::NotChecked | Self::NotBackedUp | Self::Unknown => crate::log::Tone::Muted,

@@ -16,7 +16,6 @@ Docs  ● healthy
    │  ├── Location: [sandbox]/local/Docs-hdd
    │  ├── Snapshots: 1
    │  ├── Size: [size]
-   │  ├── Status: ● up to date, newest snapshot less than a minute ago
    │  └──┐Schedules
    │     ├── Backup: manual, last less than a minute ago
    │     ├── Check: manual, no check yet
@@ -26,7 +25,6 @@ Docs  ● healthy
       ├── Location: [sandbox]/remote/Docs
       ├── Snapshots: 1
       ├── Size: [size]
-      ├── Status: ● up to date (listed less than a minute ago)
       └──┐Schedules
          ├── Copy: manual, last less than a minute ago
          ├── Check: manual, no check yet

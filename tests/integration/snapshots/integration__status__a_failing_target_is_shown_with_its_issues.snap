@@ -18,7 +18,6 @@ Docs  ● degraded
    │  ├── Location: [sandbox]/local/Docs-hdd
    │  ├── Snapshots: 1
    │  ├── Size: [size]
-   │  ├── Status: ● up to date, newest snapshot less than a minute ago
    │  └──┐Schedules
    │     ├── Backup: manual, last less than a minute ago
    │     ├── Check: manual, no check yet
@@ -28,7 +27,6 @@ Docs  ● degraded
    │  ├── Location: [sandbox]/remote/unplugged/Docs
    │  ├── Snapshots: unknown
    │  ├── Size: [size]
-   │  ├── Status: ● copy failing
    │  └──┐Schedules
    │     ├── Copy: manual, last failed
    │     ├── Check: manual, no check yet
@@ -38,7 +36,6 @@ Docs  ● degraded
       ├── Location: [sandbox]/remote/Docs
       ├── Snapshots: 1
       ├── Size: [size]
-      ├── Status: ● up to date (listed less than a minute ago)
       └──┐Schedules
          ├── Copy: manual, last less than a minute ago
          ├── Check: manual, no check yet
