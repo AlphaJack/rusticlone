@@ -108,6 +108,13 @@ pub(crate) fn answers_soon(listen: &str) -> bool {
     true
 }
 
+/// Writes the macOS app again around this executable, which an update replaced with `version`: its version,
+/// and a signature that covers the new executable. Nothing for an executable outside the app.
+#[cfg(all(target_vendor = "apple", feature = "self-update"))]
+pub(crate) fn rewrite_app(version: &str) -> Result<()> {
+    imp::rewrite_app(version)
+}
+
 /// Whether this is the macOS app opened from Finder or Spotlight, which passes no arguments.
 #[cfg(target_vendor = "apple")]
 pub(crate) fn opened_as_app() -> bool {
@@ -406,7 +413,7 @@ mod imp {
 
     /// The app, with a copy of this executable, signed as itself rather than by the linker's anonymous
     /// signature. A copy rather than a link, which macOS would resolve to the executable outside the app.
-    fn write_app(app: &Path, exe: &Path) -> Result<PathBuf> {
+    fn write_app(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
         let contents = app.join("Contents");
         // Named as the app: Login Items and Activity Monitor show it.
         let bundled = contents.join("MacOS").join(APP_NAME);
@@ -431,10 +438,9 @@ mod imp {
   <key>CFBundleExecutable</key><string>{APP_NAME}</string>
   <key>CFBundleIconFile</key><string>{NAME}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>{}</string>
+  <key>CFBundleShortVersionString</key><string>{version}</string>
   <key>LSUIElement</key><true/>
-",
-            env!("CARGO_PKG_VERSION")
+"
         );
         std::fs::write(contents.join("Info.plist"), property_list(&info))?;
         run("codesign", &["--force", "--sign", "-", &app.to_string_lossy()])?;
@@ -446,6 +452,19 @@ mod imp {
         // Finder and the Dock keep showing the icon they cached until the app is registered again.
         run(LSREGISTER, &["-f", &app.to_string_lossy()])?;
         Ok(bundled)
+    }
+
+    /// The app that holds this executable, written again with `version`.
+    #[cfg(feature = "self-update")]
+    pub(super) fn rewrite_app(version: &str) -> Result<()> {
+        let exe = std::env::current_exe()?;
+        // The executable, in `Contents/MacOS` of the app.
+        match exe.parent().and_then(Path::parent).and_then(Path::parent) {
+            Some(app) if exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) => {
+                write_app(app, &exe, version).map(drop)
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Whether the plist is installed and the user switched it off. macOS 13 introduced the switch.
@@ -469,7 +488,7 @@ mod imp {
         std::fs::create_dir_all(&dir)?;
         // Stopped before its app is replaced. Loaded already when installed before.
         _ = run("launchctl", &["bootout", &format!("{}/{NAME}", domain())]);
-        let exe = write_app(&app()?, exe)?;
+        let exe = write_app(&app()?, exe, env!("CARGO_PKG_VERSION"))?;
         let text = property_list(&format!(
             "  <key>Label</key><string>{NAME}</string>
   <key>ProgramArguments</key><array><string>{}</string>{}</array>
