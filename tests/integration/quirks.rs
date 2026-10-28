@@ -5,7 +5,7 @@ use std::{fs, path::Path, time::Duration};
 
 use serde_json::json;
 
-use crate::common::{KEEP, Sandbox, wait_for};
+use crate::common::{KEEP, Sandbox, docs_with_remote, wait_for};
 
 /// A profile `name` into `repo/<name>`, whose sources are links that its backup hook creates into
 /// `source/<target>`, each as `link-<source>`, and removes when rustic is done.
@@ -100,6 +100,19 @@ fn hooks_mount_the_repository_and_link_the_sources() {
     let restored = sb.path(&format!("restored/{}", real.strip_prefix("/").unwrap().display()));
     assert_eq!(fs::read_to_string(restored.join("one/a.txt")).unwrap(), "a");
     assert_eq!(fs::read_to_string(restored.join("two/b.txt")).unwrap(), "b");
+}
+
+/// Hooks that run before rustic, as one that mounts a disk, may print into the output that rustic writes its
+/// JSON to. Not those that run after: rustic 0.11 has not written all of it yet, and their output lands inside.
+#[test]
+fn hooks_may_print() {
+    let sb = docs_with_remote("");
+    let print = if cfg!(windows) { "cmd /c echo [printed by a hook]" } else { "echo [printed by a hook]" };
+    let hooks = |kind| format!("[{kind}.hooks]\nrun-before = ['{print}']\n");
+    sb.backup_profile("Docs", &[&["docs"]], &["Docs-remote"], &(hooks("repository") + &hooks("backup")));
+    sb.target("Docs-remote", "Docs", &hooks("repository"));
+    sb.run(&["backup", "--all"]).assert_exit(0).assert_result("copied", json!({"snapshots": 1}));
+    sb.run(&["collections"]).assert_exit(0);
 }
 
 /// Another profile backs up into the same repository last. After the state is lost, a run that reads only
