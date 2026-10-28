@@ -119,6 +119,16 @@ They are read at start: restart Rusticlone after editing its configuration file.
 Settings for individual collections or repositories are variables in the `[global.env]` section of rustic profiles.
 They can be shared across profiles by using the [`[global] use-profiles`](https://rustic.cli.rs/docs/commands/init/configuration_file.html#:~:text=use%2Dprofiles) feature.
 
+### Profiles
+
+Rusticlone looks for rustic profiles in these folders, then in the working directory:
+
+| OS | admin user | regular user |
+|---|---|---|
+| Linux | `/etc/rustic` | `$HOME/.config/rustic` |
+| macOS | `/etc/rustic` | `$HOME/Library/Application Support/rustic` |
+| Windows | `%PROGRAMDATA%\rustic\config` | `%APPDATA%\rustic\config` |
+
 ### Backup
 
 Rusticlone groups rustic profiles in **collections**.
