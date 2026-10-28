@@ -98,11 +98,11 @@ For scheduled backups, you need to start Rusticlone on boot or user login. You c
 This will also make the app visible in the start menu or app library, and add a tray icon when it's running as regular user.
 It will also create a configuration file based on your system:
 
-| OS | admin user | regular user |
+| OS | regular user | root / SYSTEM |
 |---|---|---|
-| Linux | `/etc/rusticlone/rusticlone.env` | `$HOME/.config/rusticlone/rusticlone.env` |
-| macOS | `/etc/rusticlone/rusticlone.env` | `$HOME/Library/Application Support/rusticlone/rusticlone.env` |
-| Windows | `%PROGRAMDATA%\rusticlone\config\rusticlone.env` | `%APPDATA%\rusticlone\config\rusticlone.env` |
+| Linux | `$HOME/.config/rusticlone/rusticlone.env` | `/etc/rusticlone/rusticlone.env` |
+| macOS | `$HOME/Library/Application Support/rusticlone/rusticlone.env` | `/etc/rusticlone/rusticlone.env` |
+| Windows | `%APPDATA%\rusticlone\config\rusticlone.env` | `%PROGRAMDATA%\rusticlone\config\rusticlone.env` |
 
 ## Usage
 
@@ -118,6 +118,18 @@ They are read at start: restart Rusticlone after editing its configuration file.
 
 Settings for individual collections or repositories are variables in the `[global.env]` section of rustic profiles.
 They can be shared across profiles by using the [`[global] use-profiles`](https://rustic.cli.rs/docs/commands/init/configuration_file.html#:~:text=use%2Dprofiles) feature.
+
+### Profiles
+
+Rusticlone looks for profiles in the same folders as rustic:
+
+| OS | regular user | root / SYSTEM |
+|---|---|---|
+| Linux | `$HOME/.config/rustic` | `/root/.config/rustic`<br>`/etc/rustic` |
+| macOS | `$HOME/Library/Application Support/rustic` | `/var/root/Library/Application Support/rustic`<br>`/etc/rustic` |
+| Windows | `%APPDATA%\rustic\config` | `%WINDIR%\System32\config\systemprofile\AppData\Roaming\rustic\config`<br>`%PROGRAMDATA%\rustic\config` |
+
+Profiles in the working directory are also considered, so it's easy to run one-off commands without moving files.
 
 ### Backup
 
@@ -400,11 +412,11 @@ To see backups from another network, see [remote server](#remote-server) for a r
 Rusticlone state is meant to be disposable, as the source of truth for your backups remains your repositories.
 CLI and server both write to the same shared folder, by default:
 
-| OS | admin user | regular user |
+| OS | regular user | root / SYSTEM |
 |---|---|---|
-| Linux | `/var/lib/rusticlone` | `$HOME/.local/state/rusticlone` |
-| macOS | `/Library/Application Support/rusticlone` | `$HOME/Library/Application Support/rusticlone` |
-| Windows | `%PROGRAMDATA%\rusticlone\state` | `%LOCALAPPDATA%\rusticlone` |
+| Linux | `$HOME/.local/state/rusticlone` | `/var/lib/rusticlone` |
+| macOS | `$HOME/Library/Application Support/rusticlone` | `/Library/Application Support/rusticlone` |
+| Windows | `%LOCALAPPDATA%\rusticlone` | `%PROGRAMDATA%\rusticlone\state` |
 
 There you can find rustic logs, process locks and a [redb](https://www.redb.org/) database with historical run details and repository statistics.
 
