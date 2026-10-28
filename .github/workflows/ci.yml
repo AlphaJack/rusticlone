@@ -131,7 +131,6 @@ jobs:
 
   test-windows:
     name: test (windows-latest)
-    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -153,20 +152,25 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Turn off Defender's real-time scanning
+        if: github.event_name != 'pull_request'
         shell: pwsh
         run: Set-MpPreference -DisableRealtimeMonitoring $true
       - name: Install cargo-nextest
+        if: github.event_name != 'pull_request'
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-nextest
       - name: Install cargo-binstall
+        if: github.event_name != 'pull_request'
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-binstall
       - name: Install rustic
+        if: github.event_name != 'pull_request'
         shell: bash
         run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
       - name: Test
+        if: github.event_name != 'pull_request'
         env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
