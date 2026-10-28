@@ -27,7 +27,7 @@ pub(crate) enum Keeper {
     Docker,
     #[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "containers run Linux"))]
     Podman,
-    /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy put there as root.
+    /// A folder that is not the user's, or the system packages' even for root: `/usr/bin`, `/bin`, `/usr/sbin`.
     System,
 }
 
@@ -39,8 +39,8 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 
 /// Who keeps `exe` where it is: a package manager that the user runs keeps it in a folder of its own, wherever
 /// its root is (Homebrew's `Cellar`, `WinGet`'s `Packages`, Scoop's `apps` beside its `shims`, Chocolatey's
-/// `lib` beside `choco.exe`); Nix in its read-only store; the system in a folder that is not the user's; a
-/// container's image any. The macOS app's copy of one is kept by the same. `None` for the user's own copy.
+/// `lib` beside `choco.exe`); Nix in its read-only store; the system in its packages' folders and in any that
+/// is not the user's; a container's image any. The macOS app's copy of one is kept by the same. `None` for the user's own copy.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
 #[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
 pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
@@ -75,6 +75,9 @@ pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
             None
         }
     });
+    // Packages' folders, which root can write too: a copy of root's own goes in `/usr/local/bin`.
+    let system = |dir: &Path| ["/usr/bin", "/bin", "/usr/sbin"].iter().any(|d| dir == Path::new(d));
+    let kept = kept.or_else(|| exe.parent().filter(|dir| system(dir)).map(|_| Keeper::System));
     kept.or_else(|| (!exe.parent().is_some_and(crate::sys::writable)).then_some(Keeper::System))
 }
 
@@ -102,6 +105,15 @@ mod tests {
         std::fs::remove_dir_all(&app).unwrap();
         assert!(!mine && found);
         assert_eq!(source, Some(Path::new("/opt/homebrew/bin/rusticlone").to_path_buf()));
+    }
+
+    /// Root can write them, but a package put the executable there.
+    #[cfg(unix)]
+    #[test]
+    fn the_system_packages_folders_are_managed_for_root_too() {
+        for dir in ["/usr/bin", "/bin", "/usr/sbin"] {
+            assert_eq!(keeper(&Path::new(dir).join(crate::NAME)), Some(Keeper::System), "{dir}");
+        }
     }
 
     #[test]
