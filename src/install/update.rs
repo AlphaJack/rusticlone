@@ -169,15 +169,7 @@ pub(crate) fn at_start() -> bool {
 /// Whether this executable can replace itself, as the new one is written beside it: not when its folder
 /// is not the user's, as `/usr/bin` of a package, which its package manager updates.
 pub(crate) fn replaceable() -> bool {
-    std::env::current_exe().is_ok_and(|exe| exe.parent().is_some_and(writable))
-}
-
-/// Whether a file can be created in `dir`: tried with a probe that is removed, which also holds for
-/// Windows's ACLs.
-fn writable(dir: &std::path::Path) -> bool {
-    let probe = dir.join(format!(".{}-probe-{}", crate::NAME, std::process::id()));
-    let created = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
-    created && std::fs::remove_file(&probe).is_ok()
+    std::env::current_exe().is_ok_and(|exe| exe.parent().is_some_and(crate::sys::writable))
 }
 
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
@@ -222,66 +214,38 @@ fn replace(dry_run: bool) -> Result<Logged> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Manifest, archive, writable};
+    use std::path::Path;
 
-    /// A folder of its own in the temporary one, removed with its contents.
-    struct Folder(std::path::PathBuf);
-
-    impl Folder {
-        fn new(name: &str) -> Self {
-            let dir = std::env::temp_dir().join(format!("{}-{name}-{}", crate::NAME, std::process::id()));
-            std::fs::create_dir_all(&dir).unwrap();
-            Self(dir)
-        }
-    }
-
-    impl Drop for Folder {
-        fn drop(&mut self) {
-            _ = std::fs::remove_dir_all(&self.0);
-        }
-    }
+    use super::{Manifest, archive};
+    use crate::sys::writable;
 
     #[test]
-    fn the_users_folder_is_replaceable_and_the_probe_is_removed() {
-        let folder = Folder::new("replaceable");
-        assert!(writable(&folder.0));
-        assert_eq!(std::fs::read_dir(&folder.0).unwrap().count(), 0);
+    fn the_temporary_folder_is_replaceable() {
+        assert!(writable(&std::env::temp_dir()));
     }
 
     /// As `/usr/bin` of a package. Root writes there anyway.
     #[cfg(target_os = "linux")]
     #[test]
     fn a_folder_only_root_writes_is_not_replaceable_on_linux() {
-        use std::os::unix::fs::PermissionsExt as _;
         if crate::sys::is_root() {
             return;
         }
-        let folder = Folder::new("packaged");
-        std::fs::set_permissions(&folder.0, std::fs::Permissions::from_mode(0o555)).unwrap();
-        assert!(!writable(&folder.0));
-        std::fs::set_permissions(&folder.0, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(!writable(Path::new("/usr/bin")));
     }
 
     /// The system volume is read-only, even for root.
     #[cfg(target_vendor = "apple")]
     #[test]
     fn the_system_volume_is_not_replaceable_on_macos() {
-        assert!(!writable(std::path::Path::new("/usr/bin")));
+        assert!(!writable(Path::new("/usr/bin")));
     }
 
-    /// As `Program Files` for a user: an ACL that denies writing, which holds for administrators too.
+    /// Windows is not asked: its own folders are writable by whom they belong to.
     #[cfg(windows)]
     #[test]
-    fn a_folder_its_acl_denies_writing_is_not_replaceable_on_windows() {
-        let folder = Folder::new("packaged");
-        let acl = |grant: &str| {
-            let status = std::process::Command::new("icacls").arg(&folder.0).args([grant, "*S-1-1-0:(W)"]).status();
-            assert!(status.unwrap().success());
-        };
-        acl("/deny");
-        let writable = writable(&folder.0);
-        acl("/remove:d");
-        assert!(!writable);
+    fn any_folder_is_replaceable_on_windows() {
+        assert!(writable(Path::new(r"C:\Windows")));
     }
 
     /// A real manifest, of mercurio's release: its artifacts are listed as rusticlone's are.

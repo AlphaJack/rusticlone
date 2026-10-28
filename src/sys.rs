@@ -78,7 +78,7 @@ pub(crate) fn own_config_dir(app: &str) -> Option<PathBuf> {
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.
 /// Unix asks the kernel, which also counts read-only mounts and ACLs. Windows's own folders are writable
 /// by whom they belong to, so it assumes they are.
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", feature = "self-update"))]
 #[cfg_attr(unix, expect(unsafe_code, reason = "faccessat reads the NUL-terminated path it is given"))]
 pub(crate) fn writable(dir: &std::path::Path) -> bool {
     #[cfg(unix)]
