@@ -16,10 +16,16 @@ pub(crate) mod update;
 /// Whether a package manager keeps `exe` where it is, and updates it there: one that the user runs keeps it
 /// in a folder of its own, wherever its root is (Homebrew's `Cellar`, `WinGet`'s `Packages`, Scoop's `apps`
 /// beside its `shims`, Chocolatey's `lib` beside `choco.exe`); the system's, in a folder that is not the
-/// user's, as `/usr/bin` or `/nix/store`. A copy elsewhere is the user's.
+/// user's, as `/usr/bin` or `/nix/store`; the macOS app's copy of one of those. A copy elsewhere is the user's.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
+#[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
 pub(crate) fn managed(exe: &std::path::Path) -> bool {
     use std::path::Path;
+    // The macOS app's copy of one.
+    #[cfg(all(target_vendor = "apple", feature = "desktop"))]
+    if autostart::app_source(exe).is_some() {
+        return true;
+    }
     // Where a link leads, as Homebrew's `bin` to its `Cellar`: macOS names the executable as it was started.
     let exe = &exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
@@ -33,11 +39,30 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 }
 
 #[cfg(all(test, any(feature = "desktop", feature = "self-update")))]
+#[expect(clippy::disallowed_methods, reason = "lays out package managers' folders")]
 mod tests {
     use std::path::Path;
 
     use super::managed;
     use crate::sys::writable;
+
+    /// The app copies Homebrew's executable, and names it in its resources.
+    #[cfg(all(target_vendor = "apple", feature = "desktop"))]
+    #[test]
+    fn the_macos_apps_copy_of_homebrews_executable_is_managed() {
+        let app = std::env::temp_dir().join(format!("{}-app-{}.app", crate::NAME, std::process::id()));
+        let exe = app.join("Contents/MacOS").join(crate::APP_NAME);
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(app.join("Contents/Resources")).unwrap();
+        std::fs::write(&exe, b"").unwrap();
+        let mine = managed(&exe);
+        std::fs::write(app.join("Contents/Resources/source"), "/opt/homebrew/bin/rusticlone\n").unwrap();
+        let source = super::autostart::app_source(&exe);
+        let found = managed(&exe);
+        std::fs::remove_dir_all(&app).unwrap();
+        assert!(!mine && found);
+        assert_eq!(source, Some(Path::new("/opt/homebrew/bin/rusticlone").to_path_buf()));
+    }
 
     #[test]
     fn a_copy_in_the_users_folder_is_not_managed() {
