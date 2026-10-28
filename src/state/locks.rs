@@ -88,12 +88,13 @@ impl Store {
                 },
             };
             held.clear();
+            // Watched before `waiting` reads who holds the lock: a holder that saves its record after the read
+            // wakes this wait, which reads it again. Another process may also cancel the run by removing its record.
+            watcher = watcher.or_else(|| self.watch_state());
             waiting(shown);
             if let Some(stop) = cx.stop() {
                 return Err(Error::Stopped { stop }.into());
             }
-            // Another process may cancel the run by removing its record.
-            watcher = watcher.or_else(|| self.watch_state());
             if freed.get(&busy.0).is_none_or(JoinHandle::is_finished) {
                 let file = self.lock_file(&busy.0)?;
                 freed.insert(busy.0, thread::spawn(move || lock_blocking(&file, busy.1).map(|()| clock::wake())));
