@@ -50,6 +50,8 @@ fn a_failed_backup_from_the_web_notifies() {
         connection.is_some()
     });
     let mut socket = connection.unwrap();
+    // macOS hands the accepted socket the listener's non-blocking mode, in which the timeout does not wait.
+    socket.set_nonblocking(false).unwrap();
     socket.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
     let mut reader = BufReader::new(&mut socket);
     let mut line = String::new();
