@@ -22,13 +22,13 @@ git_release_draft = true
 # Thanks people other than the owner on the release page.
 git_release_body = """
 {{ changelog }}
-{%- set_global others = [] %}
-{%- for c in remote.contributors %}{% if c.username != "AlphaJack" %}{% set_global others = others | concat(with=c.username) %}{% endif %}{% endfor %}
+{%- set_global others = "" %}
+{%- for c in remote.contributors %}{% if c.username != "AlphaJack" %}{% set_global others = others ~ "- @" ~ c.username ~ "\n" %}{% endif %}{% endfor %}
 {%- if others %}
+
 ### Contributors
 
-{% for u in others %}- @{{ u }}
-{% endfor %}
+{{ others }}
 {%- endif %}
 """
 
