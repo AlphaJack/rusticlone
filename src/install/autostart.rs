@@ -1071,6 +1071,7 @@ mod tests {
                 (format!("packaging/chocolatey/{}.nuspec", crate::NAME), &nuspec),
                 ("packaging/chocolatey/tools/chocolateyinstall.ps1".into(), &chocolatey_install),
                 ("packaging/chocolatey/tools/chocolateyBeforeModify.ps1".into(), &chocolatey_before_modify),
+                ("packaging/chocolatey/tools/chocolateyUninstall.ps1".into(), &chocolatey_uninstall),
             ],
         );
     }
@@ -1122,7 +1123,8 @@ mod tests {
         let targets = crate::tests::dist_targets("windows");
         let target = targets.iter().find(|t| t.starts_with("x86_64")).map_or("", String::as_str);
         format!(
-            r"$ErrorActionPreference = 'Stop'
+            r#"$ErrorActionPreference = 'Stop'
+$restart = Join-Path $env:TEMP '{name}-restart.txt'
 
 # url64bit and checksum64: set by .github/workflows/chocolatey.yml at each release.
 $packageArgs = @{{
@@ -1134,28 +1136,65 @@ $packageArgs = @{{
 }}
 
 Install-ChocolateyZipPackage @packageArgs
-",
+
+# The {name} that chocolateyBeforeModify.ps1 stopped, started again for its users: in their session and without
+# this one's elevation, as at their login. A launcher that exits starts it, as removing a running task stops it.
+if (Test-Path $restart) {{
+  $exe = Join-Path $packageArgs.unzipLocation '{name}.exe'
+  foreach ($user in Get-Content $restart) {{
+    $task = "{name}-restart-$([guid]::NewGuid())"
+    $launch = "Start-Process -FilePath '$exe' -ArgumentList serve -WindowStyle Hidden"
+    $action = New-ScheduledTaskAction -Execute 'conhost.exe' -Argument "--headless powershell.exe -NoProfile -Command `"$launch`""
+    $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    Register-ScheduledTask -TaskName $task -Action $action -Principal $principal -Settings $settings | Out-Null
+    Start-ScheduledTask -TaskName $task
+    $deadline = (Get-Date).AddSeconds(30)
+    while ((Get-ScheduledTask -TaskName $task).State -eq 'Running' -and (Get-Date) -lt $deadline) {{ Start-Sleep 1 }}
+    Unregister-ScheduledTask -TaskName $task -Confirm:$false
+    Write-Host "Started {name} again for $user"
+  }}
+  Remove-Item $restart
+}}
+"#,
             url = env!("CARGO_PKG_REPOSITORY"),
             name = crate::NAME,
         )
     }
 
     /// The script that Chocolatey runs before an upgrade or uninstall: it stops the rusticlone that runs from the
-    /// package, as Windows keeps a running executable from being replaced. The `Run` key starts the new one at
-    /// the next login.
+    /// package, as Windows keeps a running executable from being replaced, and notes its users, for whom the
+    /// install script starts the new one.
     fn chocolatey_before_modify() -> String {
         format!(
             r#"$ErrorActionPreference = 'Stop'
+$restart = Join-Path $env:TEMP '{name}-restart.txt'
 
-# Windows keeps a running executable from being replaced: rusticlone started from this package is stopped.
+# Windows keeps a running executable from being replaced: {name} started from this package is stopped.
 $tools = Split-Path -Parent $MyInvocation.MyCommand.Definition
-Get-CimInstance Win32_Process -Filter "Name = '{name}.exe'" |
+$users = Get-CimInstance Win32_Process -Filter "Name = '{name}.exe'" |
   Where-Object {{ $_.ExecutablePath -like "$tools\*" }} |
   ForEach-Object {{
+    $owner = Invoke-CimMethod -InputObject $_ -MethodName GetOwner
     Stop-Process -Id $_.ProcessId -Force
-    Write-Host "Stopped {name} ($($_.ProcessId)) to replace it: launch it again from the Start menu"
+    "$($owner.Domain)\$($owner.User)"
   }}
+if ($users) {{
+  $users | Sort-Object -Unique | Set-Content $restart
+}}
 "#,
+            name = crate::NAME,
+        )
+    }
+
+    /// The script that Chocolatey runs to uninstall: no install follows to start rusticlone again.
+    fn chocolatey_uninstall() -> String {
+        format!(
+            r"$ErrorActionPreference = 'Stop'
+
+# Noted by chocolateyBeforeModify.ps1 for an upgrade's install script, which does not follow an uninstall.
+Remove-Item (Join-Path $env:TEMP '{name}-restart.txt') -ErrorAction SilentlyContinue
+",
             name = crate::NAME,
         )
     }
