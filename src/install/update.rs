@@ -52,10 +52,11 @@ pub(crate) enum Logged {
         from: String,
         to: String,
     },
-    /// Not downloaded: a package manager updates this executable, or its folder is not the user's.
+    /// Not downloaded: a package manager updates this executable, or its folder is not the user's. `how`: [`How`].
     Packaged {
         from: String,
         to: String,
+        how: String,
     },
     /// At start, which goes on with the executable and rustic as they are.
     #[cfg_attr(not(feature = "server"), expect(dead_code, reason = "only the server updates at start"))]
@@ -71,6 +72,66 @@ impl Message for Logged {
             Self::Current { .. } | Self::Available { .. } | Self::Updated { .. } => Level::Success,
         }
     }
+}
+
+/// How to update an executable that its package manager keeps.
+#[derive(Debug, PartialEq, Eq, crate::i18n::Fluent)]
+#[fluent(prefix = "update-with")]
+#[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "only Linux's packages are asked"))]
+enum How {
+    Homebrew,
+    Scoop,
+    Chocolatey,
+    Winget,
+    Nix,
+    Container,
+    /// The Arch package that owns it.
+    Pacman {
+        package: String,
+    },
+    /// The Debian package that owns it.
+    Dpkg {
+        package: String,
+    },
+    /// A copy that root put in a system folder.
+    Admin,
+}
+
+impl How {
+    fn of(exe: &Path) -> Self {
+        use crate::install::Keeper;
+        match crate::install::keeper(exe) {
+            Some(Keeper::Homebrew) => Self::Homebrew,
+            Some(Keeper::Scoop) => Self::Scoop,
+            Some(Keeper::Chocolatey) => Self::Chocolatey,
+            Some(Keeper::WinGet) => Self::Winget,
+            Some(Keeper::Nix) => Self::Nix,
+            Some(Keeper::Container) => Self::Container,
+            Some(Keeper::System) | None => owner(exe),
+        }
+    }
+}
+
+/// The system package that owns `exe`, asked of pacman then dpkg; else a copy that root put there.
+#[cfg_attr(not(target_os = "linux"), expect(unused_variables, reason = "only Linux's packages are asked"))]
+#[cfg_attr(target_os = "linux", expect(clippy::disallowed_methods, reason = "asks the system's package managers"))]
+fn owner(exe: &Path) -> How {
+    #[cfg(target_os = "linux")]
+    {
+        let exe = exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
+        let ask = |program: &str, args: &[&str]| {
+            let out = std::process::Command::new(program).args(args).arg(&exe).output().ok()?;
+            out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
+        };
+        if let Some(package) = ask("pacman", &["-Qqo"]).and_then(|o| o.lines().next().map(str::to_owned)) {
+            return How::Pacman { package };
+        }
+        // `package: /usr/bin/rusticlone`, or `package:arch: …`.
+        if let Some(package) = ask("dpkg-query", &["-S"]).and_then(|o| o.split(':').next().map(str::to_owned)) {
+            return How::Dpkg { package };
+        }
+    }
+    How::Admin
 }
 
 /// The parts of GitHub's release that are read.
@@ -174,15 +235,21 @@ pub(crate) fn replaceable() -> bool {
 }
 
 /// What is logged without downloading: this release is the newest, or a dry run, or a package manager keeps
-/// this executable. `None` to download the newest.
-fn without_download(current: &Version, newest: &Version, dry_run: bool, replaceable: bool) -> Option<Logged> {
+/// this executable, which `how` says how to update. `None` to download the newest.
+fn without_download(
+    current: &Version,
+    newest: &Version,
+    dry_run: bool,
+    replaceable: bool,
+    how: impl FnOnce() -> String,
+) -> Option<Logged> {
     let (from, to) = (current.to_string(), newest.to_string());
     if newest <= current {
         Some(Logged::Current { current: from })
     } else if dry_run {
         Some(Logged::Available { from, to })
     } else if !replaceable {
-        Some(Logged::Packaged { from, to })
+        Some(Logged::Packaged { from, to, how: how() })
     } else {
         None
     }
@@ -195,7 +262,8 @@ fn replace(dry_run: bool) -> Result<Logged> {
     let api = REPOSITORY.replace("://github.com/", "://api.github.com/repos/");
     let Release { tag_name: tag, assets } = serde_json::from_slice(&fetch(&format!("{api}/releases/latest"))?)?;
     let newest = Version::parse(tag.trim_start_matches('v'))?;
-    if let Some(logged) = without_download(&current, &newest, dry_run, replaceable()) {
+    let how = || std::env::current_exe().map(|exe| How::of(&exe).to_string()).unwrap_or_default();
+    if let Some(logged) = without_download(&current, &newest, dry_run, replaceable(), how) {
         return Ok(logged);
     }
     let (from, to) = (current.to_string(), newest.to_string());
@@ -224,18 +292,38 @@ fn replace(dry_run: bool) -> Result<Logged> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use semver::Version;
 
-    use super::{Logged, Manifest, archive, without_download};
+    use super::{How, Logged, Manifest, archive, without_download};
+
+    /// Each package manager says its own command; a system folder's owner is asked.
+    #[test]
+    fn each_package_manager_is_named_in_the_message() {
+        assert_eq!(How::of(Path::new("/opt/homebrew/Cellar/rusticlone/2.0.1/bin/rusticlone")), How::Homebrew);
+        assert_eq!(How::of(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), How::Nix);
+        for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::Container, How::Admin] {
+            assert!(!how.to_string().is_empty());
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let package = How::Pacman { package: "rusticlone-bin".into() }.to_string();
+            assert!(package.contains("rusticlone-bin"), "{package}");
+        }
+    }
 
     /// A package manager's executable is not downloaded, even with a newer release; the user's is.
     #[test]
     fn a_package_managers_executable_is_left_to_it() {
         let (old, new) = (Version::new(2, 0, 0), Version::new(2, 0, 1));
-        assert!(matches!(without_download(&old, &new, false, false), Some(Logged::Packaged { .. })));
-        assert!(without_download(&old, &new, false, true).is_none());
-        assert!(matches!(without_download(&old, &new, true, false), Some(Logged::Available { .. })));
-        assert!(matches!(without_download(&new, &new, false, false), Some(Logged::Current { .. })));
+        let how = || String::from("brew");
+        assert!(
+            matches!(without_download(&old, &new, false, false, how), Some(Logged::Packaged { how, .. }) if how == "brew")
+        );
+        assert!(without_download(&old, &new, false, true, how).is_none());
+        assert!(matches!(without_download(&old, &new, true, false, how), Some(Logged::Available { .. })));
+        assert!(matches!(without_download(&new, &new, false, false, how), Some(Logged::Current { .. })));
     }
 
     /// A real manifest, of mercurio's release: its artifacts are listed as rusticlone's are.

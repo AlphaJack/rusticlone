@@ -13,35 +13,64 @@ pub(crate) mod rustic;
 #[cfg(feature = "self-update")]
 pub(crate) mod update;
 
-/// Whether a package manager keeps `exe` where it is, and updates it there: one that the user runs keeps it
-/// in a folder of its own, wherever its root is (Homebrew's `Cellar`, `WinGet`'s `Packages`, Scoop's `apps`
-/// beside its `shims`, Chocolatey's `lib` beside `choco.exe`); the system's, in a folder that is not the
-/// user's, as `/usr/bin` or `/nix/store`; the macOS app's copy of one of those; any in a Docker or Podman
-/// container, whose image is pulled again. A copy elsewhere is the user's.
+/// Who keeps an executable where it is, and updates it there.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Keeper {
+    Homebrew,
+    Scoop,
+    Chocolatey,
+    WinGet,
+    Nix,
+    /// A Docker or Podman container, whose image is pulled again.
+    #[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "containers run Linux"))]
+    Container,
+    /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy put there as root.
+    System,
+}
+
+/// Whether a package manager keeps `exe` where it is: see [`keeper`].
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn managed(exe: &std::path::Path) -> bool {
+    keeper(exe).is_some()
+}
+
+/// Who keeps `exe` where it is: a package manager that the user runs keeps it in a folder of its own, wherever
+/// its root is (Homebrew's `Cellar`, `WinGet`'s `Packages`, Scoop's `apps` beside its `shims`, Chocolatey's
+/// `lib` beside `choco.exe`); Nix in its read-only store; the system in a folder that is not the user's; a
+/// container's image any. The macOS app's copy of one is kept by the same. `None` for the user's own copy.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
 #[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
-pub(crate) fn managed(exe: &std::path::Path) -> bool {
+pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
     use std::path::Path;
-    // A container's image: a newer one is pulled.
     #[cfg(target_os = "linux")]
     if ["/.dockerenv", "/run/.containerenv"].iter().any(|marker| Path::new(marker).exists()) {
-        return true;
+        return Some(Keeper::Container);
     }
-    // The macOS app's copy of one.
     #[cfg(all(target_vendor = "apple", feature = "desktop"))]
-    if autostart::app_source(exe).is_some() {
-        return true;
+    if let Some(source) = autostart::app_source(exe) {
+        return Some(keeper(&source).unwrap_or(Keeper::Homebrew));
     }
     // Where a link leads, as Homebrew's `bin` to its `Cellar`: macOS names the executable as it was started.
     let exe = &exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
-    let kept = exe.ancestors().any(|dir| {
-        named(dir, "Cellar")
-            || (named(dir, "Packages") && dir.parent().is_some_and(|p| named(p, "WinGet")))
-            || (named(dir, "apps") && dir.parent().is_some_and(|p| p.join("shims").is_dir()))
-            || (named(dir, "lib") && dir.parent().is_some_and(|p| p.join("choco.exe").is_file()))
+    let kept = exe.ancestors().find_map(|dir| {
+        let parent = dir.parent();
+        if named(dir, "Cellar") {
+            Some(Keeper::Homebrew)
+        } else if named(dir, "Packages") && parent.is_some_and(|p| named(p, "WinGet")) {
+            Some(Keeper::WinGet)
+        } else if named(dir, "apps") && parent.is_some_and(|p| p.join("shims").is_dir()) {
+            Some(Keeper::Scoop)
+        } else if named(dir, "lib") && parent.is_some_and(|p| p.join("choco.exe").is_file()) {
+            Some(Keeper::Chocolatey)
+        } else if named(dir, "store") && parent.is_some_and(|p| named(p, "nix") && p.parent() == Some(Path::new("/"))) {
+            Some(Keeper::Nix)
+        } else {
+            None
+        }
     });
-    kept || !exe.parent().is_some_and(crate::sys::writable)
+    kept.or_else(|| (!exe.parent().is_some_and(crate::sys::writable)).then_some(Keeper::System))
 }
 
 #[cfg(all(test, any(feature = "desktop", feature = "self-update")))]
@@ -49,7 +78,7 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 mod tests {
     use std::path::Path;
 
-    use super::managed;
+    use super::{Keeper, keeper, managed};
     use crate::sys::writable;
 
     /// The app copies Homebrew's executable, and names it in its resources.
@@ -94,7 +123,8 @@ mod tests {
     #[test]
     fn homebrews_cellar_is_managed() {
         for prefix in ["/opt/homebrew", "/usr/local", "/home/linuxbrew/.linuxbrew"] {
-            assert!(managed(&Path::new(prefix).join("Cellar/rusticlone/2.0.1/bin/rusticlone")), "{prefix}");
+            let exe = Path::new(prefix).join("Cellar/rusticlone/2.0.1/bin/rusticlone");
+            assert_eq!(keeper(&exe), Some(Keeper::Homebrew), "{prefix}");
         }
     }
 
@@ -103,7 +133,7 @@ mod tests {
     fn wingets_packages_are_managed() {
         let user = r"C:\Users\me\AppData\Local\Microsoft\WinGet\Packages\AlphaJack.Rusticlone_Source\rusticlone.exe";
         let machine = r"C:\Program Files\WinGet\Packages\AlphaJack.Rusticlone_Source\rusticlone.exe";
-        assert!(managed(Path::new(user)) && managed(Path::new(machine)));
+        assert_eq!((keeper(Path::new(user)), keeper(Path::new(machine))), (Some(Keeper::WinGet), Some(Keeper::WinGet)));
     }
 
     /// Found by its layout, as `ChocolateyInstall` may move its root anywhere.
@@ -115,9 +145,9 @@ mod tests {
         std::fs::create_dir_all(&root).unwrap();
         assert!(!managed(&exe));
         std::fs::write(root.join("choco.exe"), b"").unwrap();
-        let found = managed(&exe);
+        let found = keeper(&exe);
         std::fs::remove_dir_all(&root).unwrap();
-        assert!(found);
+        assert_eq!(found, Some(Keeper::Chocolatey));
     }
 
     /// Found by its layout, as `SCOOP` may move its root anywhere.
@@ -128,9 +158,9 @@ mod tests {
         let exe = root.join(r"apps\rusticlone\current\rusticlone.exe");
         assert!(!managed(&exe));
         std::fs::create_dir_all(root.join("shims")).unwrap();
-        let found = managed(&exe);
+        let found = keeper(&exe);
         std::fs::remove_dir_all(&root).unwrap();
-        assert!(found);
+        assert_eq!(found, Some(Keeper::Scoop));
     }
 
     #[test]
