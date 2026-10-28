@@ -826,7 +826,6 @@ mod imp {
     }
 
     pub(super) fn install(listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
-        use std::os::windows::process::CommandExt;
         if sys::is_root() {
             return install_service(exe, serve);
         }
@@ -838,15 +837,9 @@ mod imp {
         link.set_icon_location(Some(exe.clone()));
         link.set_name(Some(crate::i18n::t!("app-description")));
         link.create_lnk(start_menu()?)?;
-        // Started now without a console, as at login, unless it runs already. Without this one's output
-        // either, which would otherwise keep printing into the terminal after install returns.
+        // Started now as at login, unless it runs already.
         if crate::health::check(listen).is_err() {
-            use std::process::Stdio;
-            keep_own_handles();
-            let flags = windows_sys::Win32::System::Threading::DETACHED_PROCESS;
-            let mut server = std::process::Command::new(exe);
-            server.args(serve).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
-            server.creation_flags(flags).spawn()?;
+            start_detached(&exe, serve)?;
         }
         Ok(PathBuf::from(run_key()))
     }
@@ -889,19 +882,30 @@ mod imp {
         }
     }
 
-    /// Makes this process's standard input, output and error not inheritable. Rust lets a child inherit every
-    /// inheritable handle, and the server would hold the pipe of a script that reads install's output, which
-    /// then waits until the server stops.
-    #[expect(unsafe_code, reason = "changes a flag of this process's own standard handles")]
-    fn keep_own_handles() {
-        use windows_sys::Win32::{
-            Foundation::{HANDLE_FLAG_INHERIT, SetHandleInformation},
-            System::Console::{GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE},
+    /// Starts the server as the `Run` key does, by the shell, which passes it none of this process's handles. A
+    /// handle it inherited, as the pipe that a script or Chocolatey's shim reads install's output from, would
+    /// keep that reader waiting until the server stops; Rust passes every inheritable one.
+    #[expect(unsafe_code, reason = "asks the shell to start a program named by NUL-terminated strings")]
+    fn start_detached(exe: &str, serve: &[String]) -> Result<()> {
+        use windows_sys::Win32::UI::{
+            Shell::{SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, ShellExecuteExW},
+            WindowsAndMessaging::SW_HIDE,
         };
-        for handle in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
-            // SAFETY: this process's own handle; one that is missing is refused.
-            unsafe { SetHandleInformation(GetStdHandle(handle), HANDLE_FLAG_INHERIT, 0) };
+        let (host, args) = headless(exe, &serve.join(" "));
+        let (file, parameters) = (wide(&host.display().to_string()), wide(&args));
+        // SAFETY: all zeros is the structure's empty value, which the fields below fill.
+        let mut info: SHELLEXECUTEINFOW = unsafe { std::mem::zeroed() };
+        info.cbSize = u32::try_from(std::mem::size_of::<SHELLEXECUTEINFOW>()).unwrap_or(u32::MAX);
+        // Started before this process exits.
+        info.fMask = SEE_MASK_NOASYNC;
+        info.lpFile = file.as_ptr();
+        info.lpParameters = parameters.as_ptr();
+        info.nShow = SW_HIDE;
+        // SAFETY: `info` and the strings it points to outlive the call.
+        if unsafe { ShellExecuteExW(&raw mut info) } == 0 {
+            return Err(std::io::Error::last_os_error().into());
         }
+        Ok(())
     }
 
     /// `None` if not installed. The server started at login has no service to stop it: it runs until logout.
