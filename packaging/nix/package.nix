@@ -18,7 +18,7 @@ assert lib.assertMsg (lib.versionAtLeast rustic.version tested)
   "rustic ${rustic.version} is older than ${tested}, which Cargo.toml pins: nix flake update";
 rustPlatform.buildRustPackage {
   pname = name;
-  inherit (cargo.package) version;
+  inherit (cargo.workspace.package) version;
 
   src = lib.fileset.toSource {
     root = ../..;
@@ -72,8 +72,8 @@ rustPlatform.buildRustPackage {
 
   meta = {
     inherit (cargo.package) description;
-    homepage = cargo.package.repository;
-    license = lib.getLicenseFromSpdxId cargo.package.license;
+    homepage = cargo.workspace.package.repository;
+    license = lib.getLicenseFromSpdxId cargo.workspace.package.license;
     mainProgram = name;
     platforms = lib.platforms.linux ++ lib.platforms.darwin;
   };
