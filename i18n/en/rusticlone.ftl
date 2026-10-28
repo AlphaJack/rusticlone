@@ -82,6 +82,7 @@ collections-profile = Profile
 collections-location = Location
 collections-snapshots = Snapshots
 collections-status = Status
+collections-schedules = Schedules
 collections-unknown = { repo-status-unknown }
 collections-failing = FAILING { $failures }
 # A schedule and when its step last ran: `@weekly, last 2 days ago`.

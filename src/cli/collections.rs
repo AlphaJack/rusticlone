@@ -150,9 +150,12 @@ impl Overview {
         ];
         // Every repository is backed up on the collection's schedule, a target by a copy; checks and prunes
         // have the repository's own.
-        below.push(self.scheduled(RunKind::Backup, c.backup_schedule.as_ref(), c.backed_up(r)));
-        below.push(self.scheduled(RunKind::Check, r.check_schedule.as_ref(), r.checked));
-        below.push(self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned));
+        let schedules = vec![
+            self.scheduled(RunKind::Backup, c.backup_schedule.as_ref(), c.backed_up(r)),
+            self.scheduled(RunKind::Check, r.check_schedule.as_ref(), r.checked),
+            self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned),
+        ];
+        below.push(Tree { line: section(Text::Schedules), below: schedules });
         Tree { line: log::bold(&r.name), below }
     }
 

@@ -19,27 +19,30 @@ Docs  ● degraded
    │  ├── Snapshots: 1
    │  ├── Size: [size]
    │  ├── Status: up to date, newest snapshot less than a minute ago
-   │  ├── Backup: manual, last less than a minute ago
-   │  ├── Check: manual, no check yet
-   │  └── Prune: manual, no prune yet
+   │  └──┐Schedules
+   │     ├── Backup: manual, last less than a minute ago
+   │     ├── Check: manual, no check yet
+   │     └── Prune: manual, no prune yet
    ├──┐Docs-usb
    │  ├── Profile: [profiles]/Docs-usb.toml
    │  ├── Location: [sandbox]/remote/unplugged/Docs
    │  ├── Snapshots: unknown
    │  ├── Size: [size]
    │  ├── Status: COPY FAILING
-   │  ├── Backup: manual, last FAILING 1
-   │  ├── Check: manual, no check yet
-   │  └── Prune: manual, no prune yet
+   │  └──┐Schedules
+   │     ├── Backup: manual, last FAILING 1
+   │     ├── Check: manual, no check yet
+   │     └── Prune: manual, no prune yet
    └──┐Docs-remote
       ├── Profile: [profiles]/Docs-remote.toml
       ├── Location: [sandbox]/remote/Docs
       ├── Snapshots: 1
       ├── Size: [size]
       ├── Status: up to date (listed less than a minute ago)
-      ├── Backup: manual, last less than a minute ago
-      ├── Check: manual, no check yet
-      └── Prune: manual, no prune yet
+      └──┐Schedules
+         ├── Backup: manual, last less than a minute ago
+         ├── Check: manual, no check yet
+         └── Prune: manual, no prune yet
 
 Fragment profiles
 └── common

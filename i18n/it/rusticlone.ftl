@@ -82,6 +82,7 @@ collections-profile = Profilo
 collections-location = Posizione
 collections-snapshots = Snapshot
 collections-status = Stato
+collections-schedules = Pianificazioni
 collections-unknown = { repo-status-unknown }
 collections-failing = IN ERRORE { $failures }
 # Una pianificazione e quando il suo passaggio è stato eseguito l'ultima volta: `@weekly, ultima volta 2 giorni fa`.

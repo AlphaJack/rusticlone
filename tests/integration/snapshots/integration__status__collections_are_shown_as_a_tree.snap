@@ -17,18 +17,20 @@ Docs  ● healthy
    │  ├── Snapshots: 1
    │  ├── Size: [size]
    │  ├── Status: up to date, newest snapshot less than a minute ago
-   │  ├── Backup: manual, last less than a minute ago
-   │  ├── Check: manual, no check yet
-   │  └── Prune: manual, no prune yet
+   │  └──┐Schedules
+   │     ├── Backup: manual, last less than a minute ago
+   │     ├── Check: manual, no check yet
+   │     └── Prune: manual, no prune yet
    └──┐Docs-remote
       ├── Profile: [profiles]/Docs-remote.toml
       ├── Location: [sandbox]/remote/Docs
       ├── Snapshots: 1
       ├── Size: [size]
       ├── Status: up to date (listed less than a minute ago)
-      ├── Backup: manual, last less than a minute ago
-      ├── Check: manual, no check yet
-      └── Prune: manual, no prune yet
+      └──┐Schedules
+         ├── Backup: manual, last less than a minute ago
+         ├── Check: manual, no check yet
+         └── Prune: manual, no prune yet
 
 Fragment profiles
 └── common

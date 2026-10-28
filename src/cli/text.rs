@@ -23,6 +23,7 @@ pub(super) enum Text<'a> {
     Location,
     Snapshots,
     Status,
+    Schedules,
     Unknown,
     Failing {
         failures: u32,
