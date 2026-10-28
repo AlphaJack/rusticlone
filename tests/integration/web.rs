@@ -854,3 +854,54 @@ fn metrics_keep_their_names() {
         insta::assert_snapshot!(server.get("/metrics").body);
     });
 }
+
+/// Answers every request with `204 No Content`, and counts them.
+fn receiver() -> (String, std::sync::mpsc::Receiver<()>) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("json://{}", listener.local_addr().unwrap());
+    let (tx, rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        for mut socket in listener.incoming().flatten() {
+            let mut request = [0; 8192];
+            _ = socket.set_read_timeout(Some(Duration::from_secs(5)));
+            _ = socket.read(&mut request);
+            _ = write!(socket, "HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            _ = tx.send(());
+        }
+    });
+    (url, rx)
+}
+
+#[test]
+fn notifications_are_sent_on_request() {
+    let (url, received) = receiver();
+    let sb = docs_with_remote(&global_env(&[("NOTIFY_URLS", &url)]));
+    let server = sb.server(&[]);
+    let sent = server.post("/collections/Docs/notifications");
+    assert!(sent.code == 200 && flash(&sent.body, "success"), "{}", sent.body);
+    received.recv_timeout(Duration::from_secs(15)).unwrap();
+    assert_eq!(server.post("/collections/Unknown/notifications").code, 404);
+    // The setup form's URLs, before they are saved.
+    let tested = server.post_form("/setup/notifications", &format!("notify={url}"));
+    assert!(tested.code == 200 && flash(&tested.body, "success"), "{}", tested.body);
+    received.recv_timeout(Duration::from_secs(15)).unwrap();
+    assert_eq!(server.post_form("/setup/notifications", "notify=invalid%3A%2F%2Ftarget").code, 422);
+}
+
+#[test]
+fn an_undelivered_notification_is_refused() {
+    // Nothing listens on port 9 (discard).
+    let sb = docs_with_remote(&global_env(&[("NOTIFY_URLS", "json://127.0.0.1:9")]));
+    let server = sb.server(&[]);
+    assert_eq!(server.post("/collections/Docs/notifications").code, 422);
+}
+
+#[test]
+fn stopping_what_does_not_run_is_refused() {
+    let sb = docs_with_remote("");
+    let server = sb.server(&[]);
+    assert_eq!(server.delete("/collections/Docs/runs/1").code, 422);
+    assert_eq!(server.delete("/collections/Docs/runs/1/steps/0").code, 422);
+    // Every run of the collection: there is none to stop, and nothing to refuse.
+    assert_eq!(server.delete("/collections/Docs/runs").code, 200);
+}

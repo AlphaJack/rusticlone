@@ -76,9 +76,43 @@ pub(crate) fn install(binary: &[u8], path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// A server on this computer that answers every request with `status` and `body`, and sends the path asked
+/// for. Its URL, without a trailing slash.
+#[cfg(test)]
+pub(super) fn serve(status: u16, body: &'static [u8]) -> (String, std::sync::mpsc::Receiver<String>) {
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        for mut socket in listener.incoming().flatten() {
+            let mut request = [0; 8192];
+            let read = socket.read(&mut request).unwrap_or_default();
+            let request = String::from_utf8_lossy(&request[..read]);
+            let path = request.split(' ').nth(1).unwrap_or_default().to_owned();
+            let head = format!("HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+            _ = socket.write_all(head.as_bytes()).and_then(|()| socket.write_all(body));
+            _ = tx.send(path);
+        }
+    });
+    (url, rx)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_download_is_its_body_on_success_only() {
+        let (url, asked) = serve(200, b"archive");
+        assert_eq!(fetch(&format!("{url}/v1/r.tar.gz")).unwrap(), b"archive");
+        assert_eq!(asked.recv().unwrap(), "/v1/r.tar.gz");
+        let (url, _) = serve(404, b"Not Found");
+        let missing = fetch(&format!("{url}/r.tar.gz")).unwrap_err();
+        assert!(matches!(missing.downcast_ref(), Some(Error::Status { status: 404, .. })), "{missing}");
+        // Nothing listens on port 9 (discard).
+        let refused = fetch("http://127.0.0.1:9/r.tar.gz").unwrap_err();
+        assert!(matches!(refused.downcast_ref(), Some(Error::Download { .. })), "{refused}");
+    }
 
     #[test]
     fn the_executable_is_found_at_any_depth_and_installed_whole() {

@@ -1,0 +1,43 @@
+---
+source: tests/integration/status.rs
+expression: "readable(&sb, &run.stdout)"
+---
+Profile folders
+[folders]
+
+Docs  ● healthy
+├──┐Sources
+│  └──┐[sandbox]/source/docs
+│     ├── Files: 1
+│     └── Size: [size]
+└──┐Repositories
+   ├──┐Docs-hdd
+   │  ├── Profile: [profiles]/Docs-hdd.toml
+   │  ├── Location: [sandbox]/local/Docs-hdd
+   │  ├── Snapshots: 1
+   │  ├── Size: [size]
+   │  ├── Status: up to date, newest snapshot less than a minute ago
+   │  └──┐Schedules
+   │     ├── Backup: manual, last less than a minute ago
+   │     ├── Check: manual, no check yet
+   │     └── Prune: manual, no prune yet
+   └──┐Docs-remote
+      ├── Profile: [profiles]/Docs-remote.toml
+      ├── Location: [sandbox]/remote/Docs
+      ├── Snapshots: 1
+      ├── Size: [size]
+      ├── Status: up to date (listed less than a minute ago)
+      └──┐Schedules
+         ├── Copy: manual, last less than a minute ago
+         ├── Check: manual, no check yet
+         └── Prune: manual, no prune yet
+
+Fragment profiles
+└── common
+
+Unused profiles (no backup profile uses their repository)
+└── unused
+
+Broken profiles
+└──┐broken
+   └── Reason: profile broken is invalid: rustic show-config failed (exit 1): rustic-rs fatal error: parse error: TOML parse error at line 1, column 12

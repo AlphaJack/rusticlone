@@ -274,3 +274,47 @@ fn lines(live: &Live) -> Drawn {
 fn painted(step: &StepRecord) -> String {
     step.results.iter().map(|r| log::paint(r.level, &step.result(r))).collect::<Vec<_>>().join("; ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct Said(Level, &'static str);
+
+    impl std::fmt::Display for Said {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str(self.1)
+        }
+    }
+
+    impl Message for Said {
+        fn level(&self) -> Level {
+            self.0
+        }
+    }
+
+    #[test]
+    fn messages_are_drawn_below_their_collection() {
+        let backed_up = Said(Level::Success, "backed up");
+        let notified = Said(Level::Failure, "not notified\nDocs is failing\n🔴 missing source\n🟡 1 file skipped");
+        let lines = section_lines("Docs", "backup", &[&backed_up, &notified]);
+        assert_eq!(
+            lines,
+            [
+                "Docs: backup",
+                "├── ● backed up",
+                "└──┐● not notified",
+                "   └──┐Docs is failing",
+                "      ├── ● missing source",
+                "      └── ● 1 file skipped",
+            ]
+        );
+    }
+
+    #[test]
+    fn an_issue_without_a_line_before_it_stands_alone() {
+        let drawn = tree(&below("🟡 1 file skipped\nafter".lines()));
+        assert_eq!(drawn, "├── ● 1 file skipped\n└── after\n");
+        assert_eq!(section_lines("Docs", "check", &[]), ["Docs: check"]);
+    }
+}

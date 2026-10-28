@@ -141,3 +141,21 @@ fn lines(label: &str, branches: &[Tree]) -> Vec<String> {
     let head = format!("{}: {label}", log::bold(crate::NAME));
     iter::once(head).chain(tree(branches).lines().map(ToOwned::to_owned)).collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_command_is_drawn_below_its_name() {
+        let drawn = lines("update", &[branch(Level::Success, "updated"), branch(Level::Failure, "rustic: offline")]);
+        assert_eq!(drawn, [format!("{}: update", crate::NAME), "├── ● updated".into(), "└── ● rustic: offline".into()]);
+    }
+
+    #[test]
+    fn without_a_terminal_a_command_only_runs() {
+        assert_eq!(command("update", || Ok(Level::Warning)).unwrap(), Level::Warning);
+        assert!(command("update", || Err(std::io::Error::other("offline").into())).is_err());
+        assert_eq!(step("checking", "checked", || Ok(1)).unwrap(), 1);
+    }
+}
