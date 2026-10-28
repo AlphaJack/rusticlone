@@ -13,7 +13,7 @@ use anyhow::Result;
 use parking_lot::RwLock;
 use serde_json::{Map, Value};
 
-use crate::sys;
+use crate::{i18n::t, sys};
 
 /// A profile as `rustic show-config` prints it, merged with the profiles it uses.
 pub(crate) type Config = Map<String, Value>;
@@ -217,7 +217,7 @@ pub(crate) fn profile_files() -> Result<Vec<(String, PathBuf)>> {
 #[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
 #[fluent(prefix = "profile-error")]
 pub(crate) enum Error {
-    #[fluent(dirs = display(dirs))]
+    #[fluent(dirs = searched(dirs))]
     NotFound {
         name: String,
         dirs: Vec<PathBuf>,
@@ -268,6 +268,21 @@ pub(crate) fn dirs_display() -> String {
 
 fn display(dirs: &[PathBuf]) -> String {
     dirs.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join(", ")
+}
+
+/// The profile folders, as where profiles were not found: the current one by name, last.
+pub(crate) fn dirs_searched() -> String {
+    searched(&profile_dirs().unwrap_or_default())
+}
+
+fn searched(dirs: &[PathBuf]) -> String {
+    let here = env::current_dir().ok();
+    let named: Vec<PathBuf> = dirs.iter().filter(|d| Some(*d) != here.as_ref()).cloned().collect();
+    match (named.is_empty(), named.len() < dirs.len()) {
+        (_, false) => display(&named),
+        (true, true) => t!("profile-here"),
+        (false, true) => t!("profile-dirs-or-here", dirs = display(&named)),
+    }
 }
 
 /// Rejects `dry-run = true`, which reports success and saves nothing, and a repository that rustic would

@@ -9,23 +9,37 @@ use std::{
 };
 
 use parking_lot::Mutex;
+use serde::Serialize;
 
 use super::tree::{Tree, tree};
 use crate::{
     clock,
     engine::Engine,
     live::{Live, Runs},
-    log::{self, Message, Tone},
+    log::{self, Level, Message, Tone},
     result::{RunResults, Status},
     rustic::Progress,
     state::{ResultRecord, RunRecord, StepRecord},
 };
+
+#[cfg(any(feature = "server", feature = "self-update"))]
+mod command;
+
+#[cfg(any(feature = "server", feature = "self-update"))]
+pub(super) use command::{command, step};
 
 /// A run as last drawn.
 struct Drawn {
     lines: Vec<String>,
     /// The results the lines show.
     shown: Vec<ResultRecord>,
+}
+
+/// A step outside runs, as a run of only that step.
+struct Outside {
+    collection: String,
+    label: String,
+    step: String,
 }
 
 struct Board {
@@ -37,6 +51,10 @@ struct Board {
     queued: Mutex<BTreeMap<(String, i64), String>>,
     /// Results that ended runs showed.
     shown: Mutex<Vec<ResultRecord>>,
+    /// The step this process does outside runs.
+    doing: Mutex<Option<Outside>>,
+    /// Lines of steps outside runs that ended, to print with the next drawing.
+    ended: Mutex<Vec<String>>,
 }
 
 static BOARD: Board = Board {
@@ -45,7 +63,12 @@ static BOARD: Board = Board {
     drawn: Mutex::new(BTreeMap::new()),
     queued: Mutex::new(BTreeMap::new()),
     shown: Mutex::new(Vec::new()),
+    doing: Mutex::new(None),
+    ended: Mutex::new(Vec::new()),
 };
+
+/// The id of steps outside runs, which runs never have.
+const OUTSIDE: i64 = -1;
 
 /// The runs of this process, drawn in a terminal.
 pub(super) fn runs() -> Arc<Runs> {
@@ -110,21 +133,91 @@ pub(super) fn print(report: &RunResults, heading: &str) {
     if BOARD.runs.get().is_none() || report.results.is_empty() {
         return report.print();
     }
-    let results = report
-        .results
-        .iter()
-        .map(|r| Tree::leaf(format!("{} {}", Tone::from(r.level()).dot(), log::paint(r.level(), &r.to_string()))));
-    let head = format!("{}: {heading}", log::bold(title(&report.collection)));
-    let lines: Vec<String> =
-        iter::once(head).chain(tree(&results.collect::<Vec<_>>()).lines().map(ToOwned::to_owned)).collect();
-    log::runs(Vec::new(), &lines);
+    let results: Vec<&dyn Message> = report.results.iter().map(|r| -> &dyn Message { r }).collect();
+    section(&report.collection, heading, &results);
+}
+
+/// Does `step` in each of the collections `names` with `f`, one after the other, and logs the messages it
+/// returns. In a terminal, each is drawn as a run of that one step below `Docs: label`: queued, running, then
+/// its messages.
+pub(super) fn steps<M: Message + Serialize>(
+    names: &[&str],
+    label: &str,
+    step: &str,
+    mut f: impl FnMut(usize) -> Vec<M>,
+) {
+    if BOARD.runs.get().is_none() {
+        for (i, name) in names.iter().enumerate() {
+            for message in f(i) {
+                log::event(Some(title(name)), &message);
+            }
+        }
+        return;
+    }
+    let key = |name: &str| (name.to_owned(), OUTSIDE);
+    BOARD.queued.lock().extend(names.iter().map(|name| (key(name), label.to_owned())));
+    for (i, name) in names.iter().enumerate() {
+        BOARD.queued.lock().remove(&key(name));
+        *BOARD.doing.lock() =
+            Some(Outside { collection: (*name).to_owned(), label: label.to_owned(), step: step.to_owned() });
+        draw();
+        let messages = f(i);
+        let messages: Vec<&dyn Message> = messages.iter().map(|m| -> &dyn Message { m }).collect();
+        // Together, so that no drawing in between shows neither.
+        let mut doing = BOARD.doing.lock();
+        *doing = None;
+        BOARD.ended.lock().extend(section_lines(name, label, &messages));
+        drop(doing);
+        draw();
+    }
+}
+
+/// Prints `messages` below `Docs: heading`.
+fn section(collection: &str, heading: &str, messages: &[&dyn Message]) {
+    log::runs(Vec::new(), &section_lines(collection, heading, messages));
+}
+
+/// `messages` below `Docs: heading`. A message's lines after its first go below it.
+fn section_lines(collection: &str, heading: &str, messages: &[&dyn Message]) -> Vec<String> {
+    let branches = messages.iter().map(|m| branch(m.level(), &m.to_string()));
+    let head = format!("{}: {heading}", log::bold(title(collection)));
+    iter::once(head).chain(tree(&branches.collect::<Vec<_>>()).lines().map(ToOwned::to_owned)).collect()
+}
+
+/// A message at `level`: its first line with its dot, then the others below it.
+fn branch(level: Level, text: &str) -> Tree {
+    let mut text = text.lines();
+    let first = log::paint(level, text.next().unwrap_or_default());
+    Tree { line: format!("{} {first}", Tone::from(level).dot()), below: below(text) }
+}
+
+/// A message's lines after its first. A line that starts with a level's emoji, as a notification's issues,
+/// goes below the line before it that does not, with that level's dot instead.
+fn below(lines: std::str::Lines<'_>) -> Vec<Tree> {
+    let mut branches: Vec<Tree> = Vec::new();
+    for line in lines {
+        let dotted = [Level::Success, Level::Warning, Level::Failure]
+            .into_iter()
+            .find_map(|level| Some((level, line.strip_prefix(level.emoji())?.trim_start())));
+        let Some((level, text)) = dotted else {
+            branches.push(Tree::leaf(line.to_owned()));
+            continue;
+        };
+        let leaf = Tree::leaf(format!("{} {}", level.dot(), log::paint(level, text)));
+        match branches.last_mut() {
+            Some(parent) => parent.below.push(leaf),
+            None => branches.push(leaf),
+        }
+    }
+    branches
 }
 
 fn draw() {
     let Some(runs) = BOARD.runs.get().and_then(Weak::upgrade) else { return };
     let live: BTreeMap<_, _> = runs.all().into_iter().map(|l| ((l.collection.clone(), l.id), l)).collect();
+    let doing = BOARD.doing.lock();
+    let mut ended = std::mem::take(&mut *BOARD.ended.lock());
     let mut drawn = BOARD.drawn.lock();
-    let mut ended = Vec::new();
     drawn.retain(|key, run| {
         let running = live.contains_key(key);
         if !running {
@@ -144,6 +237,14 @@ fn draw() {
     });
     let mut rows: BTreeMap<_, Vec<String>> = waiting.collect();
     rows.extend(drawn.iter().map(|(key, run)| (key.clone(), run.lines.clone())));
+    if let Some(Outside { collection, label, step }) = doing.as_ref() {
+        let head = format!("{}: {label}", log::bold(title(collection)));
+        let tree = tree(&[Tree::leaf(format!("{} {step}", Tone::Running.dot()))]);
+        rows.insert(
+            (collection.clone(), OUTSIDE),
+            iter::once(head).chain(tree.lines().map(ToOwned::to_owned)).collect(),
+        );
+    }
     log::runs(rows.into_values().flatten().collect(), &ended);
 }
 

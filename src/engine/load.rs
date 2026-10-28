@@ -180,7 +180,7 @@ impl Engine {
     fn no_collection(&self, name: &str) -> Error {
         let known: Vec<String> = self.every_collection().map(|c| c.name().to_owned()).collect();
         match known.is_empty() {
-            true => Error::NoCollections { dirs: profile::dirs_display() },
+            true => Error::NoCollections { dirs: profile::dirs_searched() },
             false => Error::NoCollection { name: name.to_owned(), known: known.join(", ") },
         }
     }

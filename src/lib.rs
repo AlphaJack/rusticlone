@@ -19,6 +19,7 @@ mod args;
 pub mod cli;
 mod clock;
 mod engine;
+#[cfg(feature = "server")]
 mod first_run;
 mod fmt;
 #[cfg(feature = "server")]

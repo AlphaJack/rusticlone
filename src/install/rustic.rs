@@ -6,7 +6,10 @@
 use anyhow::Result;
 
 use super::download::{fetch, install, untar};
-use crate::rustic::{Cli, bin, downloaded, name, parse_version, pinned};
+use crate::{
+    i18n::t,
+    rustic::{Cli, bin, downloaded, name, parse_version, pinned},
+};
 
 /// The key that signs rustic's releases (`.sig`), from <https://rustic.cli.rs/docs/nightly_builds.html>.
 const KEY: &str = "RWSWSCEJEEacVeCy0va71hlrVtiW8YzMzOyJeso0Bfy/ZXq5OryWi/8T";
@@ -58,26 +61,34 @@ pub(crate) fn download(ask: bool) -> Result<()> {
     };
     let question = match Cli::rustic().arg("--version").output() {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ask::Download { version: version.to_string(), dir },
-        Ok(out) if there(bin()) => match parse_version(&String::from_utf8_lossy(&out.stdout)) {
-            Some(found) if found >= version => return Ok(()),
-            found => Ask::Replace {
-                found: found.map(|f| f.to_string()).unwrap_or_default(),
-                version: version.to_string(),
-                dir,
-            },
-        },
-        _ => return Ok(()),
+        Ok(out) => {
+            let found = parse_version(&String::from_utf8_lossy(&out.stdout));
+            let shown = found.as_ref().map(ToString::to_string).unwrap_or_default();
+            if !there(bin()) || found.as_ref().is_some_and(|f| *f >= version) {
+                crate::log::did(&t!("release-found", version = shown, path = bin().display().to_string()));
+                return Ok(());
+            }
+            Ask::Replace { found: shown, version: version.to_string(), dir }
+        }
+        Err(_) => return Ok(()),
     };
     let Some(target) = TARGET else { return Err(Error::NoRelease.into()) };
-    if ask && !crate::sys::confirm(&question.to_string())? {
+    let short = match &question {
+        Ask::Download { .. } => t!("release-short-download", version = version.to_string()),
+        Ask::Replace { found, .. } => t!("release-short-replace", found = found.clone(), version = version.to_string()),
+    };
+    if ask && !crate::log::ask(&question.to_string(), &short)? {
+        crate::log::did(&t!("release-declined"));
         return Ok(());
     }
+    crate::log::now(&t!("release-downloading", version = version.to_string()));
     let archive = format!("{RELEASES}/v{version}/rustic-v{version}-{target}.tar.gz");
     let (data, signature) = (fetch(&archive)?, fetch(&format!("{archive}.sig"))?);
     let key = minisign_verify::PublicKey::from_base64(KEY)?;
     let signature = minisign_verify::Signature::decode(&String::from_utf8_lossy(&signature))?;
     key.verify(&data, &signature, false).map_err(|source| Error::Unsigned { archive: archive.clone(), source })?;
     install(&untar(&archive, &data, &name())?, &path)?;
+    crate::log::did(&t!("release-downloaded", version = version.to_string(), path = path.display().to_string()));
     super::on_path::put(path.parent().unwrap_or(&path))
 }
 

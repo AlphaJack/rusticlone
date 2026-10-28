@@ -15,7 +15,7 @@ use crate::{install::on_path, log, sys};
 #[fluent(prefix = "place")]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub(crate) enum Logged {
-    Copied { from: String, to: String },
+    Copied { version: &'static str, to: String },
 }
 
 #[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
@@ -60,13 +60,16 @@ fn linked(exe: &Path, path: &std::ffi::OsStr) -> Option<PathBuf> {
 pub(super) fn place(placed: &Path) -> Result<()> {
     let (exe, dir) = (std::env::current_exe()?, placed.parent().unwrap_or(placed));
     let same = placed.canonicalize().is_ok_and(|p| exe.canonicalize().is_ok_and(|e| e == p));
-    if !same {
+    let (version, to) = (env!("CARGO_PKG_VERSION"), placed.display().to_string());
+    if same {
+        log::did(&crate::i18n::t!("place-in-place", version = version, path = to));
+    } else {
         std::fs::create_dir_all(dir)?;
         // Replaced whole, so that a copy that runs keeps its file.
         let partial = placed.with_extension("partial");
         std::fs::copy(&exe, &partial).with_context(|| Error::Write { path: partial.display().to_string() })?;
-        replace(&partial, placed).with_context(|| Error::Replace { path: placed.display().to_string() })?;
-        log::event(None, &Logged::Copied { from: exe.display().to_string(), to: placed.display().to_string() });
+        replace(&partial, placed).with_context(|| Error::Replace { path: to.clone() })?;
+        log::event(None, &Logged::Copied { version, to });
     }
     if crate::install::managed(placed) {
         return Ok(());
