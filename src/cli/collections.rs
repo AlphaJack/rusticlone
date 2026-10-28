@@ -6,7 +6,7 @@ use jiff::Timestamp;
 use serde::Serialize;
 
 use super::{
-    for_each_collection,
+    each_collection,
     text::{Kind, Text, Warning},
     tree::{Tree, tree},
 };
@@ -27,6 +27,9 @@ struct Overview {
     #[serde(flatten, serialize_with = "crate::shape::serialize")]
     status: StatusReport,
     directories: String,
+    /// The profile folders, the current one named so.
+    #[serde(skip)]
+    folders: Vec<String>,
     profiles: Vec<ProfileInfo>,
     /// Each repository's last listing, by collection and repository.
     #[serde(skip)]
@@ -35,7 +38,8 @@ struct Overview {
 
 pub(super) fn show(engine: &Engine, refresh: bool) -> Level {
     let level = if refresh {
-        for_each_collection(engine, &t!("cli-refresh"), |collection| engine.refresh(collection))
+        // Broken profiles are listed below, with why.
+        each_collection(engine, &engine.collections(), &t!("cli-refresh"), |collection| engine.refresh(collection))
     } else {
         Level::Success
     };
@@ -57,7 +61,14 @@ pub(super) fn show(engine: &Engine, refresh: bool) -> Level {
         })
         .collect();
     let status = StatusReport { level, ..status };
-    let overview = Overview { status, directories: profile::dirs_display(), profiles, listings };
+    let here = std::env::current_dir().ok();
+    let folders = (profile::profile_dirs().unwrap_or_default().iter())
+        .map(|d| match Some(d) == here.as_ref() {
+            true => Text::Here { dir: &d.display().to_string() }.to_string(),
+            false => d.display().to_string(),
+        })
+        .collect();
+    let overview = Overview { status, directories: profile::dirs_display(), folders, profiles, listings };
     let text = match log::is_json() {
         true => format!("{}\n", serde_json::to_string(&overview).unwrap_or_default()),
         false => overview.to_string(),
@@ -139,9 +150,13 @@ impl Overview {
         ];
         // Every repository is backed up on the collection's schedule, a target by a copy; checks and prunes
         // have the repository's own.
-        below.push(self.scheduled(RunKind::Backup, c.backup_schedule.as_ref(), c.backed_up(r)));
-        below.push(self.scheduled(RunKind::Check, r.check_schedule.as_ref(), r.checked));
-        below.push(self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned));
+        let backup = if primary { RunKind::Backup } else { RunKind::Copy };
+        let schedules = vec![
+            self.scheduled(backup, c.backup_schedule.as_ref(), c.backed_up(r)),
+            self.scheduled(RunKind::Check, r.check_schedule.as_ref(), r.checked),
+            self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned),
+        ];
+        below.push(Tree { line: section(Text::Schedules), below: schedules });
         Tree { line: log::bold(&r.name), below }
     }
 
@@ -158,7 +173,7 @@ impl Overview {
                 Text::Scheduled { cron: &cron, ran: &self.last(last) }.to_string()
             }
         };
-        field(<&str>::from(kind), &when)
+        field(capitalized(&kind.label()), &when)
     }
 
     fn collection(&self, c: &CollectionOverview) -> Vec<Tree> {
@@ -189,7 +204,9 @@ impl std::fmt::Display for Overview {
             let dirs = self.directories.clone();
             writeln!(f, "{}", crate::engine::Error::NoCollections { dirs })?;
         } else {
-            writeln!(f, "{}", Text::Directories { dirs: &self.directories })?;
+            let folders: Vec<Tree> = self.folders.iter().cloned().map(Tree::leaf).collect();
+            writeln!(f, "{}", section(Text::Directories))?;
+            f.write_str(&tree(&folders))?;
         }
         if let Some(untested) = &self.status.untested {
             writeln!(f, "{} {}", Level::Warning.dot(), log::paint(Level::Warning, &untested.to_string()))?;
@@ -224,6 +241,12 @@ fn section(text: impl std::fmt::Display) -> String {
 /// `key: value`, with the key in bold.
 fn field(key: impl std::fmt::Display, value: &str) -> Tree {
     Tree::leaf(format!("{}: {value}", section(key)))
+}
+
+/// `backup` as a heading: `Backup`.
+fn capitalized(text: &str) -> String {
+    let mut chars = text.chars();
+    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
 fn unknown() -> String {

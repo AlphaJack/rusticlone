@@ -147,6 +147,19 @@ mod tests {
         assert!(check(UV, &other_file, UV_WORKFLOW).is_err());
     }
 
+    /// GitHub's answer is checked against the repository's own workflow, run for the tag.
+    #[test]
+    fn an_archive_is_checked_against_the_attestations_found() {
+        let (repository, asked) = crate::install::download::serve(200, UV);
+        let found = super::verify(&repository, "v1.0.0", "uv.tar.gz", b"uv").unwrap_err().to_string();
+        assert!(found.contains(&format!("{repository}/.github/workflows/release.yml@refs/tags/v1.0.0")), "{found}");
+        let hex = crate::sys::sha256(b"uv");
+        assert_eq!(asked.recv().unwrap(), format!("/attestations/sha256:{hex}"));
+        let (repository, _) = crate::install::download::serve(404, b"Not Found");
+        let missing = super::verify(&repository, "v1.0.0", "uv.tar.gz", b"uv").unwrap_err();
+        assert!(missing.downcast_ref::<super::Error>().is_some_and(|e| matches!(e, super::Error::Missing { .. })));
+    }
+
     /// dist's workflow is the one that attests.
     #[test]
     #[expect(clippy::disallowed_methods, reason = "reads the workflow that the constant names")]
