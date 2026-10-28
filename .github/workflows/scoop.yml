@@ -1,0 +1,27 @@
+name: Scoop
+
+# Starts the Excavator of AlphaJack/scoop-bucket, which updates the rusticlone manifest to the latest release.
+# requirements: secret SCOOP_BUCKET_TOKEN, a fine-grained token with Actions read and write on AlphaJack/scoop-bucket
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+
+  scoop:
+    name: Update Scoop bucket
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+
+      - name: Start Excavator
+        env:
+          GH_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        run: gh workflow run excavator.yml -R AlphaJack/scoop-bucket
