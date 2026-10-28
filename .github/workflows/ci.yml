@@ -110,7 +110,6 @@ jobs:
       - name: Install rustic
         run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
 
-      # Here rather than its own job: a second macOS runner per run waits minutes for one of the 5 an account gets.
       - name: Clippy
         if: runner.os == 'macOS'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -153,6 +152,60 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+  bench-windows:
+    name: bench (${{ matrix.variant }})
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [base, devdrive, threads, lld, all]
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create a Dev Drive
+        if: matrix.variant == 'devdrive' || matrix.variant == 'all'
+        uses: samypr100/setup-dev-drive@562171fe8df7401fdf582d766cd3b6ab80d5b1a0 # v4.1.0
+        with:
+          drive-size: 10GB
+          trusted-dev-drive: true
+          env-mapping: |
+            CARGO_TARGET_DIR,{{ DEV_DRIVE }}/target
+            BENCH_TEMP,{{ DEV_DRIVE }}/tmp
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+      - name: Link with rust-lld
+        if: matrix.variant == 'lld' || matrix.variant == 'all'
+        shell: bash
+        run: echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld" >> "$GITHUB_ENV"
+      - name: Turn off Defender's real-time scanning
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest
+      - name: Install cargo-binstall
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-binstall
+      - name: Install rustic
+        shell: bash
+        run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+      - name: Build
+        run: cargo nextest run --workspace --locked --no-run
+      - name: Test
+        shell: bash
+        env:
+          THREADS: ${{ (matrix.variant == 'threads' || matrix.variant == 'all') && '--test-threads 8' || '' }}
+        run: |
+          export TEMP="${BENCH_TEMP:-$RUNNER_TEMP}" TMP="${BENCH_TEMP:-$RUNNER_TEMP}"
+          mkdir -p "$TEMP"
+          cargo nextest run --workspace --locked $THREADS
 
   test-windows:
     name: test (windows-latest)
