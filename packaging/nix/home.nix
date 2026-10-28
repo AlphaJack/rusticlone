@@ -73,7 +73,8 @@ in
           EnvironmentVariables = cfg.settings;
           WorkingDirectory = "${config.home.homeDirectory}/Library/Application Support/rustic";
           KeepAlive.SuccessfulExit = false;
-          ProcessType = "Background";
+          Nice = 10;
+          LowPriorityIO = true;
         };
       };
     })
