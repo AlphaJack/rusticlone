@@ -75,7 +75,7 @@ $R backup --all
 
 ## DRY principle
 
-- A setting is a line of `settings!` in `src/settings.rs`. `cargo xtask generate` rewrites `packaging/rusticlone.env` from the settings read at startup, and the result is committed. `documented_variables_exist` fails on a README variable that no setting reads.
+- A setting is a line of `settings!` in `src/settings.rs`. `packaging/rusticlone.env` is generated from the settings read at startup and committed. `documented_variables_exist` fails on a README variable that no setting reads.
 - A table of the state is a line of `tables!` in `src/state.rs`.
 - Text for users is a message in `i18n/en/rusticlone.ftl`. `#[derive(Fluent)]` looks a message up by the name of the type and variant it describes, and `t!` by its id. Both fail the build on a missing message or argument, and `tests/literals.rs` fails on English in `src`. Another language is a folder beside `en`.
 
@@ -114,34 +114,23 @@ cargo nextest run --test integration restore::  # one file of integration tests
 cargo nextest run restores_a                    # tests by name
 ```
 
-Run the checks of [ci.yml](.github/workflows/ci.yml) before pushing:
-
-```sh
-cargo fmt --all
-cargo clippy --workspace --all-targets -- -D warnings
-cargo clippy --workspace --all-targets --no-default-features -- -D warnings
-cargo doc --workspace --no-deps --all-features --document-private-items
-cargo xtask acyclic
-cargo nextest run --workspace     # a test that hangs fails, after the time in .config/nextest.toml
-cargo xtask vendor --check
-cargo xtask logo --check
-cargo deny check
-```
-
-CI also runs the tests on Linux and macOS, verifies the systemd units with `systemd-analyze`, and runs clippy on Windows. Tests for another system do not compile on yours, so the dev container covers Linux.
+Run the `run:` steps of [ci.yml](.github/workflows/ci.yml) before pushing.
+Tests for another system do not compile on yours, so the dev container covers Linux.
 
 ## Pull requests
 
-The PR title is a conventional commit, such as `feat(web): show the next run` or `fix(backup)!: ...`.
-PRs are squash-merged with the title as the commit and the description as its body, and release-plz builds the version and the release notes from them.
-[pr-title.yml](.github/workflows/pr-title.yml) checks the title. Examples:
+The PR title is a conventional commit such as `feat(web): show the next run`.
+PRs are squash-merged with the title as the commit and the description as its body.
+[pr-title.yml](.github/workflows/pr-title.yml) checks the title against these types and scopes:
 
-| Type | For | In the release notes |
-| --- | --- | --- |
-| `feat` | something users can do that they could not before | Added |
-| `fix` | a bug users hit | Fixed |
-| `perf` | the same behaviour, faster or smaller | Performance |
-| `refactor`, `docs`, `test`, `ci`, `chore` | anything users do not notice | left out unless breaking |
+| Type | For |
+| --- | --- |
+| `feat` | something users can do that they could not before |
+| `fix` | a bug users hit |
+| `perf` | the same behaviour, faster or smaller |
+| `refactor`, `docs`, `test`, `ci`, `chore` | anything users do not notice |
+
+[release-plz.toml](release-plz.toml) gives `feat`, `fix` and `perf` their heading in the release notes and leaves the others out unless breaking.
 
 The scope is optional and becomes a heading under the type. Leave it out for changes across the whole app.
 
@@ -164,4 +153,4 @@ At the end of the description, after some text:
 1. Every push to main updates a release PR, in which release-plz sets the version and the changelog from the PR titles since the last release.
 2. Merging it tags `vX.Y.Z` and drafts a GitHub release.
 3. The tag starts [release.yml](.github/workflows/release.yml), where cargo-dist builds the binaries and installers.
-4. [docker.yml](.github/workflows/docker.yml) then pushes the image to ghcr.io, and [aur.yml](.github/workflows/aur.yml) publishes `rusticlone-bin`. Both can be run again for a tag by hand.
+4. The publish and post-announce jobs in `[workspace.metadata.dist]` of `Cargo.toml` then publish the packages. Their workflows in `.github/workflows` can be run again for a tag by hand.
