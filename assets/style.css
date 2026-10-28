@@ -160,7 +160,8 @@
   .spinner { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--foreground); animation: spin .8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   /* a running run's spinner becomes a red cross under the pointer, to stop it */
-  .stop { display: inline-flex; padding: 0; border: 0; background: none; color: var(--failure); cursor: pointer; vertical-align: middle; }
+  /* the padding widens the pointer's target past the 12px icon, the margin keeps the row as it was */
+  .stop { display: inline-flex; padding: 8px; margin: -8px; border: 0; background: none; color: var(--failure); cursor: pointer; vertical-align: middle; }
   .stop .i { display: none; width: 12px; height: 12px; stroke-width: 3; }
   .stop:hover .spinner, .stop:focus-visible .spinner { display: none; }
   .stop:hover .i, .stop:focus-visible .i { display: block; }
