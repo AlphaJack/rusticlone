@@ -178,7 +178,7 @@ impl Cli {
 }
 
 /// Rustic inherits the run's locks, so that they stay held while it runs, even if this process
-/// is killed. On Windows, rustic ends with this process instead (see [`super::process::tie`]).
+/// is killed. On Windows, rustic ends with this process instead (see `process::tie`).
 #[cfg(unix)]
 fn inherit_locks(cmd: &mut Command, cx: &Ctx) {
     let locks = cx.held();

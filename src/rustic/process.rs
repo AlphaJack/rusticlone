@@ -39,7 +39,7 @@ pub(crate) fn tie(process: std::os::windows::io::RawHandle) {
     });
     if job != 0 {
         // SAFETY: the job above, and a process that this one started.
-        unsafe { AssignProcessToJobObject(job as _, process as _) };
+        unsafe { AssignProcessToJobObject(job as _, process.cast()) };
     }
 }
 
