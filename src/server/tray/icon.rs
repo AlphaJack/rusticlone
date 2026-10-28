@@ -15,7 +15,7 @@ thread_local! {
     static SHOWN: RefCell<Option<TrayIcon>> = const { RefCell::new(None) };
 }
 
-/// The id of the item that stops the server. A switch's id is its label; every other item's id is the page
+/// The id of the item that stops the server. A switch's id is its name; every other item's id is the page
 /// it opens.
 const QUIT: &str = "quit";
 
@@ -50,8 +50,8 @@ pub(super) fn show(
     }
     _ = menu.append(&PredefinedMenuItem::separator());
     for (switch, state) in switches {
-        let label = switch.to_string();
-        _ = menu.append(&CheckMenuItem::with_id(&label, &label, state.is_some(), *state == Some(true), None));
+        let id: &str = (*switch).into();
+        _ = menu.append(&CheckMenuItem::with_id(id, switch.label(), state.is_some(), *state == Some(true), None));
     }
     _ = menu.append(&PredefinedMenuItem::separator());
     _ = menu.append(&MenuItem::with_id(QUIT, quit_label(), true, None));
