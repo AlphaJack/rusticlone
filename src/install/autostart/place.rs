@@ -52,7 +52,8 @@ fn linked(exe: &Path, path: &std::ffi::OsStr) -> Option<PathBuf> {
     std::env::split_paths(path).map(|dir| dir.join(name)).find(|link| link.canonicalize().is_ok_and(|l| l == real))
 }
 
-/// Copies this executable to `placed` unless that leads to it, and puts its folder on `PATH` for new terminals.
+/// Copies this executable to `placed` unless that leads to it, and puts its folder on `PATH` for new terminals,
+/// unless a package manager keeps it: its own link or shim is on `PATH` already.
 pub(super) fn place(placed: &Path) -> Result<()> {
     let (exe, dir) = (std::env::current_exe()?, placed.parent().unwrap_or(placed));
     let same = placed.canonicalize().is_ok_and(|p| exe.canonicalize().is_ok_and(|e| e == p));
@@ -63,6 +64,9 @@ pub(super) fn place(placed: &Path) -> Result<()> {
         std::fs::copy(&exe, &partial).with_context(|| Error::Write { path: partial.display().to_string() })?;
         replace(&partial, placed).with_context(|| Error::Replace { path: placed.display().to_string() })?;
         log::event(None, &Logged::Copied { from: exe.display().to_string(), to: placed.display().to_string() });
+    }
+    if crate::install::managed(placed) {
+        return Ok(());
     }
     on_path::put(dir)
 }
