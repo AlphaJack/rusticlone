@@ -1,6 +1,6 @@
 //! Rustic's process, and the processes it starts.
 
-/// Bytes read and written so far, from `/proc`. Not CPU time: rustic spins while it waits for a
+/// Bytes read and written so far, from `/proc`, network included. Not CPU time: rustic spins while it waits for a
 /// stdin command.
 #[cfg(target_os = "linux")]
 #[expect(clippy::disallowed_methods, reason = "reads /proc")]
@@ -10,8 +10,43 @@ pub(super) fn work(pid: u32) -> Option<u64> {
     Some(io.filter_map(|l| l.split_whitespace().nth(1)?.parse::<u64>().ok()).sum())
 }
 
+/// Bytes read from and written to disk so far. Unlike Linux, macOS does not count a remote's traffic.
+#[cfg(target_vendor = "apple")]
+#[expect(unsafe_code, reason = "fills a resource usage record of a process")]
+pub(super) fn work(pid: u32) -> Option<u64> {
+    let mut usage = std::mem::MaybeUninit::<libc::rusage_info_v2>::zeroed();
+    // SAFETY: a record of the size that the flavor asks for.
+    let filled =
+        unsafe { libc::proc_pid_rusage(pid.cast_signed(), libc::RUSAGE_INFO_V2, usage.as_mut_ptr().cast()) } == 0;
+    // SAFETY: filled by the call, which returned 0.
+    let usage = filled.then(|| unsafe { usage.assume_init() })?;
+    Some(usage.ri_diskio_bytesread + usage.ri_diskio_byteswritten)
+}
+
+/// Bytes read and written so far, by every kind of I/O: files, pipes and network.
+#[cfg(windows)]
+#[expect(unsafe_code, reason = "reads the I/O counters of a process")]
+pub(super) fn work(pid: u32) -> Option<u64> {
+    use windows_sys::Win32::{
+        Foundation::CloseHandle,
+        System::Threading::{GetProcessIoCounters, IO_COUNTERS, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION},
+    };
+    let mut counters = IO_COUNTERS::default();
+    // SAFETY: a handle opened, used and closed here, and a record of the type that the call fills.
+    let read = unsafe {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if handle.is_null() {
+            return None;
+        }
+        let read = GetProcessIoCounters(handle, &raw mut counters);
+        CloseHandle(handle);
+        read != 0
+    };
+    read.then(|| counters.ReadTransferCount + counters.WriteTransferCount + counters.OtherTransferCount)
+}
+
 /// Unknown on other systems: only output shows activity.
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(any(target_os = "linux", target_vendor = "apple", windows)))]
 pub(super) fn work(_: u32) -> Option<u64> {
     None
 }
@@ -68,15 +103,22 @@ pub(crate) fn kill(pid: u32) {
     }
 }
 
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(all(test, any(target_os = "linux", target_vendor = "apple", windows)))]
 mod tests {
+    use std::io::Write;
+
     use super::*;
 
+    /// Written to disk: macOS counts the disk's bytes only.
     #[test]
-    #[expect(clippy::disallowed_methods, reason = "reads a file to produce I/O")]
+    #[expect(clippy::disallowed_methods, reason = "writes a file to produce I/O")]
     fn work_is_counted() {
         let before = work(std::process::id()).unwrap();
-        _ = std::fs::read("/proc/self/stat");
+        let path = std::env::temp_dir().join(format!("{}-work-{}", crate::NAME, std::process::id()));
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(&vec![1; 1 << 20]).unwrap();
+        file.sync_all().unwrap();
+        std::fs::remove_file(&path).unwrap();
         assert!(work(std::process::id()).unwrap() > before);
     }
 }
