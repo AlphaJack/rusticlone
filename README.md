@@ -185,7 +185,7 @@ For safety, the primary forgets only after every target has received the copy.
 For extra safety, one of your copy targets can be, like `Documents-b2`, a repository on an air-gapped device (unmounted HDD) or an immutable endpoint (blob storage with [Object Lock](https://www.backblaze.com/blog/object-lock-101-protecting-data-from-ransomware/), or an append-only [REST server](https://github.com/restic/rest-server)).
 This will give you the second 1 in the [3-2-1-1-0](https://www.backblaze.com/blog/whats-the-diff-3-2-1-vs-3-2-1-1-0-vs-4-3-2/#:~:text=What%20Is%203-2-1-1-0%3F) backup strategy.
 
-On Windows, Microsoft Defender scans every file that rustic reads, which can make backups 10 times slower.
+On Windows, Microsoft Defender scans every file that rustic reads and writes. In our tests, this made backups 1.5 times slower and restores almost 3 times slower.
 To avoid this, run this once in a PowerShell opened as administrator:
 
 ```powershell
