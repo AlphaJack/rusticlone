@@ -982,9 +982,8 @@ mod tests {
     fn pkgbuild() -> String {
         let targets = crate::tests::linux_targets();
         // Each Linux target, under Arch's name for its architecture.
-        let arches: Vec<(&str, &str)> = (targets.iter().map(String::as_str))
-            .map(|t| (t.split('-').next().map_or(t, |arch| if arch == "armv7" { "armv7h" } else { arch }), t))
-            .collect();
+        let arches: Vec<(&str, &str)> =
+            (targets.iter().map(String::as_str)).map(|t| (t.split('-').next().unwrap_or(t), t)).collect();
         let each = |line: &dyn Fn(&str, &str) -> String| arches.iter().map(|(a, t)| line(a, t)).collect::<String>();
         format!(
             r#"

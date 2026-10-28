@@ -315,7 +315,6 @@ mod tests {
                 let arch = match target.split('-').next() {
                     Some("x86_64") => "amd64",
                     Some("aarch64") => "arm64",
-                    Some("armv7") => "arm",
                     other => other.unwrap_or_default(),
                 };
                 format!("      {arch}) triple={target} ;; \\\n")

@@ -16,7 +16,6 @@ RUN set -eu; \
     case "${TARGETARCH}" in \
       amd64) triple=x86_64-unknown-linux-musl ;; \
       arm64) triple=aarch64-unknown-linux-musl ;; \
-      arm) triple=armv7-unknown-linux-musleabihf ;; \
       *) echo "unsupported platform: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     fetch() { wget -q "$1/$2" "$1/$2.sha256"; echo "$(cut -d ' ' -f 1 "$2.sha256")  $2" | sha256sum -c -; }; \

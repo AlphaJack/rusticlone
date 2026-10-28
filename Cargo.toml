@@ -227,9 +227,7 @@ publish-jobs = ["homebrew", "./crates"]
 targets = [
     "x86_64-unknown-linux-musl",
     "aarch64-unknown-linux-musl",
-    "armv7-unknown-linux-musleabihf",
     "aarch64-apple-darwin",
-    "x86_64-apple-darwin",
     "x86_64-pc-windows-msvc",
 ]
 install-path = "CARGO_HOME"
@@ -253,9 +251,8 @@ github-custom-job-permissions = { "crates" = { contents = "read" }, "docker" = {
 global = "ubuntu-24.04"
 x86_64-unknown-linux-musl = "ubuntu-24.04"
 aarch64-unknown-linux-musl = "ubuntu-24.04-arm"
-armv7-unknown-linux-musleabihf = "ubuntu-24.04"
 aarch64-apple-darwin = "macos-14"
-x86_64-pc-windows-msvc = "windows-2022"
+x86_64-pc-windows-msvc = "windows-2025"
 
 [workspace.metadata.dist.dependencies.homebrew]
 rustic = { stage = ["run"] }
