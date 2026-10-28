@@ -110,7 +110,7 @@ jobs:
       - name: Install rustic
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
 
       - name: Clippy
         if: runner.os == 'macOS'
@@ -196,7 +196,7 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
       - name: Test
         env:
           TEMP: ${{ runner.temp }}
