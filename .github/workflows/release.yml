@@ -401,3 +401,12 @@ jobs:
     secrets: inherit
     permissions:
       "contents": "read"
+
+  custom-scoop:
+    needs:
+      - plan
+      - announce
+    uses: ./.github/workflows/scoop.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit

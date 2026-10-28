@@ -41,6 +41,13 @@ Arch Linux (AUR):
 yay -S rusticlone-bin
 ```
 
+Scoop:
+
+```pwsh
+scoop bucket add alphajack https://github.com/AlphaJack/scoop-bucket
+scoop install alphajack/rusticlone
+```
+
 Cargo:
 
 ```sh

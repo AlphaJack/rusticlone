@@ -244,8 +244,8 @@ include = [
     "assets/images/logo.svg",
 ]
 github-build-setup = "../build-setup.yml"
-post-announce-jobs = ["./docker", "./aur", "./nix"]
-github-custom-job-permissions = { "crates" = { contents = "read" }, "docker" = { contents = "read", packages = "write" }, "aur" = { contents = "read" }, "nix" = { contents = "read" } }
+post-announce-jobs = ["./docker", "./aur", "./nix", "./scoop"]
+github-custom-job-permissions = { "crates" = { contents = "read" }, "docker" = { contents = "read", packages = "write" }, "aur" = { contents = "read" }, "nix" = { contents = "read" }, "scoop" = {} }
 
 [workspace.metadata.dist.github-custom-runners]
 global = "ubuntu-24.04"
