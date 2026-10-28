@@ -400,6 +400,11 @@ impl Sandbox {
         to_run(&out)
     }
 
+    /// One invocation as a person reads it: text, without `--json`.
+    pub(crate) fn run_text(&self, args: &[&str]) -> Run {
+        to_run(&self.command(BIN).args(args).output().unwrap())
+    }
+
     pub(crate) fn rustic(&self, args: &[&str]) -> Output {
         self.command("rustic").args(args).output().unwrap()
     }

@@ -265,3 +265,40 @@ fn notify_says_what_it_sends() {
     sb.run(&["notify", "--all"]).assert_exit(1).assert_result("undelivered", json!({}));
     sb.run(&["notify"]).assert_exit(1);
 }
+
+/// What a person reads: every integration test above reads `--json`.
+#[test]
+fn collections_are_shown_as_a_tree() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.profile("unused", "[repository]\nrepository = '/nowhere'\npassword = 'x'\n");
+    sb.profile("broken", "[repository\n");
+    let run = sb.run_text(&["collections", "--refresh"]);
+    run.assert_exit(1);
+    insta::assert_snapshot!(readable(&sb, &run.stdout));
+}
+
+#[test]
+fn a_failing_target_is_shown_with_its_issues() {
+    let sb = docs_with_remote("");
+    std::fs::write(sb.path("remote/unplugged"), "").unwrap();
+    sb.backup_profile("Docs", &[&["docs"]], &["Docs-usb", "Docs-remote"], "");
+    sb.target("Docs-usb", "unplugged/Docs", "");
+    sb.run(&["backup", "--all"]).assert_exit(1);
+    let run = sb.run_text(&["collections"]);
+    run.assert_exit(2);
+    insta::assert_snapshot!(readable(&sb, &run.stdout));
+}
+
+/// `collections`' text, the same on every system: the folders rustic searches differ, and so do sizes.
+fn readable(sb: &Sandbox, text: &str) -> String {
+    let text = (text.replace(&sb.profile_dir().display().to_string(), "[profiles]"))
+        .replace(&sb.path("").display().to_string(), "[sandbox]/")
+        .replace('\\', "/");
+    let lines = text.lines().map(|l| match l.split_once("profile folders: ").or_else(|| l.split_once("size: ")) {
+        Some((before, _)) if l.contains("profile folders: ") => format!("{before}profile folders: [folders]"),
+        Some((before, _)) => format!("{before}size: [size]"),
+        None => l.to_owned(),
+    });
+    lines.map(|l| l + "\n").collect()
+}

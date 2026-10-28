@@ -258,9 +258,7 @@ fn pixels(level: Level, ink: Rgb, cut_only: bool) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use strum::IntoEnumIterator as _;
-
-    use super::Switch;
+    use super::*;
 
     /// A click names the item by its id, which is not its label: that one is translated.
     #[test]
@@ -269,5 +267,33 @@ mod tests {
             let id: &str = switch.into();
             assert!(id.parse::<Switch>().ok() == Some(switch), "{id}");
         }
+    }
+
+    /// The menu's worst collection colors the icon.
+    #[test]
+    fn the_worst_row_sets_the_level() {
+        let row = |level| Row { label: String::new(), level, url: None };
+        assert_eq!(level(&[]), Level::Success);
+        assert_eq!(level(&[row(Level::Warning), row(Level::Failure), row(Level::Success)]), Level::Failure);
+    }
+
+    /// The pixels at the dot's center, in the top right corner.
+    fn center(pixels: &[u8]) -> &[u8] {
+        let (x, y) = (SIDE - 5, 5);
+        let i = 4 * (y * SIDE + x) as usize;
+        &pixels[i..i + 4]
+    }
+
+    #[test]
+    fn a_dot_shows_what_needs_attention() {
+        let well = pixels(Level::Success, ink(true), false);
+        assert_eq!(well.len(), 4 * LOGO.len());
+        assert!(well.chunks(4).all(|p| p[..3] == WHITE), "only the logo, in its ink");
+        let failing = pixels(Level::Failure, ink(false), false);
+        assert_eq!(center(&failing), [FAILURE[0], FAILURE[1], FAILURE[2], u8::MAX]);
+        assert_eq!(center(&pixels(Level::Warning, ink(false), false))[..3], WARNING);
+        // macOS draws the dot apart: only the gap around it is cut from the logo.
+        assert_eq!(center(&pixels(Level::Failure, ink(false), true))[3], 0);
+        assert_eq!(dot(Level::Success), None);
     }
 }
