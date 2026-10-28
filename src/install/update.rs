@@ -135,11 +135,13 @@ fn system(target: &str) -> impl Iterator<Item = &str> {
 /// Updates this executable, then rustic if it was downloaded: the new executable does, since it knows
 /// the rustic it is tested with. A dry run only says whether there is a newer release.
 pub(crate) fn update(dry_run: bool) -> Result<()> {
+    // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
+    let exe = std::env::current_exe()?;
     let logged = replace(dry_run)?;
     crate::log::event(None, &logged);
     match logged {
         Logged::Updated { .. } => {
-            std::process::Command::new(std::env::current_exe()?).arg("update").status()?;
+            std::process::Command::new(exe).arg("update").status()?;
         }
         Logged::Current { .. } if !dry_run => super::rustic::download(true)?,
         Logged::Current { .. } | Logged::Available { .. } | Logged::Packaged { .. } | Logged::NotUpdated { .. } => {}
@@ -173,13 +175,15 @@ pub(crate) fn replaceable() -> bool {
 }
 
 /// Whether a package manager that the user runs keeps `exe` where it is: Homebrew in its `Cellar`, `WinGet` in
-/// its `Packages`, Scoop in its `apps` beside its `shims`, wherever its root is. A copy elsewhere is the user's.
+/// its `Packages`, Scoop in its `apps` beside its `shims`, Chocolatey in its `lib` beside `choco.exe`, wherever
+/// their root is. A copy elsewhere is the user's.
 fn managed(exe: &Path) -> bool {
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
     exe.ancestors().any(|dir| {
         named(dir, "Cellar")
             || (named(dir, "Packages") && dir.parent().is_some_and(|p| named(p, "WinGet")))
             || (named(dir, "apps") && dir.parent().is_some_and(|p| p.join("shims").is_dir()))
+            || (named(dir, "lib") && dir.parent().is_some_and(|p| p.join("choco.exe").is_file()))
     })
 }
 
@@ -249,6 +253,20 @@ mod tests {
         let user = r"C:\Users\me\AppData\Local\Microsoft\WinGet\Packages\AlphaJack.Rusticlone_Source\rusticlone.exe";
         let machine = r"C:\Program Files\WinGet\Packages\AlphaJack.Rusticlone_Source\rusticlone.exe";
         assert!(managed(Path::new(user)) && managed(Path::new(machine)));
+    }
+
+    /// Found by its layout, as `ChocolateyInstall` may move its root anywhere.
+    #[cfg(windows)]
+    #[test]
+    fn chocolateys_lib_is_managed_wherever_its_root_is() {
+        let root = std::env::temp_dir().join(format!("{}-chocolatey-{}", crate::NAME, std::process::id()));
+        let exe = root.join(r"lib\rusticlone\tools\rusticlone.exe");
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(!managed(&exe));
+        std::fs::write(root.join("choco.exe"), b"").unwrap();
+        let found = managed(&exe);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert!(found);
     }
 
     /// Found by its layout, as `SCOOP` may move its root anywhere.

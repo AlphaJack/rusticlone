@@ -255,8 +255,12 @@ pub(crate) fn serve(
     let listen = listen.to_owned();
     let serve = move |tray| {
         #[cfg(feature = "self-update")]
-        if settings::AUTO_UPDATE.enabled()? && crate::install::update::at_start() {
-            return restart();
+        if settings::AUTO_UPDATE.enabled()? {
+            // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
+            let exe = std::env::current_exe()?;
+            if crate::install::update::at_start() {
+                return restart(&exe);
+            }
         }
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
         runtime.block_on(run(Arc::new(build), &listen, open, tray))
@@ -279,8 +283,8 @@ pub(crate) fn serve(
 /// error, after which the service manager starts it again; else as a new process, and this one ends.
 #[cfg(feature = "self-update")]
 #[expect(clippy::disallowed_methods, reason = "starts the updated rusticlone, not rustic")]
-fn restart() -> Result<()> {
-    let mut command = std::process::Command::new(std::env::current_exe()?);
+fn restart(exe: &std::path::Path) -> Result<()> {
+    let mut command = std::process::Command::new(exe);
     command.args(std::env::args_os().skip(1));
     #[cfg(unix)]
     return Err(std::os::unix::process::CommandExt::exec(&mut command).into());
