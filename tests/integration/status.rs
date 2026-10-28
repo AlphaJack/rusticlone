@@ -346,6 +346,18 @@ fn backup_lines_read_as_sentences() {
     assert!(backed_up.contains("Docs: backed up") && !backed_up.contains("Docs: Docs:"), "{backed_up}");
 }
 
+/// Profiles, none a collection: the hint, then every group of the other profiles.
+#[test]
+fn profiles_without_a_collection_are_shown_as_a_tree() {
+    let sb = Sandbox::new();
+    sb.profile("Docs", "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '/nowhere'\n\n[[backup.snapshots]]\nsources = []\n");
+    sb.target("Music", "music", "");
+    sb.profile("broken", "[repository\n");
+    let run = sb.run_text(&["collections"]);
+    run.assert_exit(1);
+    insta::assert_snapshot!(readable(&sb, &run.stdout));
+}
+
 /// The collection `Docs`, as people name it: its primary `Docs-hdd`, copied to `targets`, and `Docs-remote`.
 fn hdd_and_remote(targets: &[&str]) -> Sandbox {
     let sb = Sandbox::new();
