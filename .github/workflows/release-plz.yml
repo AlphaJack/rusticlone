@@ -5,7 +5,11 @@ name: Release PR
 #   pull requests of this repository
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
     branches:
       - main
 
@@ -16,7 +20,10 @@ jobs:
 
   release-plz:
     name: Update release PR or tag
-    if: ${{ !github.event.repository.fork }}
+    if: >-
+      ${{ !github.event.repository.fork
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     concurrency:
       group: ${{ github.workflow }}
@@ -27,10 +34,18 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # needed to list changes
         with:
+          ref: main
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Check that main is still the commit CI tested
+        id: tested
+        env:
+          TESTED: ${{ github.event.workflow_run.head_sha }}
+        run: echo "current=$([ "$(git rev-parse HEAD)" = "$TESTED" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Run release-plz
+        if: steps.tested.outputs.current == 'true'
         uses: release-plz/action@f67a7e724bdad4a0f6875f186060a0ca2770d76c # v0.5.147
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}

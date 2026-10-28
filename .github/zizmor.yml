@@ -6,3 +6,4 @@ rules:
   secrets-inherit: { ignore: [release.yml] }
   excessive-permissions: { ignore: [release.yml] }
   self-repository: { ignore: [release.yml] }
+  dangerous-triggers: { ignore: [release-plz.yml] }
