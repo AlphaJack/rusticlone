@@ -30,7 +30,7 @@ Docs  ● degraded
    │  ├── Size: [size]
    │  ├── Status: COPY FAILING
    │  └──┐Schedules
-   │     ├── Backup: manual, last FAILING 1
+   │     ├── Copy: manual, last FAILING 1
    │     ├── Check: manual, no check yet
    │     └── Prune: manual, no prune yet
    └──┐Docs-remote
@@ -40,7 +40,7 @@ Docs  ● degraded
       ├── Size: [size]
       ├── Status: up to date (listed less than a minute ago)
       └──┐Schedules
-         ├── Backup: manual, last less than a minute ago
+         ├── Copy: manual, last less than a minute ago
          ├── Check: manual, no check yet
          └── Prune: manual, no prune yet
 

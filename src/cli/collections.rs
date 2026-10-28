@@ -150,8 +150,9 @@ impl Overview {
         ];
         // Every repository is backed up on the collection's schedule, a target by a copy; checks and prunes
         // have the repository's own.
+        let backup = if primary { RunKind::Backup } else { RunKind::Copy };
         let schedules = vec![
-            self.scheduled(RunKind::Backup, c.backup_schedule.as_ref(), c.backed_up(r)),
+            self.scheduled(backup, c.backup_schedule.as_ref(), c.backed_up(r)),
             self.scheduled(RunKind::Check, r.check_schedule.as_ref(), r.checked),
             self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned),
         ];

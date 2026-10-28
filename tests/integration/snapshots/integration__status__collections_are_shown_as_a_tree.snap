@@ -28,7 +28,7 @@ Docs  ● healthy
       ├── Size: [size]
       ├── Status: up to date (listed less than a minute ago)
       └──┐Schedules
-         ├── Backup: manual, last less than a minute ago
+         ├── Copy: manual, last less than a minute ago
          ├── Check: manual, no check yet
          └── Prune: manual, no prune yet
 
