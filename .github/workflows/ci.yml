@@ -106,7 +106,7 @@ jobs:
       - name: Put temporary files on a RAM disk, like /dev/shm on Linux
         if: runner.os == 'macOS'
         run: |
-          dev=$(hdiutil attach -nomount ram://2097152 | awk '{print $1}')
+          dev=$(hdiutil attach -nomount ram://$((1024 * 2048)) | awk '{print $1}')
           diskutil erasevolume APFS ramdisk "$dev"
           echo "TMPDIR=/Volumes/ramdisk/" >> "$GITHUB_ENV"
 
