@@ -2,7 +2,7 @@ use std::fs;
 
 use serde_json::json;
 
-use crate::common::{Sandbox, docs_with_remote};
+use crate::common::{Sandbox, cmd, docs_with_remote, toml_str};
 
 #[test]
 fn lost_target_is_recreated_with_full_history() {
@@ -77,9 +77,9 @@ fn target_mounted_by_repository_hooks() {
     let (disk, mount) = (sb.path("disk"), sb.path("remote/usb"));
     fs::create_dir(&disk).unwrap();
     let hooks = format!(
-        "[repository.hooks]\nrun-before = ['ln -s {} {}']\nrun-finally = ['rm {1}']\n",
-        disk.display(),
-        mount.display()
+        "[repository.hooks]\nrun-before = [{}]\nrun-finally = [{}]\n",
+        toml_str(&cmd::link(&disk, &mount)),
+        toml_str(&cmd::unlink(&mount))
     );
     sb.backup_profile("Docs", &[&["docs"]], &["Docs-usb"], "");
     sb.target("Docs-usb", "usb/Docs", &hooks);

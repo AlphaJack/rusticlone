@@ -2,7 +2,7 @@ use std::fs;
 
 use serde_json::json;
 
-use crate::common::{Sandbox, docs_with_remote};
+use crate::common::{Sandbox, below_root, docs_with_remote};
 
 #[test]
 fn restores_lost_sources_and_local_repository_from_target() {
@@ -67,7 +67,7 @@ fn restores_into_another_directory_after_a_hostname_change() {
     let to = sb.path("restored");
     sb.run(&["restore", "--all", "--to", to.to_str().unwrap()]).assert_exit(0);
     let docs = sb.path("source/docs");
-    let below = docs.strip_prefix("/").unwrap();
+    let below = below_root(&docs);
     assert_eq!(sb.tree(&format!("restored/{}", below.display())), original);
 }
 

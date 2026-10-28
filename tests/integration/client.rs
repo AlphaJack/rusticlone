@@ -3,7 +3,7 @@
 use std::{
     io::{BufRead, BufReader, Read, Write},
     net::TcpStream,
-    process::{Child, Command},
+    process::Child,
     sync::Arc,
     thread,
 };
@@ -206,8 +206,7 @@ impl Drop for Server {
 
 /// Sends SIGTERM, as systemd does. The server stops its rustic calls before it exits.
 pub(crate) fn terminate(child: &mut Child) {
-    let term = Command::new("kill").args(["-TERM", &child.id().to_string()]).status();
-    if !term.is_ok_and(|s| s.success()) {
+    if !crate::common::signal(child.id(), "TERM") {
         _ = child.kill();
     }
     _ = child.wait();

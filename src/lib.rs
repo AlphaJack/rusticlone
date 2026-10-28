@@ -74,6 +74,8 @@ mod tests {
     #[cfg(feature = "server")]
     #[expect(clippy::disallowed_methods, reason = "writes the generated files")]
     pub(crate) fn generated(source: &str, files: &[(String, &dyn Fn() -> String)]) {
+        // `file!()` separates with `\` on Windows.
+        let source = source.replace('\\', "/");
         let written: Vec<String> = (files.iter())
             .filter_map(|(path, content)| {
                 let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);

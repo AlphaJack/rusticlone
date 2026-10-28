@@ -148,6 +148,27 @@ jobs:
           cache-targets: "false"
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Turn off Defender's real-time scanning
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: Install cargo-nextest
+        if: runner.os == 'Windows'
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest
+      - name: Install cargo-binstall
+        if: runner.os == 'Windows'
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-binstall
+      - name: Install rustic
+        if: runner.os == 'Windows'
+        shell: bash
+        run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+      - name: Test
+        if: runner.os == 'Windows'
+        run: cargo nextest run --workspace --locked
 
   nix:
     runs-on: ubuntu-24.04
