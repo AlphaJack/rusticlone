@@ -11,9 +11,9 @@ Docs  ● healthy
 │     ├── Files: 1
 │     └── Size: [size]
 └──┐Repositories
-   ├──┐Docs
-   │  ├── Profile: [profiles]/Docs.toml
-   │  ├── Location: [sandbox]/local/Docs
+   ├──┐Docs-hdd
+   │  ├── Profile: [profiles]/Docs-hdd.toml
+   │  ├── Location: [sandbox]/local/Docs-hdd
    │  ├── Snapshots: 1
    │  ├── Size: [size]
    │  ├── Status: up to date, newest snapshot less than a minute ago

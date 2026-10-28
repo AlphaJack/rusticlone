@@ -269,7 +269,7 @@ fn notify_says_what_it_sends() {
 /// What a person reads: every integration test above reads `--json`.
 #[test]
 fn collections_are_shown_as_a_tree() {
-    let sb = docs_with_remote("");
+    let sb = hdd_and_remote(&["Docs-remote"]);
     sb.run(&["backup", "--all"]).assert_exit(0);
     sb.profile("unused", "[repository]\nrepository = '/nowhere'\npassword = 'x'\n");
     sb.profile("broken", "[repository\n");
@@ -280,14 +280,22 @@ fn collections_are_shown_as_a_tree() {
 
 #[test]
 fn a_failing_target_is_shown_with_its_issues() {
-    let sb = docs_with_remote("");
+    let sb = hdd_and_remote(&["Docs-usb", "Docs-remote"]);
     std::fs::write(sb.path("remote/unplugged"), "").unwrap();
-    sb.backup_profile("Docs", &[&["docs"]], &["Docs-usb", "Docs-remote"], "");
     sb.target("Docs-usb", "unplugged/Docs", "");
     sb.run(&["backup", "--all"]).assert_exit(1);
     let run = sb.run_text(&["collections"]);
     run.assert_exit(2);
     insta::assert_snapshot!(readable(&sb, &run.stdout));
+}
+
+/// The collection `Docs`, as people name it: its primary `Docs-hdd`, copied to `targets`, and `Docs-remote`.
+fn hdd_and_remote(targets: &[&str]) -> Sandbox {
+    let sb = Sandbox::new();
+    sb.backup_profile("Docs-hdd", &[&["docs"]], targets, "");
+    sb.target("Docs-remote", "Docs", "");
+    sb.write("docs/a.txt", "version 1");
+    sb
 }
 
 /// `collections`' text, the same on every system: the folders rustic searches differ, and so do sizes. The
