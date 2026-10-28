@@ -1,4 +1,5 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿# Generated from src/install/autostart.rs by cargo xtask generate
+$ErrorActionPreference = 'Stop'
 
 # url64bit and checksum64: set by .github/workflows/chocolatey.yml at each release.
 $packageArgs = @{
