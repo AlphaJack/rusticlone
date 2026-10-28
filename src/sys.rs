@@ -581,6 +581,14 @@ mod unix_tests {
         fs::set_permissions(&dir, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(read_only);
     }
+
+    /// Runs on the same volume wait for each other on a spinning disk.
+    #[test]
+    fn paths_on_a_volume_share_its_device() {
+        let root = std::path::Path::new("/");
+        assert!(super::device(root).is_some());
+        assert_eq!(super::device(&root.join("not yet").join("created")), super::device(root));
+    }
 }
 
 #[cfg(all(test, target_os = "linux"))]
@@ -611,7 +619,17 @@ mod tests {
 
 #[cfg(all(test, target_vendor = "apple"))]
 mod tests {
-    use super::needs_disk_access;
+    use std::path::Path;
+
+    use super::{needs_disk_access, solid_state};
+
+    /// The startup disk says whether it is solid-state, if `diskutil` knows; the same below a folder not created
+    /// yet.
+    #[test]
+    fn a_local_disk_says_whether_it_seeks() {
+        let root = Path::new("/");
+        assert_eq!(solid_state(&root.join("not yet").join("created")), solid_state(root));
+    }
 
     /// Folders that macOS asks about at the first read need no Full Disk Access.
     #[test]
