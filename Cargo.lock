@@ -4067,6 +4067,7 @@ dependencies = [
  "anyhow",
  "base64",
  "flate2",
+ "fluent-syntax",
  "mercurio",
  "resvg",
  "ring",
