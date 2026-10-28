@@ -108,7 +108,7 @@ jobs:
           tool: cargo-binstall
       # The rustic pinned in Cargo.toml, which the tests run.
       - name: Install rustic
-        run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+        run: cargo binstall --no-confirm "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
 
       - name: Clippy
         if: runner.os == 'macOS'
@@ -187,7 +187,7 @@ jobs:
           tool: cargo-binstall
       - name: Install rustic
         shell: bash
-        run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+        run: cargo binstall --no-confirm "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
       - name: Test
         env:
           TEMP: ${{ runner.temp }}

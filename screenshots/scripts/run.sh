@@ -10,7 +10,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source screenshots/scripts/colors.sh
-rustic=$(sed -n '/metadata.rustic/,/^$/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+rustic=$(cargo metadata --format-version 1 --no-deps | jq -r .metadata.rustic.version)
 playwright=1.58.0
 screenshots=rusticlone-screenshots
 everything=(web $(basename -s .tape screenshots/scripts/cli/*.tape) runs tray notification)
