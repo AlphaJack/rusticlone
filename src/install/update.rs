@@ -81,11 +81,18 @@ enum How {
     Homebrew,
     Scoop,
     Chocolatey,
+    #[fluent(id = format!("{}.{}", owner(), crate::APP_NAME))]
     Winget,
     Nix,
+    #[fluent(image = format!("ghcr.io/{}/{}", owner().to_lowercase(), crate::NAME))]
     Container,
     /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy that root put there.
     System,
+}
+
+/// The repository's owner on GitHub, who publishes the `WinGet` package and the container image.
+fn owner() -> &'static str {
+    REPOSITORY.trim_start_matches("https://github.com/").split('/').next().unwrap_or_default()
 }
 
 impl How {
@@ -272,6 +279,8 @@ mod tests {
     fn each_package_manager_is_named_in_the_message() {
         assert_eq!(How::of(Path::new("/opt/homebrew/Cellar/rusticlone/2.0.1/bin/rusticlone")), How::Homebrew);
         assert_eq!(How::of(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), How::Nix);
+        assert!(How::Winget.to_string().contains("AlphaJack.Rusticlone"), "{}", How::Winget);
+        assert!(How::Container.to_string().contains("ghcr.io/alphajack/rusticlone"), "{}", How::Container);
         for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::Container, How::System] {
             assert!(!how.to_string().is_empty());
         }
