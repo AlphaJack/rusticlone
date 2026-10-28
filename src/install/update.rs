@@ -172,7 +172,7 @@ pub(crate) fn replaceable() -> bool {
     std::env::current_exe().is_ok_and(|exe| !managed(&exe) && exe.parent().is_some_and(crate::sys::writable))
 }
 
-/// Whether a package manager that the user runs keeps `exe` where it is: Homebrew in its `Cellar`, WinGet in
+/// Whether a package manager that the user runs keeps `exe` where it is: Homebrew in its `Cellar`, `WinGet` in
 /// its `Packages`, Scoop in its `apps` beside its `shims`, wherever its root is. A copy elsewhere is the user's.
 fn managed(exe: &Path) -> bool {
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
