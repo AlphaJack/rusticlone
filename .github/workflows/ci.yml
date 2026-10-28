@@ -77,6 +77,8 @@ jobs:
           # Its timers, disks and privacy rules differ: Linux runs none of that code.
           - os: macos-14
             target: aarch64-apple-darwin
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
     runs-on: ${{ matrix.os }}
     env:
       RUSTC_WRAPPER: ""
@@ -104,6 +106,7 @@ jobs:
           tool: cargo-binstall
       # The rustic pinned in Cargo.toml, which the tests run.
       - name: Install rustic
+        shell: bash
         run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
 
       - name: Test
