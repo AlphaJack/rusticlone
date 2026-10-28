@@ -109,6 +109,8 @@ impl Cli {
         #[cfg(unix)]
         inherit_locks(cmd, cx);
         let child = cmd.spawn().map_err(Error::CannotRun)?;
+        #[cfg(windows)]
+        super::process::tie(std::os::windows::io::AsRawHandle::as_raw_handle(&child));
         log(&format!("rustic {}", args.join(" ")));
 
         let pid = child.id();
@@ -176,7 +178,7 @@ impl Cli {
 }
 
 /// Rustic inherits the run's locks, so that they stay held while it runs, even if this process
-/// is killed.
+/// is killed. On Windows, rustic ends with this process instead (see `process::tie`).
 #[cfg(unix)]
 fn inherit_locks(cmd: &mut Command, cx: &Ctx) {
     let locks = cx.held();
