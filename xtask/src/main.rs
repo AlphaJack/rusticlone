@@ -5,6 +5,7 @@
 //! `cargo xtask fixtures`: see [`fixtures`].
 //! `cargo xtask acyclic [--mermaid]`: see [`acyclic`].
 //! `cargo xtask logo [--check]`: see [`logo`].
+//! `cargo xtask translations`: see [`translations`].
 //! `cargo xtask generate`: writes anew every generated file: the logo's renderings, and the files of the
 //! `generated_*` tests, such as the env file and the Linux packages.
 //! `cargo xtask screenshots [--setup | --only NAME... | --teardown]`: takes the README's screenshots anew, in Docker:
@@ -16,6 +17,7 @@
 mod acyclic;
 mod fixtures;
 mod logo;
+mod translations;
 
 use std::{env, fs, io::Read, path::Path};
 
@@ -43,10 +45,11 @@ fn main() -> Result<()> {
         ["acyclic", "--mermaid"] => acyclic::check(true),
         ["logo"] => logo::render(false),
         ["logo", "--check"] => logo::render(true),
+        ["translations"] => translations::report(),
         ["generate"] => generate(),
         ["screenshots", ref options @ ..] => screenshots(options),
         _ => bail!(
-            "usage: cargo xtask vendor [VERSION | --check] | cargo xtask fixtures | cargo xtask acyclic [--mermaid] | cargo xtask logo [--check] | cargo xtask generate | cargo xtask screenshots [--setup | --only NAME... | --teardown]"
+            "usage: cargo xtask vendor [VERSION | --check] | cargo xtask fixtures | cargo xtask acyclic [--mermaid] | cargo xtask logo [--check] | cargo xtask translations | cargo xtask generate | cargo xtask screenshots [--setup | --only NAME... | --teardown]"
         ),
     }
 }
