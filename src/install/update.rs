@@ -77,7 +77,6 @@ impl Message for Logged {
 /// How to update an executable that its package manager keeps.
 #[derive(Debug, PartialEq, Eq, crate::i18n::Fluent)]
 #[fluent(prefix = "update-with")]
-#[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "only Linux's packages are asked"))]
 enum How {
     Homebrew,
     Scoop,
@@ -85,16 +84,8 @@ enum How {
     Winget,
     Nix,
     Container,
-    /// The Arch package that owns it.
-    Pacman {
-        package: String,
-    },
-    /// The Debian package that owns it.
-    Dpkg {
-        package: String,
-    },
-    /// A copy that root put in a system folder.
-    Admin,
+    /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy that root put there.
+    System,
 }
 
 impl How {
@@ -107,31 +98,9 @@ impl How {
             Some(Keeper::WinGet) => Self::Winget,
             Some(Keeper::Nix) => Self::Nix,
             Some(Keeper::Container) => Self::Container,
-            Some(Keeper::System) | None => owner(exe),
+            Some(Keeper::System) | None => Self::System,
         }
     }
-}
-
-/// The system package that owns `exe`, asked of pacman then dpkg; else a copy that root put there.
-#[cfg_attr(not(target_os = "linux"), expect(unused_variables, reason = "only Linux's packages are asked"))]
-#[cfg_attr(target_os = "linux", expect(clippy::disallowed_methods, reason = "asks the system's package managers"))]
-fn owner(exe: &Path) -> How {
-    #[cfg(target_os = "linux")]
-    {
-        let exe = exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
-        let ask = |program: &str, args: &[&str]| {
-            let out = std::process::Command::new(program).args(args).arg(&exe).output().ok()?;
-            out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
-        };
-        if let Some(package) = ask("pacman", &["-Qqo"]).and_then(|o| o.lines().next().map(str::to_owned)) {
-            return How::Pacman { package };
-        }
-        // `package: /usr/bin/rusticlone`, or `package:arch: …`.
-        if let Some(package) = ask("dpkg-query", &["-S"]).and_then(|o| o.split(':').next().map(str::to_owned)) {
-            return How::Dpkg { package };
-        }
-    }
-    How::Admin
 }
 
 /// The parts of GitHub's release that are read.
@@ -298,18 +267,13 @@ mod tests {
 
     use super::{How, Logged, Manifest, archive, without_download};
 
-    /// Each package manager says its own command; a system folder's owner is asked.
+    /// Each package manager says its own command.
     #[test]
     fn each_package_manager_is_named_in_the_message() {
         assert_eq!(How::of(Path::new("/opt/homebrew/Cellar/rusticlone/2.0.1/bin/rusticlone")), How::Homebrew);
         assert_eq!(How::of(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), How::Nix);
-        for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::Container, How::Admin] {
+        for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::Container, How::System] {
             assert!(!how.to_string().is_empty());
-        }
-        #[cfg(target_os = "linux")]
-        {
-            let package = How::Pacman { package: "rusticlone-bin".into() }.to_string();
-            assert!(package.contains("rusticlone-bin"), "{package}");
         }
     }
 

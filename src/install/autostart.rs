@@ -1153,7 +1153,7 @@ Get-CimInstance Win32_Process -Filter "Name = '{name}.exe'" |
   Where-Object {{ $_.ExecutablePath -like "$tools\*" }} |
   ForEach-Object {{
     Stop-Process -Id $_.ProcessId -Force
-    Write-Host "Stopped {name} ($($_.ProcessId)) to replace it: it starts again at the next login, or from the Start menu"
+    Write-Host "Stopped {name} ($($_.ProcessId)) to replace it: launch it again from the Start menu"
   }}
 "#,
             name = crate::NAME,
