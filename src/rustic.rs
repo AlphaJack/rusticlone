@@ -15,7 +15,7 @@ mod snapshot;
 pub(crate) use cli::Cli;
 pub(crate) use commands::{Reading, RestorePlan};
 #[cfg(feature = "server")]
-pub(crate) use contents::{Diff, Dirs, Found, NodeKind};
+pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
 #[cfg(feature = "server")]
 use contents::{diff, dirs, found};
 pub(crate) use ctx::{Ctx, Origin, RunHandle, Stop};

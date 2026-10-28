@@ -1,6 +1,9 @@
 //! Snapshot contents as rustic lists them, for browsing.
 
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    path::{Component, Path},
+};
 
 use jiff::Timestamp;
 
@@ -78,6 +81,24 @@ fn quoted(line: &str) -> Option<(&str, String)> {
         }
     }
     Some((line.get(..start)?, path))
+}
+
+/// Where a snapshot's source is in its tree: `/home/me` there too, `C:\Users\me` at `/C/Users/me`.
+pub(crate) fn in_tree(path: &str) -> String {
+    let mut tree = String::new();
+    for c in Path::new(path).components() {
+        match c {
+            Component::Normal(part) => tree += &format!("/{}", part.to_string_lossy()),
+            Component::Prefix(prefix) => {
+                for part in prefix.as_os_str().to_string_lossy().split(['\\', '/', ':', '?']).filter(|p| !p.is_empty())
+                {
+                    tree += &format!("/{part}");
+                }
+            }
+            Component::RootDir | Component::CurDir | Component::ParentDir => {}
+        }
+    }
+    tree
 }
 
 /// Snapshots that contain the same matching files.
@@ -181,6 +202,13 @@ fn totals(line: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sources_are_found_in_the_tree() {
+        assert_eq!(in_tree("/home/me/docs"), "/home/me/docs");
+        #[cfg(windows)]
+        assert_eq!(in_tree(r"C:\Users\me\docs"), "/C/Users/me/docs");
+    }
+
     #[test]
     fn what_changed() {
         for (_, report) in crate::rustic::fixtures("diff.stdout") {
