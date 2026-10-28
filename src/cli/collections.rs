@@ -52,8 +52,9 @@ pub(super) fn show(engine: &Engine, refresh: bool) -> Level {
         ..ProfileInfo::default()
     }));
     let warned = profiles.iter().any(|i| !i.warnings.is_empty()).then_some(Level::Warning);
+    let invalid = profiles.iter().any(|i| i.kind == Kind::Broken).then_some(Level::Failure);
     let status = engine.report();
-    let level = level.max(status.level).max(warned.unwrap_or_default());
+    let level = level.max(status.level).max(warned.unwrap_or_default()).max(invalid.unwrap_or_default());
     let repos =
         status.collections.iter().flat_map(|c| std::iter::once(&c.primary).chain(&c.targets).map(move |r| (c, r)));
     let listings = repos
@@ -194,7 +195,7 @@ impl std::fmt::Display for Overview {
             writeln!(f, "\n{}  {} {}", log::bold(&c.title), c.level.dot(), log::paint(c.level, &c.level.word()))?;
             f.write_str(&tree(&self.collection(c)))?;
         }
-        let kinds = [Kind::NoSources, Kind::Inherited, Kind::Unused, Kind::Broken].map(|kind| {
+        let kinds = [Kind::Inherited, Kind::Unused, Kind::Broken].map(|kind| {
             let profiles: Vec<Tree> = (self.profiles.iter().filter(|p| p.kind == kind))
                 .map(|p| match &p.error {
                     Some(e) => Tree::leaf(format!("{}: {}", log::bold(&p.name), log::paint(Level::Failure, e))),
@@ -253,7 +254,8 @@ fn profile_info(engine: &Engine, p: &profile::RusticProfile, inherited: &BTreeSe
     let kind = match (p.is_backup_profile(), copying.is_empty()) {
         (true, _) => Kind::BackupProfile,
         (false, false) => Kind::CopyTarget,
-        (false, true) if p.sourceless => Kind::NoSources,
+        // Meant as a backup profile, which backs up nothing: invalid, with why.
+        (false, true) if p.sourceless => Kind::Broken,
         (false, true) if inherited.contains(p.name.as_str()) => Kind::Inherited,
         (false, true) => Kind::Unused,
     };
@@ -278,6 +280,6 @@ fn profile_info(engine: &Engine, p: &profile::RusticProfile, inherited: &BTreeSe
         targets: if p.is_backup_profile() { p.targets.clone() } else { Vec::new() },
         forgets: p.has_keep,
         warnings,
-        error: None,
+        error: (kind == Kind::Broken).then(|| Text::NoSources.to_string()),
     }
 }

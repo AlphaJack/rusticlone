@@ -85,6 +85,7 @@ collections-primary = principale
 collections-copy-target = destinazione di copia
 collections-no-collections = Ancora nessuna raccolta: nessun profilo ha sia un [repository] sia [[backup.snapshots]] con sorgenti. Aggiungili a un profilo in una delle cartelle sopra, o esegui `{ -name } serve --open` per crearne una
 collections-other = Altri profili
+collections-no-sources = il suo [[backup.snapshots]] non elenca sorgenti. Aggiungi i percorsi di cui fare il backup
 collections-unknown = { repo-status-unknown }
 collections-failing = { $failures ->
     [one] non riuscita
@@ -99,7 +100,6 @@ collections-kind-backup-profile = Profili di backup
 collections-kind-copy-target = Destinazioni di copia
 collections-kind-inherited = Già in uso
 collections-kind-unused = Inutilizzati
-collections-kind-no-sources = Senza sorgenti (il loro [[backup.snapshots]] non ne elenca)
 collections-kind-broken = Non validi
 collections-warning-hidden = { $read } nasconde { $hidden }: rustic legge solo il primo file con il nome di un profilo. Rinomina o elimina { $hidden }
 

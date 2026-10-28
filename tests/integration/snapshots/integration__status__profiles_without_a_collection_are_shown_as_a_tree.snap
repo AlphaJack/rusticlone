@@ -8,11 +8,10 @@ Profile folders
 ● No collections yet: no profile has both a [repository] and [[backup.snapshots]] with sources. Add them to a profile in one of the folders above, or run `rusticlone serve --open` to create one
 
 Other profiles
-├──┐Without sources (their [[backup.snapshots]] list none)
-│  └── Docs
 ├──┐Inherited
 │  └── common
 ├──┐Unused
 │  └── Music
 └──┐Invalid
+   ├── Docs: its [[backup.snapshots]] list no sources. Add the paths to back up
    └── broken: rustic show-config failed (exit 1): rustic-rs fatal error: parse error: TOML parse error at line 1, column 12

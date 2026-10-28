@@ -315,12 +315,15 @@ fn a_repository_without_a_password_is_an_issue() {
 }
 
 #[test]
-fn a_backup_profile_without_sources_is_not_unused() {
+fn a_backup_profile_without_sources_is_invalid() {
     let sb = Sandbox::new();
     sb.profile("Docs", "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '/nowhere'\n\n[[backup.snapshots]]\nsources = []\n");
-    sb.run(&["collections"]).assert_exit(2).assert_json(&json!({"name": "Docs", "kind": "no-sources"}));
+    sb.run(&["collections"]).assert_exit(1).assert_json(&json!({"name": "Docs", "kind": "broken"}));
     let text = sb.run_text(&["collections"]).stdout;
-    assert!(text.contains("Other profiles\n├──┐Without sources") && !text.contains("Unused"), "{text}");
+    assert!(
+        text.contains("└──┐Invalid\n   └── Docs: its [[backup.snapshots]] list no sources") && !text.contains("Unused"),
+        "{text}"
+    );
 }
 
 /// Profiles, but none a collection: what is missing is said, as without any profile.

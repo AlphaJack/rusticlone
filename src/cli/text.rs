@@ -28,6 +28,8 @@ pub(super) enum Text<'a> {
     NoCollections,
     /// The profiles that are not collections.
     Other,
+    /// Why a profile with `[[backup.snapshots]]` and no source is invalid.
+    NoSources,
     Unknown,
     Failing {
         failures: u32,
@@ -55,8 +57,6 @@ pub(super) enum Text<'a> {
 pub(super) enum Kind {
     BackupProfile,
     CopyTarget,
-    /// `[[backup.snapshots]]` without sources.
-    NoSources,
     /// Named in another profile's `use-profiles`.
     Inherited,
     Unused,
