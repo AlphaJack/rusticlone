@@ -219,6 +219,7 @@ inherits = "release"
 
 [workspace.metadata.dist]
 cargo-dist-version = "0.33.0"
+precise-builds = true
 ci = "github"
 installers = ["shell", "powershell", "homebrew"]
 tap = "AlphaJack/homebrew-tap"
