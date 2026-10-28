@@ -5,7 +5,7 @@ name: Release PR
 #   pull requests of this repository
 
 on:
-  workflow_run:
+  workflow_run: # zizmor: ignore[dangerous-triggers]
     workflows:
       - CI
     types:
