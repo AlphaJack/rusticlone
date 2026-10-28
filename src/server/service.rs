@@ -9,7 +9,7 @@ use crate::log;
 #[cfg(feature = "desktop")]
 pub(super) static STOP: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
-/// SIGINT or SIGTERM, or [`STOP`].
+/// SIGINT or SIGTERM, Ctrl-C or Ctrl-Break on Windows, or [`STOP`].
 pub(super) async fn interrupted() {
     let signal = async {
         #[cfg(unix)]
@@ -23,7 +23,16 @@ pub(super) async fn interrupted() {
                 Err(_) => _ = tokio::signal::ctrl_c().await,
             }
         }
-        #[cfg(not(unix))]
+        // Ctrl-Break too, which unlike Ctrl-C can be sent to one process group.
+        #[cfg(windows)]
+        match tokio::signal::windows::ctrl_break() {
+            Ok(mut ctrl_break) => tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = ctrl_break.recv() => {}
+            },
+            Err(_) => _ = tokio::signal::ctrl_c().await,
+        }
+        #[cfg(not(any(unix, windows)))]
         {
             _ = tokio::signal::ctrl_c().await;
         }
