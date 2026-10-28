@@ -156,7 +156,6 @@ jobs:
           persist-credentials: false
       - name: Install Nix
         uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
-      # Not built: nix.yml builds it at each release. Cargo.toml changes break it too, so no path filter.
       - name: Evaluate the Nix package
         run: nix eval --raw .#packages.x86_64-linux.default.drvPath
 
