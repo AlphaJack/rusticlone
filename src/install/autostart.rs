@@ -575,7 +575,8 @@ mod imp {
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>{}</string></dict>
   <key>WorkingDirectory</key><string>{}</string>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
-  <key>ProcessType</key><string>Background</string>
+  <key>Nice</key><integer>10</integer>
+  <key>LowPriorityIO</key><true/>
 ",
             escape(&exe.to_string_lossy()),
             serve.iter().map(|a| format!("<string>{}</string>", escape(a))).collect::<String>(),

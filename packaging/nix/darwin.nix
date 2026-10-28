@@ -29,7 +29,8 @@ in
         EnvironmentVariables = cfg.settings;
         WorkingDirectory = "/etc/rustic";
         KeepAlive.SuccessfulExit = false;
-        ProcessType = "Background";
+        Nice = 10;
+        LowPriorityIO = true;
       };
     })
   ];
