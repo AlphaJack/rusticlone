@@ -266,8 +266,8 @@ output-in-use = another program has it open and locked. Close that program befor
 
 ## A collection's health
 
-unconfigured-new = nothing to back up yet: set up a backup
-unconfigured-gone = nothing to back up: the profiles of the collections that ran before are missing. Put them back in the profile folder, or set up a new backup
+unconfigured-new = No collection found: open Rusticlone to create your first one
+unconfigured-gone = No collection found: place your profiles back to the folder or create a new one 
 level-word = { $level ->
     [success] healthy
     [warning] degraded
@@ -662,6 +662,7 @@ autostart-installed-at-login = the server starts now and at login: { $file }
 autostart-uninstalled = the server is stopped and no longer starts automatically: { $file } deleted
 autostart-uninstalled-running = the server no longer starts at login: { $file } deleted. The running one stops at logout
 autostart-auto-update = the server updates itself at each start: { $file } sets { $key }=true
+autostart-auto-update-managed = auto-update stays off: the package manager updates { -name }
 autostart-app-refreshed = the app now runs { -name } { $version }, which the package manager installed
 autostart-not-installed = the server was not installed
 autostart-deleted = { $dir } deleted

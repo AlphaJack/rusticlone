@@ -662,6 +662,7 @@ autostart-installed-at-login = il server parte ora e a ogni accesso: { $file }
 autostart-uninstalled = il server è fermo e non parte più automaticamente: { $file } eliminato
 autostart-uninstalled-running = il server non parte più all'accesso: { $file } eliminato. Quello in esecuzione si ferma all'uscita
 autostart-auto-update = il server si aggiorna a ogni avvio: { $file } imposta { $key }=true
+autostart-auto-update-managed = aggiornamento automatico non attivato: { -name } è aggiornato dal gestore pacchetti
 autostart-app-refreshed = l'app ora esegue { -name } { $version }, installato dal gestore di pacchetti
 autostart-not-installed = il server non era installato
 autostart-deleted = { $dir } eliminata

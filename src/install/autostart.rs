@@ -37,6 +37,9 @@ pub(crate) enum Logged {
     AutoUpdate {
         file: String,
     },
+    /// `install --auto-update` of an executable that its package manager updates.
+    #[cfg(feature = "self-update")]
+    AutoUpdateManaged,
     NotInstalled,
     Deleted {
         dir: String,
