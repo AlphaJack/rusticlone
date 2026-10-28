@@ -129,9 +129,10 @@ PRs are squash-merged with the title as the commit and the description as its bo
 | `feat` | something users can do that they could not before |
 | `fix` | a bug users hit |
 | `perf` | the same behaviour, faster or smaller |
+| `i18n` | a new or updated translation |
 | `refactor`, `docs`, `test`, `ci`, `chore` | anything users do not notice |
 
-[release-plz.toml](release-plz.toml) gives `feat`, `fix` and `perf` their heading in the release notes and leaves the others out unless breaking.
+[release-plz.toml](release-plz.toml) gives `feat`, `fix`, `perf` and `i18n` their heading in the release notes and leaves the others out unless breaking.
 
 The scope is optional and becomes a heading under the type. Leave it out for changes across the whole app.
 

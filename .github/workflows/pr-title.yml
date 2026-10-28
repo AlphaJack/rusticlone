@@ -20,6 +20,7 @@ jobs:
             feat
             fix
             perf
+            i18n
             refactor
             docs
             test
