@@ -173,6 +173,21 @@ pub(crate) fn replaceable() -> bool {
     std::env::current_exe().is_ok_and(|exe| !super::managed(&exe))
 }
 
+/// What is logged without downloading: this release is the newest, or a dry run, or a package manager keeps
+/// this executable. `None` to download the newest.
+fn without_download(current: &Version, newest: &Version, dry_run: bool, replaceable: bool) -> Option<Logged> {
+    let (from, to) = (current.to_string(), newest.to_string());
+    if newest <= current {
+        Some(Logged::Current { current: from })
+    } else if dry_run {
+        Some(Logged::Available { from, to })
+    } else if !replaceable {
+        Some(Logged::Packaged { from, to })
+    } else {
+        None
+    }
+}
+
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
 /// executable with it.
 fn replace(dry_run: bool) -> Result<Logged> {
@@ -180,16 +195,10 @@ fn replace(dry_run: bool) -> Result<Logged> {
     let api = REPOSITORY.replace("://github.com/", "://api.github.com/repos/");
     let Release { tag_name: tag, assets } = serde_json::from_slice(&fetch(&format!("{api}/releases/latest"))?)?;
     let newest = Version::parse(tag.trim_start_matches('v'))?;
-    if newest <= current {
-        return Ok(Logged::Current { current: current.to_string() });
+    if let Some(logged) = without_download(&current, &newest, dry_run, replaceable()) {
+        return Ok(logged);
     }
     let (from, to) = (current.to_string(), newest.to_string());
-    if dry_run {
-        return Ok(Logged::Available { from, to });
-    }
-    if !replaceable() {
-        return Ok(Logged::Packaged { from, to });
-    }
     let url = |name: &str| assets.iter().find(|a| a.name == name).map(|a| a.browser_download_url.clone());
     let manifest: Manifest =
         serde_json::from_slice(&fetch(&url(MANIFEST).ok_or_else(|| Error::NoManifest { tag: tag.clone() })?)?)?;
@@ -215,7 +224,19 @@ fn replace(dry_run: bool) -> Result<Logged> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Manifest, archive};
+    use semver::Version;
+
+    use super::{Logged, Manifest, archive, without_download};
+
+    /// A package manager's executable is not downloaded, even with a newer release; the user's is.
+    #[test]
+    fn a_package_managers_executable_is_left_to_it() {
+        let (old, new) = (Version::new(2, 0, 0), Version::new(2, 0, 1));
+        assert!(matches!(without_download(&old, &new, false, false), Some(Logged::Packaged { .. })));
+        assert!(without_download(&old, &new, false, true).is_none());
+        assert!(matches!(without_download(&old, &new, true, false), Some(Logged::Available { .. })));
+        assert!(matches!(without_download(&new, &new, false, false), Some(Logged::Current { .. })));
+    }
 
     /// A real manifest, of mercurio's release: its artifacts are listed as rusticlone's are.
     #[test]

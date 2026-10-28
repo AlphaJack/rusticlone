@@ -27,19 +27,23 @@ enum Error {
 
 log::level!(Success: Logged);
 
-/// The executable to install: a package manager's where it keeps it, named as on `PATH` when a link there
-/// leads to it, as Homebrew's to its `Cellar`, since a version's folder goes with the next one; this one if
-/// its folder is on `PATH`, as after the installer script; else one in [`sys::bin_dir`].
+/// The executable to install: this one where it is, if [`kept`], else one in [`sys::bin_dir`].
 pub(super) fn target() -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
-    if crate::install::managed(&exe) {
-        let path = std::env::var_os("PATH").unwrap_or_default();
-        return Ok(linked(&exe, &path).unwrap_or(exe));
+    match kept(&exe, &std::env::var_os("PATH").unwrap_or_default()) {
+        Some(kept) => Ok(kept),
+        None => Ok(sys::bin_dir()?.join(exe.file_name().unwrap_or_default())),
     }
-    if exe.parent().is_some_and(on_path::has) {
-        return Ok(exe);
+}
+
+/// Where `exe` stays, with `path` as `PATH`: a package manager's where it keeps it, named as on `PATH` when a
+/// link there leads to it, as Homebrew's to its `Cellar`, since a version's folder goes with the next one;
+/// one in a folder on `PATH`, as after the installer script. `None` for one to copy, as from Downloads.
+fn kept(exe: &Path, path: &std::ffi::OsStr) -> Option<PathBuf> {
+    if crate::install::managed(exe) {
+        return Some(linked(exe, path).unwrap_or_else(|| exe.to_path_buf()));
     }
-    Ok(sys::bin_dir()?.join(exe.file_name().unwrap_or_default()))
+    std::env::split_paths(path).any(|dir| exe.parent() == Some(dir.as_path())).then(|| exe.to_path_buf())
 }
 
 /// The command in `path`, as `PATH`, that leads to `exe`.
@@ -79,21 +83,65 @@ fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
 mod tests {
-    /// As Homebrew's `bin/rusticlone` leads to its `Cellar`.
+    use std::path::{Path, PathBuf};
+
+    use super::{kept, linked};
+
+    /// A folder of its own in the temporary one, removed with its contents.
+    struct Folder(PathBuf);
+
+    impl Folder {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("{}-{name}-{}", crate::NAME, std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+
+        /// An executable at `relative`, with its folders.
+        fn exe(&self, relative: &str) -> PathBuf {
+            let exe = self.0.join(relative);
+            std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+            std::fs::write(&exe, b"").unwrap();
+            exe
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn path(dirs: &[&Path]) -> std::ffi::OsString {
+        std::env::join_paths(dirs).unwrap()
+    }
+
     #[test]
-    fn the_link_on_path_is_found_for_its_target() {
-        let root = std::env::temp_dir().join(format!("{}-linked-{}", crate::NAME, std::process::id()));
-        let (cellar, bin) = (root.join("Cellar/rusticlone/2.0.1/bin"), root.join("bin"));
-        std::fs::create_dir_all(&cellar).unwrap();
+    fn one_in_a_folder_on_path_stays_and_one_elsewhere_is_copied() {
+        let folder = Folder::new("kept");
+        let (bin, downloads) = (folder.exe("bin/rusticlone"), folder.exe("Downloads/rusticlone"));
+        let on_path = path(&[&folder.0.join("bin")]);
+        assert_eq!(kept(&bin, &on_path), Some(bin));
+        assert_eq!(kept(&downloads, &on_path), None);
+    }
+
+    /// As Homebrew's `bin/rusticlone` leads to its `Cellar`: the link outlives the version's folder.
+    #[cfg(unix)]
+    #[test]
+    fn homebrews_executable_stays_named_by_its_link_on_path() {
+        let folder = Folder::new("linked");
+        let exe = folder.exe("Cellar/rusticlone/2.0.1/bin/rusticlone");
+        let bin = folder.0.join("bin");
         std::fs::create_dir_all(&bin).unwrap();
-        let exe = cellar.join(crate::NAME);
-        std::fs::write(&exe, b"").unwrap();
         std::os::unix::fs::symlink(&exe, bin.join(crate::NAME)).unwrap();
-        let path = std::env::join_paths([root.join("elsewhere"), bin.clone()]).unwrap();
-        let found = super::linked(&exe, &path);
-        std::fs::remove_dir_all(&root).unwrap();
-        assert_eq!(found, Some(bin.join(crate::NAME)));
+        let on_path = path(&[&folder.0.join("elsewhere"), &bin]);
+        assert_eq!(linked(&exe, &on_path), Some(bin.join(crate::NAME)));
+        assert_eq!(kept(&exe, &on_path), Some(bin.join(crate::NAME)));
+        // Started through the link, as macOS then names it.
+        assert_eq!(kept(&bin.join(crate::NAME), &on_path), Some(bin.join(crate::NAME)));
+        // Without a link on `PATH`, where the package manager keeps it, rather than a copy.
+        assert_eq!(kept(&exe, &path(&[&folder.0.join("elsewhere")])), Some(exe));
     }
 }
