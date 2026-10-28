@@ -48,6 +48,12 @@ scoop bucket add alphajack https://github.com/AlphaJack/scoop-bucket
 scoop install alphajack/rusticlone
 ```
 
+Chocolatey:
+
+```pwsh
+choco install rusticlone
+```
+
 Cargo:
 
 ```sh
