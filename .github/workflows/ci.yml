@@ -79,7 +79,6 @@ jobs:
           # Its timers, disks and privacy rules differ: Linux runs none of that code.
           - os: macos-latest
             target: aarch64-apple-darwin
-          # The slowest runner: four partitions finish about when macOS does.
           - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 1/4 }
           - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 2/4 }
           - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 3/4 }
@@ -105,7 +104,6 @@ jobs:
         if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          # The Windows partitions build the same target: one saves it for all.
           save-if: ${{ github.ref == 'refs/heads/main' && (!matrix.partition || matrix.partition == '1/4') }}
       - name: Turn off Defender's real-time scanning
         if: runner.os == 'Windows'
