@@ -38,7 +38,7 @@ jobs:
       - name: Check formatting
         run: cargo fmt --all --check
 
-  clippy:
+  clippy-ubuntu:
     name: clippy (ubuntu-latest)
     runs-on: ubuntu-latest
     steps:
@@ -68,6 +68,30 @@ jobs:
       - name: Modules are acyclic
         run: cargo xtask acyclic
 
+  clippy-macos:
+    name: clippy (macos-latest)
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+          components: clippy
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
   test:
     name: test (${{ matrix.os }})
     strategy:
@@ -89,7 +113,6 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "stable"
-          components: clippy
       - name: Install sccache
         if: vars.CI_USE_SCCACHE == 'true'
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
@@ -110,9 +133,6 @@ jobs:
       - name: Install rustic
         run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
 
-      - name: Clippy
-        if: runner.os == 'macOS'
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
         run: cargo nextest run --workspace --locked
       - name: Check vendored htmx
