@@ -153,36 +153,60 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
-  bench-windows:
-    name: bench (${{ matrix.variant }})
+  bench:
+    name: bench (${{ matrix.os }}, ${{ matrix.variant }})
     strategy:
       fail-fast: false
       matrix:
-        variant: [base, lld]
-    runs-on: windows-latest
+        include:
+          - { os: ubuntu-latest, variant: base }
+          - { os: ubuntu-latest, variant: mold }
+          - { os: ubuntu-latest, variant: lines }
+          - { os: macos-latest, variant: base }
+          - { os: macos-latest, variant: lld }
+          - { os: macos-latest, variant: lines }
+          - { os: windows-latest, variant: base }
+          - { os: windows-latest, variant: lld }
+          - { os: windows-latest, variant: d-drive }
+          - { os: windows-latest, variant: lines }
+          - { os: windows-latest, variant: all }
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Create a Dev Drive
-        if: matrix.variant == 'devdrive' || matrix.variant == 'all'
-        uses: samypr100/setup-dev-drive@562171fe8df7401fdf582d766cd3b6ab80d5b1a0 # v4.1.0
-        with:
-          drive-size: 10GB
-          trusted-dev-drive: true
-          env-mapping: |
-            CARGO_TARGET_DIR,{{ DEV_DRIVE }}/target
-            BENCH_TEMP,{{ DEV_DRIVE }}/tmp
+      - name: Set up the variant
+        shell: bash
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          has() { [ "$VARIANT" = "$1" ] || [ "$VARIANT" = all ]; }
+          if has mold; then
+            sudo apt-get install -y -qq mold
+            echo "RUSTFLAGS=-C link-arg=-fuse-ld=mold" >> "$GITHUB_ENV"
+          fi
+          if has lld && [ "$RUNNER_OS" = macOS ]; then
+            brew install -q lld
+            echo "RUSTFLAGS=-C link-arg=-fuse-ld=$(brew --prefix lld)/bin/ld64.lld" >> "$GITHUB_ENV"
+          fi
+          if has lld && [ "$RUNNER_OS" = Windows ]; then
+            echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld" >> "$GITHUB_ENV"
+          fi
+          if has lines; then
+            { echo "CARGO_PROFILE_DEV_DEBUG=line-tables-only"; echo "CARGO_PROFILE_TEST_DEBUG=line-tables-only"; } >> "$GITHUB_ENV"
+          fi
+          if has d-drive; then
+            cp -r ~/.cargo /d/.cargo
+            { echo 'CARGO_HOME=D:\.cargo'; echo 'RUSTUP_HOME=D:\.rustup'; } >> "$GITHUB_ENV"
+            echo 'D:\.cargo\bin' >> "$GITHUB_PATH"
+          fi
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "stable"
-      - name: Link with rust-lld
-        if: matrix.variant == 'lld' || matrix.variant == 'all'
-        shell: bash
-        run: echo "CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER=rust-lld" >> "$GITHUB_ENV"
       - name: Turn off Defender's real-time scanning
+        if: runner.os == 'Windows'
         shell: pwsh
         run: Set-MpPreference -DisableRealtimeMonitoring $true
       - name: Install cargo-nextest
@@ -200,12 +224,9 @@ jobs:
         run: cargo nextest run --workspace --locked --no-run
       - name: Test
         shell: bash
-        env:
-          THREADS: ${{ (matrix.variant == 'threads' || matrix.variant == 'all') && '--test-threads 8' || '' }}
         run: |
-          export TEMP="${BENCH_TEMP:-$RUNNER_TEMP}" TMP="${BENCH_TEMP:-$RUNNER_TEMP}"
-          mkdir -p "$TEMP"
-          cargo nextest run --workspace --locked $THREADS
+          export TEMP="$RUNNER_TEMP" TMP="$RUNNER_TEMP"
+          cargo nextest run --workspace --locked
 
   test-windows:
     name: test (windows-latest)
