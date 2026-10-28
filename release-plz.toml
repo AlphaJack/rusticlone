@@ -1,4 +1,7 @@
 [workspace]
+# The last release is the last tag, not crates.io: crates.yml publishes after the builds, so a tag whose
+# build failed is never on crates.io, and the next fix must still go to the next version.
+git_only = true
 git_tag_name = "v{{ version }}"
 git_tag_enable = false
 git_release_enable = false
@@ -32,6 +35,11 @@ git_release_body = """
 """
 
 [changelog]
+# Without it, the title of CHANGELOG.md ends up on the line of the newest entry.
+header = """
+# Changelog
+
+"""
 body = """
 ## [{{ version }}]{%- if release_link -%}({{ release_link }}){% endif %} - {{ timestamp | date(format="%Y-%m-%d") }}
 {% for group, commits in commits | group_by(attribute="group") %}
