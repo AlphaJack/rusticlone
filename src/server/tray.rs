@@ -112,8 +112,8 @@ fn quit() {
     super::service::STOP.notify_one();
 }
 
-/// A setting that the menu switches on and off. Its label is also its item's id.
-#[derive(Clone, Copy, PartialEq, crate::i18n::Fluent, strum::EnumString, strum::EnumIter)]
+/// A setting that the menu switches on and off. Its item's id is its name, which parses back to it.
+#[derive(Clone, Copy, PartialEq, crate::i18n::Fluent, strum::EnumString, strum::IntoStaticStr, strum::EnumIter)]
 enum Switch {
     AtLogin,
     #[cfg(feature = "self-update")]
@@ -124,6 +124,16 @@ impl Switch {
     /// Each switch with its state. Auto-update is left out when the package manager updates rusticlone.
     fn states() -> Vec<(Self, Option<bool>)> {
         Self::iter().filter(|&s| s.shown()).map(|s| (s, s.state())).collect()
+    }
+
+    /// Root's server starts with the computer, as a system service; Windows's always at the user's login.
+    fn label(self) -> String {
+        match self {
+            Self::AtLogin if cfg!(unix) && sys::is_root() => crate::i18n::t!("switch-at-boot"),
+            Self::AtLogin => self.to_string(),
+            #[cfg(feature = "self-update")]
+            Self::AutoUpdate => self.to_string(),
+        }
     }
 
     fn shown(self) -> bool {
@@ -244,4 +254,20 @@ fn pixels(level: Level, ink: Rgb, cut_only: bool) -> Vec<u8> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use strum::IntoEnumIterator as _;
+
+    use super::Switch;
+
+    /// A click names the item by its id, which is not its label: that one is translated.
+    #[test]
+    fn each_switch_is_found_by_its_items_id() {
+        for switch in Switch::iter() {
+            let id: &str = switch.into();
+            assert!(id.parse::<Switch>().ok() == Some(switch), "{id}");
+        }
+    }
 }

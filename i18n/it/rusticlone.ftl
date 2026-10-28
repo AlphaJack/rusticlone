@@ -673,6 +673,7 @@ autostart-unit-description = Server { -app }
 # Cosa dicono dell'app i desktop e il menu Start di Windows. Le traduzioni lo sostituiscono.
 app-description = Backup 3-2-1-1-0 pianificati per computer e server, basati su profili rustic, con interfaccia e notifiche
 tray-quit = Esci (sospende i backup automatici)
+switch-at-boot = Avvia all'avvio del computer
 switch-at-login = Avvia all'accesso
 switch-auto-update = Aggiorna automaticamente
 update-current = { -name } { $current } è aggiornato
