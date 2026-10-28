@@ -227,6 +227,15 @@ impl Drop for Scratch {
     }
 }
 
+/// Windows serializes the reads and writes on a file handle: a thread waiting there for redb's lock on the
+/// state, which another process holds, keeps this process's other threads from reading it, and that process
+/// may be waiting for them. So on Windows each process uses the state from one thread at a time.
+#[cfg(windows)]
+fn one_at_a_time() -> parking_lot::ReentrantMutexGuard<'static, ()> {
+    static STATE: parking_lot::ReentrantMutex<()> = parking_lot::const_reentrant_mutex(());
+    STATE.lock()
+}
+
 impl Store {
     pub fn open() -> Result<Self> {
         Self::at(settings::state_dir()?)
@@ -236,6 +245,8 @@ impl Store {
     /// database open for writing would. Its locks are the state's, so that it waits for other runs. Without
     /// a state yet, they are in a temporary directory, so that the dry run creates no state.
     pub(crate) fn open_dry_run() -> Result<Self> {
+        #[cfg(windows)]
+        let _one = one_at_a_time();
         let dir = settings::state_dir()?;
         let path = dir.join("state.redb");
         // Shared, as the server does, when another process has it open: reading it changes no data.
@@ -289,6 +300,8 @@ impl Store {
     }
 
     pub fn at(dir: PathBuf) -> Result<Self> {
+        #[cfg(windows)]
+        let _one = one_at_a_time();
         fs::create_dir_all(dir.join("locks"))?;
         let path = dir.join("state.redb");
         let create = || Database::builder().set_concurrency_mode(ConcurrencyMode::MultiWriter).create(&path);
@@ -318,6 +331,8 @@ impl Store {
     }
 
     fn read<R>(&self, f: impl FnOnce(&ReadTransaction) -> Result<R>) -> Result<R> {
+        #[cfg(windows)]
+        let _one = one_at_a_time();
         f(&self.db.begin_read()?)
     }
 
@@ -327,6 +342,8 @@ impl Store {
 
     /// Other processes see all of the transaction or none of it.
     fn write<R>(&self, shown: Shown<'_>, f: impl FnOnce(&WriteTransaction) -> Result<R>) -> Result<R> {
+        #[cfg(windows)]
+        let _one = one_at_a_time();
         let w = self.db.begin_write()?;
         let result = f(&w)?;
         let key = match shown {
