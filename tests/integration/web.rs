@@ -728,10 +728,7 @@ fn a_first_user_is_shown_where_to_start() {
     let page = server.get("/").body;
     let dir = sb.profile_path("x").parent().unwrap().display().to_string();
     assert!(page.contains(&dir) && page.contains("/setup"), "{page}");
-    sb.run(&["backup", "--all"])
-        .assert_exit(2)
-        .assert_result("no-profiles", json!({}))
-        .assert_output("[[backup.snapshots]]");
+    sb.run(&["backup", "--all"]).assert_exit(2).assert_result("no-profiles", json!({})).assert_output(&dir);
     // A generated password, and a field for each value of each kind of repository.
     let form = server.get("/setup").body;
     assert!(

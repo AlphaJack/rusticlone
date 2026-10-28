@@ -261,7 +261,9 @@ pub(super) async fn test_notification(Form(form): Form<NotifyTest>) -> Response 
 pub(super) async fn notify(State(app): State<Arc<App>>, _: Selection, Path(collection): Path<String>) -> Response {
     blocking(move || {
         let engine = app.engine();
-        let sent = engine.collection(&collection).map(|j| (j.title.to_owned(), engine.notify_now(&j)));
+        let sent = engine
+            .collection(&collection)
+            .map(|j| (j.title.to_owned(), engine.notify_now(&j, &mut crate::notification::logged(Some(j.title)))));
         app.pages.changed_of(&collection);
         match sent {
             Some((collection, Ok(_))) => Ok(flash(&Notice::Notified { collection })),

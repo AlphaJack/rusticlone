@@ -33,7 +33,6 @@ pub(crate) enum Logged {
         file: String,
     },
     #[cfg(feature = "self-update")]
-    #[fluent(key = crate::settings::AUTO_UPDATE.key)]
     AutoUpdate {
         file: String,
     },
@@ -1014,8 +1013,8 @@ pub(crate) fn serve_args() -> Vec<String> {
     vec!["serve".into()]
 }
 
-/// Installing again updates the executable and `PATH`, and restarts the server.
-pub(crate) fn install(listen: &str) -> Result<Logged> {
+/// Puts this executable where the server runs it, and returns where. Installing again updates it and `PATH`.
+pub(crate) fn place() -> Result<PathBuf> {
     let exe = place::target()?;
     // Windows keeps a running executable from being replaced. Stopped rather than renamed aside, which
     // Windows allows: Defender quarantined an executable renamed aside while it ran and replaced, with the
@@ -1023,12 +1022,17 @@ pub(crate) fn install(listen: &str) -> Result<Logged> {
     #[cfg(windows)]
     imp::stop_running(&exe)?;
     place::place(&exe)?;
-    let file = imp::install(listen, &exe, &serve_args())?.display().to_string();
+    Ok(exe)
+}
+
+/// Installs the server that runs `exe`, from [`place()`]. Installing again restarts it.
+pub(crate) fn install(listen: &str, exe: &Path) -> Result<Logged> {
+    let file = imp::install(listen, exe, &serve_args())?.display().to_string();
     Ok(if with_computer() { Logged::Installed { file } } else { Logged::InstalledAtLogin { file } })
 }
 
 /// Root's server, and on Linux a headless user's, which `install` keeps running without a login.
-fn with_computer() -> bool {
+pub(crate) fn with_computer() -> bool {
     #[cfg(target_os = "linux")]
     return crate::sys::is_root() || imp::headless();
     #[cfg(not(target_os = "linux"))]
