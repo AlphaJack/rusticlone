@@ -110,6 +110,7 @@ jobs:
       - name: Install rustic
         run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
 
+      # Here rather than its own job: a second macOS runner per run waits minutes for one of the 5 an account gets.
       - name: Clippy
         if: runner.os == 'macOS'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
