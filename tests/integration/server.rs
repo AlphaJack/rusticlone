@@ -265,7 +265,9 @@ fn cancelled_backup_waits_for_its_next_schedule() {
         running().iter().any(|r| r["kind"] == "prune" && r["activities"][0]["doing"]["kind"] == "waiting-for")
     });
     for run in running().iter().filter(|r| r["kind"] != "backup") {
-        assert_eq!(server.delete(&format!("/collections/Slow/runs/{}", run["id"])).code, 200);
+        // On a solid-state disk the check does not wait, and may end before it is stopped.
+        let code = server.delete(&format!("/collections/Slow/runs/{}", run["id"])).code;
+        assert!(code == 200 || running().iter().all(|r| r["id"] != run["id"]), "{code} for {run}");
     }
     wait_for(10, "them to stop", || running().len() == 1);
     let stopped = Instant::now();
