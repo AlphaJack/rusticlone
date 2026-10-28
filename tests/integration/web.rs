@@ -3,7 +3,6 @@
 
 use std::{
     io::{Read, Write},
-    os::unix::fs::PermissionsExt,
     thread,
     time::{Duration, Instant},
 };
@@ -76,7 +75,8 @@ fn a_failed_backup_from_the_web_notifies() {
     assert_eq!(message["type"], "failure");
     assert!(message["title"].as_str().unwrap().ends_with(": Docs is now failing"), "{message}");
     // The missing source.
-    assert!(message["message"].as_str().unwrap().contains("/source/"), "{message}");
+    let source = format!("{0}source{0}", std::path::MAIN_SEPARATOR);
+    assert!(message["message"].as_str().unwrap().contains(&source), "{message}");
     socket.write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
 }
 
@@ -112,7 +112,7 @@ fn snapshots_can_be_browsed_and_downloaded() {
     sb.run(&["backup", "--all"]).assert_exit(0);
     let server = sb.server(&[]);
     let id = &sb.snapshot_ids("Docs")[0];
-    let docs = sb.path("source/docs").display().to_string();
+    let docs = crate::common::in_tree(&sb.path("source/docs"));
     let base = format!("/collections/Docs/repos/Docs/snapshots/{id}");
     // A snapshot of one directory opens in that directory.
     let page = server.get(&base).body;
@@ -132,6 +132,7 @@ fn snapshots_can_be_browsed_and_downloaded() {
 /// Listing a remote snapshot can take seconds. The rest of the UI does not wait for it, and its other
 /// directories are served from the cache.
 #[test]
+#[cfg(unix)]
 #[expect(clippy::disallowed_methods, reason = "observe external processes over a bounded interval")]
 fn a_slow_listing_holds_up_nothing_else() {
     let sb = docs_with_remote("");
@@ -147,7 +148,7 @@ fn a_slow_listing_holds_up_nothing_else() {
     let quoted = rustic.display().to_string().replace('\'', r"'\''");
     let script = format!("#!/bin/sh\ncase \" $* \" in *\" ls \"*) sleep 2;; esac\nexec '{quoted}' \"$@\"\n");
     std::fs::write(&slow, script).unwrap();
-    std::fs::set_permissions(&slow, std::fs::Permissions::from_mode(0o755)).unwrap();
+    std::fs::set_permissions(&slow, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
     let path = std::env::join_paths(std::iter::once(dir).chain(std::env::split_paths(&path))).unwrap();
     let server = sb.server(&[("PATH", path.to_str().unwrap())]);
     let browsing = thread::spawn({
@@ -502,11 +503,14 @@ fn edited_profiles_are_picked_up_at_once() {
     wait_for(10, "the renamed profile to go", || !listed("Docs"));
     std::fs::rename(&old, &path).unwrap();
     wait_for(10, "the profile to be back", || listed("Docs"));
-    // Also on request (`systemctl reload`).
-    let reloads = || server.output().matches(r#""kind":"reloaded""#).count();
-    let before = reloads();
-    assert!(std::process::Command::new("kill").args(["-HUP", &server.pid().to_string()]).status().unwrap().success());
-    wait_for(10, "the reload", || reloads() > before);
+    // Also on request (`systemctl reload`), which Windows has no signal for.
+    #[cfg(unix)]
+    {
+        let reloads = || server.output().matches(r#""kind":"reloaded""#).count();
+        let before = reloads();
+        assert!(crate::common::signal(server.pid(), "HUP"));
+        wait_for(10, "the reload", || reloads() > before);
+    }
 }
 
 #[test]
@@ -579,7 +583,8 @@ fn a_backup_unknown_until_one_is_made() {
 fn a_failure_can_be_dismissed() {
     let sb = Sandbox::new();
     sb.backup_profile("Docs", &[&["missing"]], &[], "");
-    sb.run(&["backup", "--all"]).assert_exit(1).assert_result("failed", json!({})).assert_output("/missing");
+    let missing = format!("{}missing", std::path::MAIN_SEPARATOR);
+    sb.run(&["backup", "--all"]).assert_exit(1).assert_result("failed", json!({})).assert_output(&missing);
     let server = sb.server(&[]);
     assert!(server.get("/collections/Docs").body.contains("/failures/snapshot%3ADocs"));
     assert_eq!(server.delete("/collections/Docs/failures/check%3ADocs").code, 422, "not shown, not dismissed");
@@ -747,7 +752,7 @@ fn a_file_is_found_across_snapshots_and_changes_are_shown() {
     sb.run(&["backup", "--all"]).assert_exit(0);
     let server = sb.server(&[]);
     let ids = sb.snapshot_ids("Docs-remote");
-    let docs = sb.path("source/docs").display().to_string();
+    let docs = crate::common::in_tree(&sb.path("source/docs"));
     // A name, in any case, anywhere in the path: each version, with a download link.
     let found = server.get("/collections/Docs/repos/Docs-remote/find?name=REPORT").body;
     assert_eq!(found.matches(&format!("<code>{docs}/sub/report.txt</code>")).count(), 2, "{found}");
@@ -788,7 +793,7 @@ fn unfinished_requests_survive_a_restart() {
     assert!(flash(&test.body, "success"), "{}", test.body);
     // Stopped (`systemctl stop`): unfinished requests are kept, the interrupted backup and the test
     // restore waiting for it.
-    assert!(std::process::Command::new("kill").args(["-TERM", &server.pid().to_string()]).status().unwrap().success());
+    assert!(crate::common::signal(server.pid(), "TERM"));
     wait_for(20, "the server to stop", || !server.running());
     assert_eq!(sb.queued("Slow"), 2);
     drop(server);

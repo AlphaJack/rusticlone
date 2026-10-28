@@ -4,7 +4,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     process::{Command, Output},
 };
 
@@ -137,6 +137,23 @@ pub(crate) fn with_kind(kind: &str, mut fields: Value) -> Value {
 }
 
 /// Whether process `pid` has ended: on Unix, signal 0 reaches every process that exists.
+/// Sends the signal `name` (`INT`, `TERM`) to a process that [`Sandbox::spawn`] started, as Ctrl-C or
+/// `systemctl stop` would. Windows has no signals: there, Ctrl-Break to its process group, which stops it
+/// as both do. Whether it was sent.
+pub(crate) fn signal(pid: u32, name: &str) -> bool {
+    #[cfg(unix)]
+    return Command::new("kill").args([format!("-{name}"), pid.to_string()]).status().is_ok_and(|s| s.success());
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, GenerateConsoleCtrlEvent};
+        _ = name;
+        // SAFETY: a plain call, about a process group.
+        #[expect(unsafe_code, reason = "sends Ctrl-Break to a process group")]
+        let sent = unsafe { GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pid) };
+        sent != 0
+    }
+}
+
 #[cfg(unix)]
 #[expect(unsafe_code, reason = "signal 0 only checks that the process exists")]
 fn ended(pid: i32) -> bool {
@@ -174,14 +191,36 @@ impl Sandbox {
         let root = runs.join(std::process::id().to_string()).join(test);
         _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
-        // Canonical, as rustic records source paths (on macOS, /var is /private/var).
-        let sb = Self { root: fs::canonicalize(&root).unwrap() };
-        for dir in ["home", "config", "state", "cwd", "source", "local", "remote"] {
+        // Canonical, as rustic records source paths (on macOS, /var is /private/var). Without Windows's
+        // `\\?\` prefix, which rustic does not record.
+        let sb = Self { root: dunce::canonicalize(&root).unwrap() };
+        for dir in ["home", "config", "state", "cwd", "source", "local", "remote", "tmp"] {
             fs::create_dir_all(sb.path(dir)).unwrap();
         }
         fs::create_dir_all(sb.profile_dir()).unwrap();
         sb.common_env(&[]);
+        #[cfg(windows)]
+        {
+            static CONFINED: std::sync::Once = std::sync::Once::new();
+            CONFINED.call_once(|| sb.assert_confined());
+        }
         sb
+    }
+
+    /// Rustic looks for profiles in the Known Folder `AppData` first. It follows `USERPROFILE`, which the
+    /// sandbox sets, so rustic never reads the developer's own profiles: one named like a sandbox's would
+    /// send backups, prunes and recreations to a real repository. Checked rather than assumed.
+    #[cfg(windows)]
+    fn assert_confined(&self) {
+        self.profile("confined", "");
+        let out = self.rustic(&["-P", "confined", "show-config"]);
+        let log = String::from_utf8_lossy(&out.stderr);
+        let used = log.lines().find_map(|l| l.split("using config ").nth(1)).unwrap_or_default();
+        assert!(
+            Path::new(used.trim()).starts_with(&self.root),
+            "rustic reads profiles outside the sandbox, so the tests could reach real repositories:\n{log}"
+        );
+        fs::remove_file(self.profile_path("confined")).unwrap();
     }
 
     /// Sets these variables in the `[global.env]` of the profile that every other one uses.
@@ -190,13 +229,18 @@ impl Sandbox {
         self.profile("common", &(repository + &global_env(vars)));
     }
 
+    /// `rel`, with `/` between its parts, inside the sandbox. With Windows's separator there, as rustic records
+    /// paths as given and Windows's own commands take no other.
     pub(crate) fn path(&self, rel: &str) -> PathBuf {
-        self.root.join(rel)
+        self.root.join(rel.replace('/', std::path::MAIN_SEPARATOR_STR))
     }
 
-    /// Where rustic looks for the sandbox user's collections.
+    /// Where rustic looks for the sandbox user's collections. On Windows, the system's: rustic finds no
+    /// Known Folder `AppData` in the sandbox.
     pub(crate) fn profile_dir(&self) -> PathBuf {
-        if cfg!(target_os = "macos") {
+        if cfg!(windows) {
+            self.path(r"programdata\rustic\config")
+        } else if cfg!(target_os = "macos") {
             self.path("home/Library/Application Support/rustic")
         } else {
             self.path("config/rustic")
@@ -309,6 +353,21 @@ impl Sandbox {
             .env(var("STATE_DIR"), self.path("store"))
             .env("TZ", "UTC")
             .current_dir(self.path("cwd"));
+        // Windows's own, without which processes cannot start or reach the network, and the sandbox's
+        // profile folders.
+        if cfg!(windows) {
+            for key in ["SystemRoot", "SystemDrive", "windir", "ComSpec", "PATHEXT", "NUMBER_OF_PROCESSORS"] {
+                if let Some(value) = env::var_os(key) {
+                    cmd.env(key, value);
+                }
+            }
+            cmd.env("USERPROFILE", self.path("home"))
+                .env("APPDATA", self.path(r"home\AppData\Roaming"))
+                .env("LOCALAPPDATA", self.path(r"home\AppData\Local"))
+                .env("PROGRAMDATA", self.path("programdata"))
+                .env("TEMP", self.path("tmp"))
+                .env("TMP", self.path("tmp"));
+        }
         // `cargo llvm-cov`: where the child writes its coverage.
         if let Some(profile) = env::var_os("LLVM_PROFILE_FILE") {
             cmd.env("LLVM_PROFILE_FILE", profile);
@@ -316,15 +375,20 @@ impl Sandbox {
         cmd
     }
 
+    /// In its own process group on Windows, which [`signal`] sends Ctrl-Break to.
     pub(crate) fn spawn(&self, args: &[&str], envs: &[(&str, &str)]) -> std::process::Child {
-        self.command(BIN)
-            .arg("--json")
+        let mut cmd = self.command(BIN);
+        cmd.arg("--json")
             .args(args)
             .envs(envs.iter().copied())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .unwrap()
+            .stderr(std::process::Stdio::piped());
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(
+            &mut cmd,
+            windows_sys::Win32::System::Threading::CREATE_NEW_PROCESS_GROUP,
+        );
+        cmd.spawn().unwrap()
     }
 
     pub(crate) fn run(&self, args: &[&str]) -> Run {
@@ -428,6 +492,91 @@ pub(crate) fn docs_with_remote(extra: &str) -> Sandbox {
     sb
 }
 
+/// Where `restore --to` puts `path`: `/home/me` under `home/me`, `C:\Users\me` under `C/Users/me`.
+pub(crate) fn below_root(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::Normal(part) => out.push(part),
+            Component::Prefix(prefix) => {
+                out.extend(prefix.as_os_str().to_string_lossy().split(['\\', '/', ':', '?']).filter(|p| !p.is_empty()));
+            }
+            Component::RootDir | Component::CurDir | Component::ParentDir => {}
+        }
+    }
+    out
+}
+
+/// Where `path` is in a snapshot's tree, as the web UI shows it: `/home/me` there too, `C:\Users\me` at
+/// `/C/Users/me`.
+#[cfg(feature = "server")]
+pub(crate) fn in_tree(path: &Path) -> String {
+    below_root(path).components().map(|c| format!("/{}", c.as_os_str().to_string_lossy())).collect()
+}
+
+/// `command` as a TOML string.
+pub(crate) fn toml_str(command: &str) -> String {
+    if command.contains('\'') {
+        format!("\"{}\"", command.replace('\\', "\\\\").replace('"', "\\\""))
+    } else {
+        format!("'{command}'")
+    }
+}
+
+/// Commands for rustic's hooks and stdin sources: Unix tools, or Windows's own. Rustic splits them as a POSIX
+/// shell would, without running one, so Windows's paths are quoted to keep their `\\`. On Windows, links are
+/// junctions, which need no administrator, and what the commands print is discarded, as Unix's print nothing.
+pub(crate) mod cmd {
+    use std::path::Path;
+
+    fn quoted(path: &Path) -> String {
+        format!("'{}'", path.display())
+    }
+
+    pub(crate) fn sleep(seconds: u32) -> String {
+        if cfg!(windows) {
+            format!("powershell -NoProfile -Command Start-Sleep -Seconds {seconds}")
+        } else {
+            format!("sleep {seconds}")
+        }
+    }
+
+    /// Links `link` to the directory `target`, replacing a link there.
+    pub(crate) fn link(target: &Path, link: &Path) -> String {
+        let (target, link) = (quoted(target), quoted(link));
+        if cfg!(windows) {
+            format!("cmd /c (if exist {link} rmdir {link}) & mklink /J {link} {target} >nul")
+        } else {
+            format!("ln -sfn {target} {link}")
+        }
+    }
+
+    pub(crate) fn unlink(link: &Path) -> String {
+        let link = quoted(link);
+        if cfg!(windows) { format!("cmd /c if exist {link} rmdir {link}") } else { format!("rm -f {link}") }
+    }
+
+    /// Writes the line `text` to `file`.
+    pub(crate) fn write(text: &str, file: &Path) -> String {
+        if cfg!(windows) {
+            format!("cmd /c (echo {text})> {}", quoted(file))
+        } else {
+            format!("sh -c 'echo {text} > {}'", file.display())
+        }
+    }
+
+    /// Moves the directory `from` into `into`, if it exists.
+    pub(crate) fn move_dir(from: &Path, into: &Path) -> String {
+        if cfg!(windows) {
+            let (from, into) = (quoted(from), quoted(into));
+            format!("cmd /c if exist {from} move {from} {into} >nul")
+        } else {
+            let (from, into) = (from.display(), into.display());
+            format!("sh -c 'test -d {from} && mv {from} {into}; true'")
+        }
+    }
+}
+
 /// A collection whose backup takes `seconds`: its source is a slow stdin command. The command writes
 /// nothing, because with a parent snapshot rustic 0.11 does not read stdin and a writer would die of
 /// SIGPIPE.
@@ -436,8 +585,9 @@ pub(crate) fn slow_profile(sb: &Sandbox, name: &str, seconds: u32, extra: &str) 
         name,
         &format!(
             "[global]\nuse-profiles = ['common']\n[repository]\nrepository = '{}'\n\
-             [[backup.snapshots]]\nsources = ['-']\nstdin-command = 'sleep {seconds}'\n{extra}",
-            sb.path(&format!("local/{name}")).display()
+             [[backup.snapshots]]\nsources = ['-']\nstdin-command = {}\n{extra}",
+            sb.path(&format!("local/{name}")).display(),
+            toml_str(&cmd::sleep(seconds))
         ),
     );
 }

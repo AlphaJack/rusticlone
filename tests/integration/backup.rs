@@ -89,6 +89,7 @@ fn lost_local_repository_is_not_reinitialised_while_targets_are_unreachable() {
 }
 
 #[test]
+#[cfg(unix)]
 fn what_a_backup_could_not_read_is_reported_until_it_can() {
     use std::os::unix::fs::PermissionsExt;
     let sb = docs_with_remote("");

@@ -343,6 +343,7 @@ fn server_shows_a_running_backup_with_progress() {
 
 /// On another disk, a check does not wait for a backup.
 #[test]
+#[cfg(unix)]
 fn server_runs_jobs_independently() {
     use std::os::unix::fs::MetadataExt;
     let sb = Sandbox::new();
