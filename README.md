@@ -98,7 +98,7 @@ For scheduled backups, you need to start Rusticlone on boot or user login. You c
 This will also make the app visible in the start menu or app library, and add a tray icon when it's running as regular user.
 It will also create a configuration file based on your system:
 
-| OS | regular user | admin user |
+| OS | regular user | root / SYSTEM |
 |---|---|---|
 | Linux | `$HOME/.config/rusticlone/rusticlone.env` | `/etc/rusticlone/rusticlone.env` |
 | macOS | `$HOME/Library/Application Support/rusticlone/rusticlone.env` | `/etc/rusticlone/rusticlone.env` |
@@ -123,7 +123,7 @@ They can be shared across profiles by using the [`[global] use-profiles`](https:
 
 Rusticlone looks for profiles in the same folders as rustic:
 
-| OS | regular user | admin user |
+| OS | regular user | root / SYSTEM |
 |---|---|---|
 | Linux | `$HOME/.config/rustic` | `/root/.config/rustic`<br>`/etc/rustic` |
 | macOS | `$HOME/Library/Application Support/rustic` | `/var/root/Library/Application Support/rustic`<br>`/etc/rustic` |
@@ -412,7 +412,7 @@ To see backups from another network, see [remote server](#remote-server) for a r
 Rusticlone state is meant to be disposable, as the source of truth for your backups remains your repositories.
 CLI and server both write to the same shared folder, by default:
 
-| OS | regular user | admin user |
+| OS | regular user | root / SYSTEM |
 |---|---|---|
 | Linux | `$HOME/.local/state/rusticlone` | `/var/lib/rusticlone` |
 | macOS | `$HOME/Library/Application Support/rusticlone` | `/Library/Application Support/rusticlone` |
