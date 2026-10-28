@@ -107,6 +107,7 @@ jobs:
       # The rustic pinned in Cargo.toml, which the tests run.
       - name: Turn off Defender's real-time scanning
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true
           Get-MpComputerStatus | Select-Object RealTimeProtectionEnabled, IsTamperProtected, AMRunningMode
