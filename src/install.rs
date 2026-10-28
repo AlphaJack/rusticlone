@@ -13,22 +13,38 @@ pub(crate) mod rustic;
 #[cfg(feature = "self-update")]
 pub(crate) mod update;
 
-/// Who keeps an executable where it is, and updates it there.
+/// Who keeps an executable where it is, and updates it there: shown as how to update it with that.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, crate::i18n::Fluent)]
+#[fluent(prefix = "update-with")]
 pub(crate) enum Keeper {
     Homebrew,
     Scoop,
     Chocolatey,
+    #[fluent(id = format!("{}.{}", owner(), crate::APP_NAME))]
     WinGet,
     Nix,
     /// A container, whose image is pulled again.
     #[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "containers run Linux"))]
+    #[fluent(image = image())]
     Docker,
     #[cfg_attr(not(target_os = "linux"), expect(dead_code, reason = "containers run Linux"))]
+    #[fluent(image = image())]
     Podman,
     /// A folder that is not the user's, or the system packages' even for root: `/usr/bin`, `/bin`, `/usr/sbin`.
     System,
+}
+
+/// The repository's owner on GitHub, who publishes the `WinGet` package and the container image.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+fn owner() -> &'static str {
+    env!("CARGO_PKG_REPOSITORY").trim_start_matches("https://github.com/").split('/').next().unwrap_or_default()
+}
+
+/// The container image, at its newest release.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+fn image() -> String {
+    format!("ghcr.io/{}/{}:latest", owner().to_lowercase(), crate::NAME)
 }
 
 /// Whether a package manager keeps `exe` where it is: see [`keeper`].
@@ -115,6 +131,30 @@ mod tests {
         for dir in ["/usr/bin", "/bin", "/usr/sbin"] {
             assert_eq!(keeper(&Path::new(dir).join(crate::NAME)), Some(Keeper::System), "{dir}");
         }
+    }
+
+    /// Each says its own command.
+    #[test]
+    fn each_keeper_names_how_to_update_with_it() {
+        assert!(Keeper::WinGet.to_string().contains("winget upgrade AlphaJack.Rusticlone"), "{}", Keeper::WinGet);
+        assert!(Keeper::Homebrew.to_string().contains("brew upgrade rusticlone"), "{}", Keeper::Homebrew);
+        for keeper in [Keeper::Scoop, Keeper::Chocolatey, Keeper::Nix, Keeper::System] {
+            assert!(!keeper.to_string().is_empty(), "{keeper:?}");
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_container_names_its_tool_and_image() {
+        let podman = Keeper::Podman.to_string();
+        assert!(podman.contains("podman pull ghcr.io/alphajack/rusticlone:latest"), "{podman}");
+        assert!(Keeper::Docker.to_string().contains("docker pull"), "{}", Keeper::Docker);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn nixs_store_is_managed() {
+        assert_eq!(keeper(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), Some(Keeper::Nix));
     }
 
     #[test]

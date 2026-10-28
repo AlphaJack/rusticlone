@@ -52,7 +52,8 @@ pub(crate) enum Logged {
         from: String,
         to: String,
     },
-    /// Not downloaded: a package manager updates this executable, or its folder is not the user's. `how`: [`How`].
+    /// Not downloaded: a package manager updates this executable, or its folder is not the user's. `how`: the
+    /// [`Keeper`](crate::install::Keeper)'s command.
     Packaged {
         from: String,
         to: String,
@@ -70,46 +71,6 @@ impl Message for Logged {
         match self {
             Self::NotUpdated { .. } | Self::Packaged { .. } => Level::Warning,
             Self::Current { .. } | Self::Available { .. } | Self::Updated { .. } => Level::Success,
-        }
-    }
-}
-
-/// How to update an executable that its package manager keeps.
-#[derive(Debug, PartialEq, Eq, crate::i18n::Fluent)]
-#[fluent(prefix = "update-with")]
-enum How {
-    Homebrew,
-    Scoop,
-    Chocolatey,
-    #[fluent(id = format!("{}.{}", owner(), crate::APP_NAME))]
-    Winget,
-    Nix,
-    /// `tool`: `docker` or `podman`.
-    #[fluent(image = format!("ghcr.io/{}/{}:latest", owner().to_lowercase(), crate::NAME))]
-    Container {
-        tool: String,
-    },
-    /// A folder that is not the user's, as `/usr/bin` of a package, or of a copy that root put there.
-    System,
-}
-
-/// The repository's owner on GitHub, who publishes the `WinGet` package and the container image.
-fn owner() -> &'static str {
-    REPOSITORY.trim_start_matches("https://github.com/").split('/').next().unwrap_or_default()
-}
-
-impl How {
-    fn of(exe: &Path) -> Self {
-        use crate::install::Keeper;
-        match crate::install::keeper(exe) {
-            Some(Keeper::Homebrew) => Self::Homebrew,
-            Some(Keeper::Scoop) => Self::Scoop,
-            Some(Keeper::Chocolatey) => Self::Chocolatey,
-            Some(Keeper::WinGet) => Self::Winget,
-            Some(Keeper::Nix) => Self::Nix,
-            Some(Keeper::Docker) => Self::Container { tool: "docker".into() },
-            Some(Keeper::Podman) => Self::Container { tool: "podman".into() },
-            Some(Keeper::System) | None => Self::System,
         }
     }
 }
@@ -242,7 +203,10 @@ fn replace(dry_run: bool) -> Result<Logged> {
     let api = REPOSITORY.replace("://github.com/", "://api.github.com/repos/");
     let Release { tag_name: tag, assets } = serde_json::from_slice(&fetch(&format!("{api}/releases/latest"))?)?;
     let newest = Version::parse(tag.trim_start_matches('v'))?;
-    let how = || std::env::current_exe().map(|exe| How::of(&exe).to_string()).unwrap_or_default();
+    let how = || {
+        let keeper = std::env::current_exe().ok().and_then(|exe| crate::install::keeper(&exe));
+        keeper.unwrap_or(crate::install::Keeper::System).to_string()
+    };
     if let Some(logged) = without_download(&current, &newest, dry_run, replaceable(), how) {
         return Ok(logged);
     }
@@ -272,24 +236,9 @@ fn replace(dry_run: bool) -> Result<Logged> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use semver::Version;
 
-    use super::{How, Logged, Manifest, archive, without_download};
-
-    /// Each package manager says its own command.
-    #[test]
-    fn each_package_manager_is_named_in_the_message() {
-        assert_eq!(How::of(Path::new("/opt/homebrew/Cellar/rusticlone/2.0.1/bin/rusticlone")), How::Homebrew);
-        assert_eq!(How::of(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), How::Nix);
-        assert!(How::Winget.to_string().contains("AlphaJack.Rusticlone"), "{}", How::Winget);
-        let podman = How::Container { tool: "podman".into() }.to_string();
-        assert!(podman.contains("podman pull ghcr.io/alphajack/rusticlone:latest"), "{podman}");
-        for how in [How::Homebrew, How::Scoop, How::Chocolatey, How::Winget, How::Nix, How::System] {
-            assert!(!how.to_string().is_empty());
-        }
-    }
+    use super::{Logged, Manifest, archive, without_download};
 
     /// A package manager's executable is not downloaded, even with a newer release; the user's is.
     #[test]
