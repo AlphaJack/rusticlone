@@ -30,7 +30,8 @@ log::level!(Success: Logged);
 /// The executable to install: this one where it is, if [`kept`], else one in [`sys::bin_dir`].
 pub(super) fn target() -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
-    match kept(&exe, &std::env::var_os("PATH").unwrap_or_default()) {
+    let installer = sys::installer_dir().ok();
+    match kept(&exe, &std::env::var_os("PATH").unwrap_or_default(), installer.as_deref()) {
         Some(kept) => Ok(kept),
         None => Ok(sys::bin_dir()?.join(exe.file_name().unwrap_or_default())),
     }
@@ -38,12 +39,14 @@ pub(super) fn target() -> Result<PathBuf> {
 
 /// Where `exe` stays, with `path` as `PATH`: a package manager's where it keeps it, named as on `PATH` when a
 /// link there leads to it, as Homebrew's to its `Cellar`, since a version's folder goes with the next one;
-/// one in a folder on `PATH`, as after the installer script. `None` for one to copy, as from Downloads.
-fn kept(exe: &Path, path: &std::ffi::OsStr) -> Option<PathBuf> {
+/// one in a folder on `PATH`; one where the `installer` script put it, for root too, before a new shell has it on
+/// `PATH`. `None` for one to copy, as from Downloads.
+fn kept(exe: &Path, path: &std::ffi::OsStr, installer: Option<&Path>) -> Option<PathBuf> {
     if crate::install::managed(exe) {
         return Some(linked(exe, path).unwrap_or_else(|| exe.to_path_buf()));
     }
-    std::env::split_paths(path).any(|dir| exe.parent() == Some(dir.as_path())).then(|| exe.to_path_buf())
+    let on_path = std::env::split_paths(path).any(|dir| exe.parent() == Some(dir.as_path()));
+    (on_path || (installer.is_some() && exe.parent() == installer)).then(|| exe.to_path_buf())
 }
 
 /// The command in `path`, as `PATH`, that leads to `exe`.
@@ -127,8 +130,17 @@ mod tests {
         let folder = Folder::new("kept");
         let (bin, downloads) = (folder.exe("bin/rusticlone"), folder.exe("Downloads/rusticlone"));
         let on_path = path(&[&folder.0.join("bin")]);
-        assert_eq!(kept(&bin, &on_path), Some(bin));
-        assert_eq!(kept(&downloads, &on_path), None);
+        assert_eq!(kept(&bin, &on_path, None), Some(bin));
+        assert_eq!(kept(&downloads, &on_path, None), None);
+    }
+
+    /// As root runs the installer script's `~/.cargo/bin/rusticlone install` from the same shell.
+    #[test]
+    fn one_where_the_installer_script_put_it_stays_before_path_has_it() {
+        let folder = Folder::new("installer");
+        let (cargo, installer) = (folder.exe(".cargo/bin/rusticlone"), folder.0.join(".cargo/bin"));
+        assert_eq!(kept(&cargo, &path(&[&folder.0.join("elsewhere")]), Some(&installer)), Some(cargo.clone()));
+        assert_eq!(kept(&cargo, &path(&[&folder.0.join("elsewhere")]), None), None);
     }
 
     /// As Homebrew's `bin/rusticlone` leads to its `Cellar`: the link outlives the version's folder.
@@ -142,10 +154,10 @@ mod tests {
         std::os::unix::fs::symlink(&exe, bin.join(crate::NAME)).unwrap();
         let on_path = path(&[&folder.0.join("elsewhere"), &bin]);
         assert_eq!(linked(&exe, &on_path), Some(bin.join(crate::NAME)));
-        assert_eq!(kept(&exe, &on_path), Some(bin.join(crate::NAME)));
+        assert_eq!(kept(&exe, &on_path, None), Some(bin.join(crate::NAME)));
         // Started through the link, as macOS then names it.
-        assert_eq!(kept(&bin.join(crate::NAME), &on_path), Some(bin.join(crate::NAME)));
+        assert_eq!(kept(&bin.join(crate::NAME), &on_path, None), Some(bin.join(crate::NAME)));
         // Without a link on `PATH`, where the package manager keeps it, rather than a copy.
-        assert_eq!(kept(&exe, &path(&[&folder.0.join("elsewhere")])), Some(exe));
+        assert_eq!(kept(&exe, &path(&[&folder.0.join("elsewhere")]), None), Some(exe));
     }
 }
