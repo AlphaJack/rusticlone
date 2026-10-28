@@ -632,13 +632,14 @@ mod tests {
 
     use super::{network_fs, solid_state};
 
-    /// A local volume says whether its disk seeks, even below a folder not created yet; a share has no volume.
+    /// A local volume says whether its disk seeks, if its disk answers, as a virtual one may not; the same below
+    /// a folder not created yet. A share has no volume.
     #[test]
     #[expect(clippy::disallowed_methods, reason = "the system drive is in the environment")]
     fn a_local_disk_says_whether_it_seeks() {
         let system = std::env::var("SystemDrive").unwrap_or_else(|_| "C:".into());
-        assert!(solid_state(Path::new(&format!(r"{system}\"))).is_some());
-        assert!(solid_state(&Path::new(&format!(r"{system}\")).join("not yet").join("created")).is_some());
+        let root = Path::new(&format!(r"{system}\")).to_path_buf();
+        assert_eq!(solid_state(&root.join("not yet").join("created")), solid_state(&root));
         assert_eq!(solid_state(Path::new(r"\\server\share")), None);
         assert!(network_fs(Path::new(r"\\server\share")) && !network_fs(Path::new(&system)));
     }
