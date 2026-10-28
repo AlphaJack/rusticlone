@@ -121,13 +121,15 @@ They can be shared across profiles by using the [`[global] use-profiles`](https:
 
 ### Profiles
 
-Rusticlone looks for rustic profiles in these folders, then in the working directory:
+Rusticlone looks for profiles in the same folders as rustic:
 
 | OS | admin user | regular user |
 |---|---|---|
-| Linux | `/root/.config/rustic`<br>`/etc/rustic` | `$HOME/.config/rustic` |
-| macOS | `/var/root/Library/Application Support/rustic`<br>`/etc/rustic` | `$HOME/Library/Application Support/rustic` |
-| Windows | `%APPDATA%\rustic\config`<br>`%PROGRAMDATA%\rustic\config` | `%APPDATA%\rustic\config` |
+| Linux | `$HOME/.config/rustic`<br>`/etc/rustic` | `$HOME/.config/rustic` |
+| macOS | `$HOME/Library/Application Support/rustic`<br>`/etc/rustic` | `$HOME/Library/Application Support/rustic` |
+| Windows | `%WINDIR%\System32\config\systemprofile\AppData\Roaming\rustic\config`<br>`%PROGRAMDATA%\rustic\config` | `%APPDATA%\rustic\config` |
+
+Profiles in the working directory are also considered.
 
 ### Backup
 
