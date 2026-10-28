@@ -678,6 +678,7 @@ switch-auto-update = Aggiorna automaticamente
 update-current = { -name } { $current } è aggiornato
 update-available = { -name } { $to } è disponibile, questo è { $from }
 update-updated = { -name } aggiornato da { $from } a { $to }
+update-packaged = { -name } { $to } è disponibile, questo è { $from }: aggiornalo con il gestore di pacchetti che lo ha installato
 update-not-updated = non aggiornato: { $error }
 update-error-checksum = { $file } non corrisponde al suo checksum: scaricalo di nuovo
 update-error-no-manifest = la release { $tag } non ha { $manifest }

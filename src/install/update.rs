@@ -52,6 +52,11 @@ pub(crate) enum Logged {
         from: String,
         to: String,
     },
+    /// Not downloaded: this executable's folder is not the user's, as `/usr/bin` of a package.
+    Packaged {
+        from: String,
+        to: String,
+    },
     /// At start, which goes on with the executable and rustic as they are.
     #[cfg_attr(not(feature = "server"), expect(dead_code, reason = "only the server updates at start"))]
     NotUpdated {
@@ -62,7 +67,7 @@ pub(crate) enum Logged {
 impl Message for Logged {
     fn level(&self) -> Level {
         match self {
-            Self::NotUpdated { .. } => Level::Warning,
+            Self::NotUpdated { .. } | Self::Packaged { .. } => Level::Warning,
             Self::Current { .. } | Self::Available { .. } | Self::Updated { .. } => Level::Success,
         }
     }
@@ -137,7 +142,7 @@ pub(crate) fn update(dry_run: bool) -> Result<()> {
             std::process::Command::new(std::env::current_exe()?).arg("update").status()?;
         }
         Logged::Current { .. } if !dry_run => super::rustic::download(true)?,
-        Logged::Current { .. } | Logged::Available { .. } | Logged::NotUpdated { .. } => {}
+        Logged::Current { .. } | Logged::Available { .. } | Logged::Packaged { .. } | Logged::NotUpdated { .. } => {}
     }
     Ok(())
 }
@@ -161,6 +166,20 @@ pub(crate) fn at_start() -> bool {
     false
 }
 
+/// Whether this executable can replace itself, as the new one is written beside it: not when its folder
+/// is not the user's, as `/usr/bin` of a package, which its package manager updates.
+pub(crate) fn replaceable() -> bool {
+    std::env::current_exe().is_ok_and(|exe| exe.parent().is_some_and(writable))
+}
+
+/// Whether a file can be created in `dir`: tried with a probe that is removed, which also holds for
+/// Windows's ACLs.
+fn writable(dir: &std::path::Path) -> bool {
+    let probe = dir.join(format!(".{}-probe-{}", crate::NAME, std::process::id()));
+    let created = std::fs::OpenOptions::new().write(true).create_new(true).open(&probe).is_ok();
+    created && std::fs::remove_file(&probe).is_ok()
+}
+
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
 /// executable with it.
 fn replace(dry_run: bool) -> Result<Logged> {
@@ -174,6 +193,9 @@ fn replace(dry_run: bool) -> Result<Logged> {
     let (from, to) = (current.to_string(), newest.to_string());
     if dry_run {
         return Ok(Logged::Available { from, to });
+    }
+    if !replaceable() {
+        return Ok(Logged::Packaged { from, to });
     }
     let url = |name: &str| assets.iter().find(|a| a.name == name).map(|a| a.browser_download_url.clone());
     let manifest: Manifest =
@@ -200,7 +222,67 @@ fn replace(dry_run: bool) -> Result<Logged> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Manifest, archive};
+    use super::{Manifest, archive, writable};
+
+    /// A folder of its own in the temporary one, removed with its contents.
+    struct Folder(std::path::PathBuf);
+
+    impl Folder {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("{}-{name}-{}", crate::NAME, std::process::id()));
+            std::fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+    }
+
+    impl Drop for Folder {
+        fn drop(&mut self) {
+            _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn the_users_folder_is_replaceable_and_the_probe_is_removed() {
+        let folder = Folder::new("replaceable");
+        assert!(writable(&folder.0));
+        assert_eq!(std::fs::read_dir(&folder.0).unwrap().count(), 0);
+    }
+
+    /// As `/usr/bin` of a package. Root writes there anyway.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_folder_only_root_writes_is_not_replaceable_on_linux() {
+        use std::os::unix::fs::PermissionsExt as _;
+        if crate::sys::is_root() {
+            return;
+        }
+        let folder = Folder::new("packaged");
+        std::fs::set_permissions(&folder.0, std::fs::Permissions::from_mode(0o555)).unwrap();
+        assert!(!writable(&folder.0));
+        std::fs::set_permissions(&folder.0, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    /// The system volume is read-only, even for root.
+    #[cfg(target_vendor = "apple")]
+    #[test]
+    fn the_system_volume_is_not_replaceable_on_macos() {
+        assert!(!writable(std::path::Path::new("/usr/bin")));
+    }
+
+    /// As `Program Files` for a user: an ACL that denies writing, which holds for administrators too.
+    #[cfg(windows)]
+    #[test]
+    fn a_folder_its_acl_denies_writing_is_not_replaceable_on_windows() {
+        let folder = Folder::new("packaged");
+        let acl = |grant: &str| {
+            let status = std::process::Command::new("icacls").arg(&folder.0).args([grant, "*S-1-1-0:(W)"]).status();
+            assert!(status.unwrap().success());
+        };
+        acl("/deny");
+        let writable = writable(&folder.0);
+        acl("/remove:d");
+        assert!(!writable);
+    }
 
     /// A real manifest, of mercurio's release: its artifacts are listed as rusticlone's are.
     #[test]

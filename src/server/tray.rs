@@ -121,9 +121,17 @@ enum Switch {
 }
 
 impl Switch {
-    /// Each switch with its state.
+    /// Each switch with its state. Auto-update is left out when the package manager updates rusticlone.
     fn states() -> Vec<(Self, Option<bool>)> {
-        Self::iter().map(|s| (s, s.state())).collect()
+        Self::iter().filter(|&s| s.shown()).map(|s| (s, s.state())).collect()
+    }
+
+    fn shown(self) -> bool {
+        match self {
+            Self::AtLogin => true,
+            #[cfg(feature = "self-update")]
+            Self::AutoUpdate => crate::install::update::replaceable(),
+        }
     }
 
     /// `None` when it cannot be switched: a server that is not installed does not start at login.
