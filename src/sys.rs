@@ -16,15 +16,18 @@ pub(crate) fn fnv1a(data: &[u8]) -> u64 {
 }
 
 /// The random bytes of a generated password, token or session id.
+#[cfg(feature = "server")]
 const RANDOM_BYTES: usize = 32;
 
 /// [`RANDOM_BYTES`] random bytes, hex-encoded.
+#[cfg(feature = "server")]
 pub(crate) fn random_hex() -> Result<String, getrandom::Error> {
     let mut bytes = [0u8; RANDOM_BYTES];
     getrandom::fill(&mut bytes)?;
     Ok(hex(&bytes))
 }
 
+#[cfg(any(feature = "server", feature = "self-update"))]
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -111,14 +114,27 @@ pub(crate) fn writable(dir: &std::path::Path) -> bool {
 
 /// Asks `question` in a terminal, and whether the answer is yes. False without a terminal to ask in.
 pub(crate) fn confirm(question: &str) -> std::io::Result<bool> {
+    ask(question, question)
+}
+
+/// [`confirm`], as `short` in the step of a command that runs.
+pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
     use std::io::IsTerminal;
     if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
         return Ok(false);
     }
-    eprint!("{question} [y/N] ");
-    let mut answer = String::new();
-    std::io::stdin().read_line(&mut answer)?;
-    Ok(answer.trim().eq_ignore_ascii_case("y"))
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    if let Some(answer) = crate::log::ask(short) {
+        return answer;
+    }
+    #[cfg(not(any(feature = "server", feature = "self-update")))]
+    let _ = short;
+    crate::log::hold(|| {
+        eprint!("{question} [y/N] ");
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        Ok(answer.trim().eq_ignore_ascii_case("y"))
+    })
 }
 
 /// Empty if the system cannot tell.

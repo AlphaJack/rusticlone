@@ -541,17 +541,6 @@ fn implicit<'a>(entries: impl IntoIterator<Item = (&'a str, Item)>) -> Item {
 }
 
 impl Setup {
-    /// What the CLI prints: a copy target on any S3-compatible service, with each field's example.
-    pub(crate) fn example() -> Self {
-        let target = Kind::S3;
-        let example = |f: &Field| if f.value.is_empty() { f.example } else { f.value };
-        let mut setup = Self { target, ..Self::default() };
-        setup
-            .values
-            .extend(target.fields().iter().map(|f| (Self::name(Role::Target, target, f), example(f).to_owned())));
-        setup
-    }
-
     /// The form's name for a field of `kind`.
     fn name(role: Role, kind: Kind, field: &Field) -> String {
         format!("{role}.{}.{}", kind.id(), field.key)

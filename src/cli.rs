@@ -1,6 +1,6 @@
 //! The command line.
 
-use std::{cell::RefCell, process::ExitCode, time::Duration};
+use std::{cell::RefCell, iter, process::ExitCode, time::Duration};
 
 use anyhow::Result;
 use jiff::SignedDuration;
@@ -14,7 +14,6 @@ use crate::{
     args::{self, Cli, Command, parse},
     clock,
     engine::{self, Asked, Batch, Collection, Engine},
-    first_run,
     i18n::t,
     log::{self, Level, Logged},
     notification, profile,
@@ -90,33 +89,59 @@ fn without_state(command: &Command) -> Result<Option<Level>> {
     if matches!(command, Command::Install { .. } | Command::Uninstall { .. }) {
         use crate::install::autostart;
         let install = matches!(command, Command::Install { .. });
-        // Here, in a terminal: the server started at login or with the computer has none. Asked, unless
-        // `--auto-update` agreed to downloads already.
-        #[cfg(feature = "self-update")]
-        if let Command::Install { auto_update } = command {
-            crate::install::rustic::download(!auto_update)?;
-        }
-        // A package manager's executable is updated by it instead.
-        #[cfg(feature = "self-update")]
-        if matches!(command, Command::Install { auto_update: true }) {
-            if crate::install::update::replaceable() {
-                let file = settings::write_env_file(&settings::AUTO_UPDATE, "true")?;
-                log::event(None, &autostart::Logged::AutoUpdate { file: file.display().to_string() });
-            } else {
-                log::event(None, &autostart::Logged::AutoUpdateManaged);
+        let label = if install { t!("cli-install") } else { t!("cli-uninstall") };
+        return board::command(&label, || {
+            // Here, in a terminal: the server started at login or with the computer has none. Asked, unless
+            // `--auto-update` agreed to downloads already.
+            #[cfg(feature = "self-update")]
+            if let Command::Install { auto_update } = command {
+                let download = || crate::install::rustic::download(!auto_update);
+                board::step(&t!("cli-step-check-rustic"), &t!("cli-step-checked-rustic"), download)?;
             }
-        }
-        let done = if install { autostart::install(listen) } else { autostart::uninstall() };
-        log::event(None, &done?);
-        // A first-time user creates the first collection in the web UI. Root's server has no desktop to open it in.
-        if install && !crate::sys::is_root() && profile::profile_files()?.is_empty() && autostart::answers_soon(listen)
-        {
-            open_running(listen)?;
-        }
-        if matches!(command, Command::Uninstall { delete: true }) {
-            autostart::delete()?.iter().for_each(|deleted| log::event(None, deleted));
-        }
-        return Ok(Some(Level::Success));
+            #[cfg(feature = "self-update")]
+            if matches!(command, Command::Install { auto_update: true }) {
+                board::step(&t!("cli-step-auto-update"), &t!("cli-step-auto-updated"), || {
+                    // A package manager's executable is updated by it instead.
+                    if crate::install::update::replaceable() {
+                        let file = settings::write_env_file(&settings::AUTO_UPDATE, "true")?;
+                        log::event(None, &autostart::Logged::AutoUpdate { file: file.display().to_string() });
+                    } else {
+                        log::event(None, &autostart::Logged::AutoUpdateManaged);
+                    }
+                    Ok(())
+                })?;
+            }
+            let service = if autostart::with_computer() { t!("cli-boot") } else { t!("cli-login") };
+            if install {
+                let exe = board::step(&t!("cli-step-place"), &t!("cli-step-placed"), autostart::place)?;
+                board::step(&t!("cli-step-install", service = service), "", || {
+                    log::event(None, &autostart::install(listen, &exe)?);
+                    Ok(())
+                })?;
+            } else {
+                board::step(&t!("cli-step-uninstall", service = service), "", || {
+                    log::event(None, &autostart::uninstall()?);
+                    Ok(())
+                })?;
+            }
+            // A first-time user creates the first collection in the web UI. Root's server has no desktop to open
+            // it in.
+            if install
+                && !crate::sys::is_root()
+                && profile::profile_files()?.is_empty()
+                && autostart::answers_soon(listen)
+            {
+                board::step(&t!("cli-step-open"), &t!("cli-step-opened"), || open_running(listen))?;
+            }
+            if matches!(command, Command::Uninstall { delete: true }) {
+                board::step(&t!("cli-step-delete"), &t!("cli-step-deleted"), || {
+                    autostart::delete()?.iter().for_each(|deleted| log::event(None, deleted));
+                    Ok(())
+                })?;
+            }
+            Ok(Level::Success)
+        })
+        .map(Some);
     }
     if let Command::Serve { open: true, .. } = command {
         #[cfg(all(any(target_os = "linux", target_vendor = "apple"), feature = "desktop"))]
@@ -130,6 +155,19 @@ fn without_state(command: &Command) -> Result<Option<Level>> {
     Ok(None)
 }
 
+/// Updates this executable, then rustic.
+#[cfg(feature = "self-update")]
+fn update(dry_run: bool) -> Result<Level> {
+    board::command(&t!("cli-update"), || {
+        let step = if dry_run { t!("cli-step-check-update") } else { t!("cli-step-update") };
+        if board::step(&step, "", || crate::install::update::update(dry_run))? {
+            let download = || crate::install::rustic::download(true);
+            board::step(&t!("cli-step-check-rustic"), &t!("cli-step-checked-rustic"), download)?;
+        }
+        Ok(Level::Success)
+    })
+}
+
 fn real_main(cli: Cli) -> Result<Level> {
     let Some(command) = cli.command else {
         args::command().print_help()?;
@@ -138,7 +176,7 @@ fn real_main(cli: Cli) -> Result<Level> {
     let dry_run = command.dry_run();
     #[cfg(feature = "self-update")]
     if matches!(command, Command::Update { .. }) {
-        return crate::install::update::update(dry_run).map(|()| Level::Success);
+        return update(dry_run);
     }
     #[cfg(feature = "server")]
     if let Some(level) = without_state(&command)? {
@@ -258,19 +296,41 @@ fn due(engine: &Engine) -> Level {
 
 /// Sends each named collection's status, and says what it sent.
 fn notify(engine: &Engine) -> Level {
-    let mut level = Level::Success;
-    for collection in engine.collections() {
-        let logged = match engine.notify_now(&collection) {
-            Ok(text) if engine.store.is_dry_run() => notification::Logged::WouldNotify { text },
-            Ok(text) => notification::Logged::Notified { text },
+    use notification::Logged as N;
+    let collections = engine.collections();
+    let Some(mut level) = found(engine, &collections) else { return Level::Warning };
+    let names: Vec<&str> = collections.iter().map(Collection::name).collect();
+    board::steps(&names, &t!("cli-notify"), &t!("cli-notify-step"), |i| {
+        let mut warnings = Vec::new();
+        let sent = match engine.notify_now(&collections[i], &mut |warning| warnings.push(warning)) {
+            Ok(text) if engine.store.is_dry_run() => N::WouldNotify { text },
+            Ok(text) => N::Notified { text },
             Err(e) => {
                 level = Level::Failure;
-                notification::Logged::Undelivered { error: e.to_string() }
+                N::Undelivered { error: e.to_string() }
             }
         };
-        log::event(Some(collection.title), &logged);
-    }
+        iter::once(sent).chain(warnings.into_iter().map(|warning| N::Warned { warning })).map(Sent).collect()
+    });
     level
+}
+
+/// A notification the command was asked to send. Failing to send it is the command's failure, where a
+/// status change that fails to notify is only a warning.
+#[derive(serde::Serialize)]
+#[serde(transparent)]
+struct Sent(notification::Logged);
+
+impl std::fmt::Display for Sent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl log::Message for Sent {
+    fn level(&self) -> Level {
+        if matches!(self.0, notification::Logged::Undelivered { .. }) { Level::Failure } else { self.0.level() }
+    }
 }
 
 /// Runs every run of `kind` that the command names, one collection after the other, until stopped.
@@ -339,17 +399,21 @@ fn stopped(engine: &Engine, asked: &Asked) {
     board::ended(asked.record());
 }
 
+/// Reports broken profiles, and returns their level. Without them or `collections`, says where profiles go instead.
+fn found(engine: &Engine, collections: &[Collection<'_>]) -> Option<Level> {
+    let level = engine.report_broken();
+    if collections.is_empty() && level == Level::Success {
+        log::event(None, &Logged::NoProfiles { dirs: profile::dirs_searched() });
+        return None;
+    }
+    Some(level)
+}
+
 /// Reports broken profiles and each collection, sends status changes, and returns the worst level. `heading`:
 /// what the command does, which results that no run showed follow.
 fn for_each_collection(engine: &Engine, heading: &str, f: impl Fn(&Collection<'_>) -> RunResults) -> Level {
     let collections = engine.collections();
-    let mut level = engine.report_broken();
-    if collections.is_empty() && level == Level::Success {
-        let examples =
-            first_run::Setup::example().profiles().iter().map(|(file, text)| format!("\n\n{file}\n{text}")).collect();
-        log::event(None, &Logged::NoProfiles { dirs: profile::dirs_display(), examples });
-        return Level::Warning;
-    }
+    let Some(mut level) = found(engine, &collections) else { return Level::Warning };
     for collection in collections.iter().take_while(|_| !clock::interrupted()) {
         let mut report = f(collection);
         board::leave_out(&mut report);

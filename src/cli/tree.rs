@@ -1,6 +1,7 @@
 //! Lines drawn as a tree, below a heading.
 
 /// A line, and the lines below it.
+#[derive(Clone)]
 pub(super) struct Tree {
     pub(super) line: String,
     pub(super) below: Vec<Tree>,

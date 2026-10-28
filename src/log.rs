@@ -9,7 +9,7 @@ use std::{
     io::{IsTerminal, Write, stderr, stdout},
     sync::{
         OnceLock,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 
@@ -188,11 +188,40 @@ struct Block {
 
 static BLOCK: Mutex<Block> = Mutex::new(Block { runs: Vec::new(), status: None, drawn: 0 });
 
+/// While set, the runs are not drawn: a question waits for its answer below the printed lines.
+static HELD: AtomicBool = AtomicBool::new(false);
+
+/// What a command draws in a terminal instead of lines above the runs.
+#[cfg(any(feature = "server", feature = "self-update"))]
+#[derive(Clone, Copy)]
+pub(crate) struct Hooks {
+    /// Takes what this process logs.
+    pub logged: fn(Level, &str),
+    /// Takes what the step that runs shows.
+    pub shown: fn(Shown<'_>),
+    /// Asks a question, in the step that runs.
+    pub ask: fn(&str) -> std::io::Result<bool>,
+}
+
+/// What a command's step that runs shows as its line.
+#[cfg(any(feature = "server", feature = "self-update"))]
+#[derive(Clone, Copy)]
+pub(crate) enum Shown<'a> {
+    /// What it does now.
+    Now(&'a str),
+    /// What it did, once it ends.
+    Did(&'a str),
+}
+
+#[cfg(any(feature = "server", feature = "self-update"))]
+static HOOKS: Mutex<Option<Hooks>> = Mutex::new(None);
+
 impl Block {
     /// Erases it, prints `lines` above it, and draws it again.
     fn redraw(&mut self, lines: &[String]) {
         let mut out = stdout().lock();
-        let rows: Vec<&String> = self.runs.iter().chain(&self.status).collect();
+        let held = HELD.load(Ordering::Relaxed);
+        let rows: Vec<&String> = self.runs.iter().chain(&self.status).filter(|_| !held).collect();
         // Up to its first row, erasing to the end of the screen. Unwrapped, each line takes one row. A terminal
         // that synchronizes output shows the frame once drawn, never erased and half redrawn.
         let erase = if self.drawn > 0 { format!("\x1b[{}A\x1b[J", self.drawn) } else { String::new() };
@@ -216,6 +245,64 @@ pub(crate) fn runs(runs: Vec<String>, ended: &[String]) {
     }
 }
 
+/// Runs `f` with the runs erased and not redrawn, as while a question waits for its answer.
+pub(crate) fn hold<T>(f: impl FnOnce() -> T) -> T {
+    HELD.store(true, Ordering::Relaxed);
+    BLOCK.lock().redraw(&[]);
+    let out = f();
+    HELD.store(false, Ordering::Relaxed);
+    BLOCK.lock().redraw(&[]);
+    out
+}
+
+/// Draws what this process logs in a terminal with `hooks`, as a command does in its tree, or, without, above the
+/// runs again.
+#[cfg(any(feature = "server", feature = "self-update"))]
+pub(crate) fn capture(hooks: Option<Hooks>) {
+    *HOOKS.lock() = hooks;
+}
+
+/// What the step of a command that runs does now. Nothing outside one.
+#[cfg(any(feature = "server", feature = "self-update"))]
+pub(crate) fn now(text: &str) {
+    let hooks = *HOOKS.lock();
+    if let Some(hooks) = hooks {
+        (hooks.shown)(Shown::Now(text));
+    }
+}
+
+/// What the step of a command that runs did, its line once it ends. Nothing outside one.
+#[cfg(any(feature = "server", feature = "self-update"))]
+pub(crate) fn did(text: &str) {
+    let hooks = *HOOKS.lock();
+    if let Some(hooks) = hooks {
+        (hooks.shown)(Shown::Did(text));
+    }
+}
+
+/// Asks `question` in the step of a command that runs, if one does.
+#[cfg(any(feature = "server", feature = "self-update"))]
+pub(crate) fn ask(question: &str) -> Option<std::io::Result<bool>> {
+    let hooks = *HOOKS.lock();
+    hooks.map(|hooks| (hooks.ask)(question))
+}
+
+/// Shows `rows` as the runs, the last one open for the answer, and reads it. Nothing is redrawn meanwhile.
+#[cfg(any(feature = "server", feature = "self-update"))]
+pub(crate) fn prompt(rows: Vec<String>) -> std::io::Result<String> {
+    let mut block = BLOCK.lock();
+    let erase = if block.drawn > 0 { format!("\x1b[{}A\x1b[J", block.drawn) } else { String::new() };
+    let mut out = stdout().lock();
+    out.write_all(format!("{erase}{} ", rows.join("\n")).as_bytes())?;
+    out.flush()?;
+    let mut answer = String::new();
+    std::io::stdin().read_line(&mut answer)?;
+    // The answer ended the last row.
+    block.drawn = rows.len();
+    block.runs = rows;
+    Ok(answer)
+}
+
 /// Erases the status line, so that what is printed next follows the printed lines.
 pub(crate) fn clear() {
     let mut block = BLOCK.lock();
@@ -232,6 +319,9 @@ pub(crate) fn init(json: bool, verbose: bool) {
 
 /// `text` in the color of `level`, where colors are shown.
 pub(crate) fn paint(level: Level, text: &str) -> String {
+    if level == Level::Success {
+        return text.to_owned();
+    }
     style(Tone::from(level).code(), text)
 }
 
@@ -263,6 +353,13 @@ fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: V
     // Progress is a live line in a terminal, and JSON elsewhere: as text lines, it would flood logs.
     if (target == "rustic" && mode.quiet) || (target == "progress" && !mode.json && !mode.live) {
         return;
+    }
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    if mode.live
+        && target == crate::NAME
+        && let Some(hooks) = *HOOKS.lock()
+    {
+        return (hooks.logged)(level, message);
     }
     let line = if mode.json {
         // The level names log processors expect.
@@ -363,7 +460,6 @@ pub(crate) enum Logged {
     },
     NoProfiles {
         dirs: String,
-        examples: String,
     },
     NotCopied {
         error: String,

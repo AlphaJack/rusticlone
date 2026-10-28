@@ -134,21 +134,22 @@ fn system(target: &str) -> impl Iterator<Item = &str> {
     target.split('-').take(PARTS)
 }
 
-/// Updates this executable, then rustic if it was downloaded: the new executable does, since it knows
-/// the rustic it is tested with. A dry run only says whether there is a newer release.
-pub(crate) fn update(dry_run: bool) -> Result<()> {
+/// Updates this executable. Then the new executable updates rustic, since it knows the rustic it is tested
+/// with. Returns whether rustic is left to update here: this executable is the newest. A dry run only says
+/// whether there is a newer release.
+pub(crate) fn update(dry_run: bool) -> Result<bool> {
     // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
     let exe = std::env::current_exe()?;
     let logged = replace(dry_run)?;
     crate::log::event(None, &logged);
     match logged {
         Logged::Updated { .. } => {
-            std::process::Command::new(exe).arg("update").status()?;
+            crate::log::hold(|| std::process::Command::new(exe).arg("update").status())?;
+            Ok(false)
         }
-        Logged::Current { .. } if !dry_run => super::rustic::download(true)?,
-        Logged::Current { .. } | Logged::Available { .. } | Logged::Packaged { .. } | Logged::NotUpdated { .. } => {}
+        Logged::Current { .. } => Ok(!dry_run),
+        Logged::Available { .. } | Logged::Packaged { .. } | Logged::NotUpdated { .. } => Ok(false),
     }
-    Ok(())
 }
 
 /// For `serve --auto-update`: updates this executable without asking, else the rustic it is tested with.

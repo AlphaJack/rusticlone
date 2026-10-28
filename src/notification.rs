@@ -96,8 +96,8 @@ impl Engine {
         });
         let notified = match update {
             Ok(Some(attempt)) if attempt.level != level => {
-                let sent =
-                    deliver(Mercurio::new(), Some(title), &urls, level, &self.message(collection, &status, &attempt));
+                let text = self.message(collection, &status, &attempt);
+                let sent = deliver(Mercurio::new(), &mut logged(Some(title)), &urls, level, &text);
                 self.record_sent(key, title, level, &sent).unwrap_or(attempt)
             }
             Ok(_) => self.store.notified(key),
@@ -110,8 +110,12 @@ impl Engine {
     }
 
     /// Sends the collection's status now, whatever was notified before, and returns its text. A dry run
-    /// sends nothing.
-    pub(crate) fn notify_now(&self, collection: &Collection<'_>) -> Result<String, Error> {
+    /// sends nothing. `warned`: with each warning of a delivery that went on.
+    pub(crate) fn notify_now(
+        &self,
+        collection: &Collection<'_>,
+        warned: &mut dyn FnMut(String),
+    ) -> Result<String, Error> {
         let status = self.status_of(collection);
         let urls = settings::NOTIFY.get(&[collection.primary]).ok_or(Error::NoUrls)?;
         let before = self.store.notified(collection.name());
@@ -119,7 +123,7 @@ impl Engine {
         if self.store.is_dry_run() {
             return Ok(text);
         }
-        let sent = deliver(Mercurio::new(), Some(collection.title), &urls, status.level, &text);
+        let sent = deliver(Mercurio::new(), warned, &urls, status.level, &text);
         if sent.is_ok() {
             self.record_sent(collection.name(), collection.title, status.level, &sent);
         }
@@ -193,7 +197,7 @@ pub(crate) fn test(urls: &str) -> Result<(), Error> {
     check(urls)?;
     deliver(
         Mercurio::new(),
-        None,
+        &mut logged(None),
         urls,
         Level::Success,
         &Line::Test { name: crate::APP_NAME, emoji: Level::Success.emoji() }.to_string(),
@@ -201,7 +205,7 @@ pub(crate) fn test(urls: &str) -> Result<(), Error> {
 }
 
 /// Refuses `urls` if mercurio does not read one of them.
-#[cfg(any(feature = "server", test))]
+#[cfg(feature = "server")]
 pub(crate) fn check(urls: &str) -> Result<(), Error> {
     add(&mut Mercurio::new(), urls)
 }
@@ -221,7 +225,19 @@ const ICON: &[u8] = include_bytes!("../assets/images/logo.png");
 const ICON_URL: &str = env!("LOGO_URL");
 
 /// Sends `text` at `urls`; warnings are logged under `collection`.
-fn deliver(client: Mercurio, collection: Option<&str>, urls: &str, level: Level, text: &str) -> Result<(), Error> {
+/// Logs each warning as the collection's.
+pub(crate) fn logged(collection: Option<&str>) -> impl FnMut(String) + '_ {
+    move |warning| log::event(collection, &Logged::Warned { warning })
+}
+
+/// `warned`: with each warning of a delivery that went on.
+fn deliver(
+    client: Mercurio,
+    warned: &mut dyn FnMut(String),
+    urls: &str,
+    level: Level,
+    text: &str,
+) -> Result<(), Error> {
     let client = client.asset(mercurio::Asset {
         image_bytes: Some(ICON),
         image_url_mask: Some(ICON_URL.into()),
@@ -241,10 +257,11 @@ fn deliver(client: Mercurio, collection: Option<&str>, urls: &str, level: Level,
     let (title, body) = text.split_once('\n').unwrap_or((text, ""));
     let body = if body.trim().is_empty() { title } else { body };
     let report = client.notify(&Message::new(body).title(title).kind(kind));
-    for warning in report.entries.iter().flat_map(|e| &e.warnings) {
-        log::event(collection, &Logged::Warned { warning: warning.clone() });
-    }
-    report.error_summary().map_or(Ok(()), |e| Err(Error::Failed(e)))
+    let error = report.error_summary();
+    // A failed delivery's error is among its warnings too: it is reported once, as the error.
+    let new = |w: &&String| !error.as_deref().is_some_and(|e| e.contains(w.as_str()));
+    report.entries.iter().flat_map(|e| &e.warnings).filter(new).for_each(|w| warned(w.clone()));
+    error.map_or(Ok(()), |e| Err(Error::Failed(e)))
 }
 
 #[cfg(test)]
@@ -264,7 +281,7 @@ mod tests {
         assert!(
             deliver(
                 client,
-                None,
+                &mut |_| {},
                 "json://localhost/one json://localhost/two",
                 Level::Failure,
                 "Docs failing\nmissing source"
@@ -284,7 +301,9 @@ mod tests {
         {
             let fake = Arc::new(FakeTransport::new());
             let client = Mercurio::with_transport(fake.clone());
-            assert!(deliver(client, None, "json://localhost/hook", level, &format!("Docs status\n{detail}")).is_ok());
+            assert!(
+                deliver(client, &mut |_| {}, "json://localhost/hook", level, &format!("Docs status\n{detail}")).is_ok()
+            );
             let request = fake.last_request().unwrap();
             let body: serde_json::Value = serde_json::from_slice(&request.body).unwrap();
             assert_eq!(body["type"], expected);
@@ -297,7 +316,9 @@ mod tests {
     fn invalid_configuration_sends_nothing() {
         let fake = Arc::new(FakeTransport::new());
         let client = Mercurio::with_transport(fake.clone());
-        assert!(deliver(client, None, "json://localhost/one invalid://target", Level::Warning, "warning").is_err());
+        assert!(
+            deliver(client, &mut |_| {}, "json://localhost/one invalid://target", Level::Warning, "warning").is_err()
+        );
         assert!(fake.requests().is_empty());
     }
 }
