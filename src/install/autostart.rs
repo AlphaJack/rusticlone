@@ -456,10 +456,12 @@ mod imp {
             std::fs::copy(exe, &partial)?;
             _ = std::fs::remove_file(&bundled);
             std::fs::rename(&partial, &bundled)?;
-            // A package manager's executable, which it updates, is copied again at start: see `refresh_app`.
+            // A package manager's executable, which it updates, is copied again at start when it no longer is
+            // the one copied: see `refresh_app`. Named with its SHA-256, as signing the app changes the copy.
             let source = source_file(&contents);
             if crate::install::managed(exe) {
-                std::fs::write(&source, exe.as_os_str().as_encoded_bytes())?;
+                let copied = sys::sha256(std::fs::read(exe)?);
+                std::fs::write(&source, format!("{}\n{copied}\n", exe.display()))?;
             } else {
                 _ = std::fs::remove_file(&source);
             }
@@ -488,30 +490,41 @@ mod imp {
         Ok(bundled)
     }
 
-    /// Where the app names the package manager's executable that it is a copy of.
+    /// Where the app names the package manager's executable that it is a copy of, and that one's SHA-256.
     fn source_file(contents: &Path) -> PathBuf {
         contents.join("Resources").join("source")
     }
 
-    pub(super) fn app_source(exe: &Path) -> Option<PathBuf> {
+    /// The package manager's executable that the app holding `exe` copied, and the SHA-256 it had then.
+    fn source(exe: &Path) -> Option<(PathBuf, String)> {
         if !exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) {
             return None;
         }
         let text = std::fs::read_to_string(source_file(exe.parent()?.parent()?)).ok()?;
-        Some(PathBuf::from(text.trim_end()))
+        let mut lines = text.lines();
+        Some((PathBuf::from(lines.next()?), lines.next().unwrap_or_default().to_owned()))
     }
 
-    /// The package manager's executable, copied into the app that holds this one when it differs: its
-    /// version, or `None` when it is the same, or gone.
+    pub(super) fn app_source(exe: &Path) -> Option<PathBuf> {
+        source(exe).map(|(path, _)| path)
+    }
+
+    /// The package manager's executable when it changed since the app that holds `exe` copied it: not when the
+    /// app's signature changed the copy, else each start would copy it again.
+    #[cfg(any(feature = "self-update", test))]
+    pub(super) fn stale(exe: &Path) -> Option<PathBuf> {
+        let (source, copied) = source(exe)?;
+        let new = std::fs::read(&source).ok()?;
+        (sys::sha256(new) != copied).then_some(source)
+    }
+
+    /// The package manager's executable, copied into the app that holds this one when it changed since the
+    /// last copy: its version, or `None` when it is the same, or gone.
     #[cfg(feature = "self-update")]
     #[expect(clippy::disallowed_methods, reason = "asks the package manager's rusticlone its version")]
     pub(super) fn refresh_app() -> Result<Option<String>> {
         let exe = std::env::current_exe()?;
-        let Some(source) = app_source(&exe) else { return Ok(None) };
-        let Ok(new) = std::fs::read(&source) else { return Ok(None) };
-        if new == std::fs::read(&exe)? {
-            return Ok(None);
-        }
+        let Some(source) = stale(&exe) else { return Ok(None) };
         let out = std::process::Command::new(&source).arg("--version").output()?;
         let version = String::from_utf8_lossy(&out.stdout).split_whitespace().last().unwrap_or_default().to_owned();
         let app = exe.parent().and_then(Path::parent).and_then(Path::parent).unwrap_or(&exe);
@@ -1271,6 +1284,26 @@ mod apple_tests {
             plist.starts_with(b"bplist00")
                 && keywords.iter().all(|k| plist.windows(k.len()).any(|w| w == k.as_bytes()))
         );
+    }
+
+    /// The app copies Homebrew's executable and signs the copy, which changes it: the app is not stale then, else
+    /// each start would copy it again and restart. It is once Homebrew upgrades its executable.
+    #[test]
+    fn the_app_copies_homebrews_executable_again_only_once_it_changed() {
+        let dir = std::env::temp_dir().join(format!("{}-brew-app-{}", crate::NAME, std::process::id()));
+        let (app, cellar) = (dir.join(format!("{}.app", crate::APP_NAME)), dir.join("Cellar/rusticlone/2.0.1/bin"));
+        std::fs::create_dir_all(&cellar).unwrap();
+        let source = cellar.join(crate::NAME);
+        std::fs::copy("/usr/bin/true", &source).unwrap();
+        let exe = super::imp::bundle(&app, &source, "2.0.1").unwrap();
+        let signed_copy_differs = std::fs::read(&exe).unwrap() != std::fs::read(&source).unwrap();
+        let after_install = super::imp::stale(&exe);
+        std::fs::copy("/usr/bin/false", &source).unwrap();
+        let after_upgrade = super::imp::stale(&exe);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert!(signed_copy_differs, "codesign no longer changes the copy: the test proves less");
+        assert_eq!(after_install, None);
+        assert_eq!(after_upgrade, Some(source));
     }
 
     /// An update replaces the executable inside the app, which breaks its signature: written again, the app

@@ -99,7 +99,7 @@ mod tests {
         std::fs::create_dir_all(app.join("Contents/Resources")).unwrap();
         std::fs::write(&exe, b"").unwrap();
         let mine = managed(&exe);
-        std::fs::write(app.join("Contents/Resources/source"), "/opt/homebrew/bin/rusticlone\n").unwrap();
+        std::fs::write(app.join("Contents/Resources/source"), "/opt/homebrew/bin/rusticlone\nabc123\n").unwrap();
         let source = super::autostart::app_source(&exe);
         let found = managed(&exe);
         std::fs::remove_dir_all(&app).unwrap();
