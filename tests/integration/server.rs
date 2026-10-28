@@ -341,16 +341,38 @@ fn server_shows_a_running_backup_with_progress() {
     });
 }
 
+/// A folder on another disk than `here`, if there is one: `/tmp` or `/var/tmp`, or the root of another fixed
+/// drive on Windows.
+fn other_disk(here: &std::path::Path) -> Option<std::path::PathBuf> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let device = |p: &std::path::Path| fs::metadata(p).unwrap().dev();
+        ["/tmp", "/var/tmp"].map(std::path::PathBuf::from).into_iter().find(|d| device(d) != device(here))
+    }
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+        // `GetDriveTypeW`'s answer for a hard disk or a solid-state drive.
+        const DRIVE_FIXED: u32 = 3;
+        let fixed = |root: &str| {
+            let wide: Vec<u16> = root.encode_utf16().chain([0]).collect();
+            // SAFETY: a NUL-terminated string.
+            #[expect(unsafe_code, reason = "asks a drive's type")]
+            let kind = unsafe { GetDriveTypeW(wide.as_ptr()) };
+            kind == DRIVE_FIXED
+        };
+        let here = here.components().next();
+        let roots = (b'C'..=b'Z').map(|letter| format!("{}:\\", char::from(letter)));
+        roots.filter(|root| fixed(root)).map(std::path::PathBuf::from).find(|root| root.components().next() != here)
+    }
+}
+
 /// On another disk, a check does not wait for a backup.
 #[test]
-#[cfg(unix)]
 fn server_runs_jobs_independently() {
-    use std::os::unix::fs::MetadataExt;
     let sb = Sandbox::new();
-    let device = |p: &std::path::Path| fs::metadata(p).unwrap().dev();
-    let Some(elsewhere) =
-        ["/tmp", "/var/tmp"].map(std::path::PathBuf::from).into_iter().find(|d| device(d) != device(&sb.path("")))
-    else {
+    let Some(elsewhere) = other_disk(&sb.path("")) else {
         eprintln!("skipped: no other disk to put a repository on");
         return;
     };
@@ -366,7 +388,8 @@ fn server_runs_jobs_independently() {
     wait_for(30, "Fast's check", || server.collection("Fast")["primary"]["check"]["last_ok"].is_string());
     assert!(server.collection("Slow")["running"][0]["activities"][0].is_object(), "Slow should still be running");
     wait_for(60, "Slow's backup", || server.collection("Slow")["snapshot"]["last_ok"].is_string());
-    fs::remove_dir_all(repo).unwrap();
+    fs::remove_dir_all(&repo).unwrap();
+    _ = fs::remove_dir(repo.parent().unwrap());
 }
 
 /// With nothing due, the server is idle: reacting to state changes does not change the state.
@@ -620,6 +643,7 @@ fn install_turns_auto_update_on_in_the_env_file() {
 }
 
 /// What `install` left in `dir`: files named after rusticlone.
+#[cfg(any(target_os = "linux", target_vendor = "apple"))]
 fn leftovers(dir: &std::path::Path) -> Vec<String> {
     let entries = fs::read_dir(dir).into_iter().flatten().flatten();
     entries.map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.contains(NAME)).collect()

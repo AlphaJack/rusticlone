@@ -132,25 +132,41 @@ fn snapshots_can_be_browsed_and_downloaded() {
 /// Listing a remote snapshot can take seconds. The rest of the UI does not wait for it, and its other
 /// directories are served from the cache.
 #[test]
-#[cfg(unix)]
 #[expect(clippy::disallowed_methods, reason = "observe external processes over a bounded interval")]
 fn a_slow_listing_holds_up_nothing_else() {
     let sb = docs_with_remote("");
     sb.run(&["backup", "--all"]).assert_exit(0);
     let id = sb.snapshot_ids("Docs")[0].clone();
-    // A rustic that reads snapshots slowly, like a slow remote, first in PATH.
+    // A rustic that reads snapshots slowly, like a slow remote: first in PATH, or on Windows a batch file that
+    // rusticlone is told to run.
     let path = std::env::var_os("PATH").unwrap();
-    let rustic = std::env::split_paths(&path).map(|d| d.join("rustic")).find(|p| p.is_file()).unwrap();
+    let name = if cfg!(windows) { "rustic.exe" } else { "rustic" };
+    let rustic = std::env::split_paths(&path).map(|d| d.join(name)).find(|p| p.is_file()).unwrap();
     let dir = sb.path("slow");
     std::fs::create_dir_all(&dir).unwrap();
-    let slow = dir.join("rustic");
-    // Quoted, so that a path with spaces, as macOS's Application Support, stays one word.
-    let quoted = rustic.display().to_string().replace('\'', r"'\''");
-    let script = format!("#!/bin/sh\ncase \" $* \" in *\" ls \"*) sleep 2;; esac\nexec '{quoted}' \"$@\"\n");
-    std::fs::write(&slow, script).unwrap();
-    std::fs::set_permissions(&slow, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
-    let path = std::env::join_paths(std::iter::once(dir).chain(std::env::split_paths(&path))).unwrap();
-    let server = sb.server(&[("PATH", path.to_str().unwrap())]);
+    #[cfg(unix)]
+    let env = {
+        let slow = dir.join("rustic");
+        // Quoted, so that a path with spaces, as macOS's Application Support, stays one word.
+        let quoted = rustic.display().to_string().replace('\'', r"'\''");
+        let script = format!("#!/bin/sh\ncase \" $* \" in *\" ls \"*) sleep 2;; esac\nexec '{quoted}' \"$@\"\n");
+        std::fs::write(&slow, script).unwrap();
+        std::fs::set_permissions(&slow, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+        let path = std::env::join_paths(std::iter::once(dir).chain(std::env::split_paths(&path))).unwrap();
+        ("PATH".to_owned(), path.into_string().unwrap())
+    };
+    #[cfg(windows)]
+    let env = {
+        let slow = dir.join("rustic.cmd");
+        let script = format!(
+            "@echo off\r\necho  %* | findstr /c:\" ls \" >nul && ping -n 3 127.0.0.1 >nul\r\n\
+             \"{}\" %*\r\nexit /b %errorlevel%\r\n",
+            rustic.display()
+        );
+        std::fs::write(&slow, script).unwrap();
+        (crate::common::var("RUSTIC"), slow.display().to_string())
+    };
+    let server = sb.server(&[(env.0.as_str(), env.1.as_str())]);
     let browsing = thread::spawn({
         let (addr, token, id) = (server.addr.clone(), server.token.clone(), id.clone());
         move || {
@@ -171,7 +187,7 @@ fn a_slow_listing_holds_up_nothing_else() {
     // The whole snapshot is listed on the first request.
     let started = Instant::now();
     let root = server.get(&format!("/collections/Docs/repos/Docs/snapshots/{id}?path=/")).body;
-    let top = sb.path("").components().nth(1).unwrap().as_os_str().to_string_lossy().into_owned();
+    let top = crate::common::in_tree(&sb.path("")).split('/').nth(1).unwrap().to_owned();
     assert!(root.contains(&format!(">{top}<")), "{root}");
     assert!(started.elapsed() < Duration::from_millis(500), "{:?}", started.elapsed());
 }

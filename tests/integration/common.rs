@@ -492,6 +492,22 @@ pub(crate) fn docs_with_remote(extra: &str) -> Sandbox {
     sb
 }
 
+/// Makes `file` unreadable to everyone, or readable again: by its mode on Unix, and on Windows by an ACL that
+/// denies Everyone reading it.
+pub(crate) fn set_readable(file: &Path, readable: bool) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(file, fs::Permissions::from_mode(if readable { 0o644 } else { 0o000 })).unwrap();
+    }
+    #[cfg(windows)]
+    {
+        let everyone = "*S-1-1-0";
+        let args = if readable { ["/remove:d", everyone] } else { ["/deny", &format!("{everyone}:(R)")] };
+        assert!(Command::new("icacls").arg(file).args(args).output().unwrap().status.success());
+    }
+}
+
 /// Where `restore --to` puts `path`: `/home/me` under `home/me`, `C:\Users\me` under `C/Users/me`.
 pub(crate) fn below_root(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
@@ -533,9 +549,10 @@ pub(crate) mod cmd {
         format!("'{}'", path.display())
     }
 
+    /// On Windows, `ping`, which waits a second between its pings and starts at once, unlike PowerShell.
     pub(crate) fn sleep(seconds: u32) -> String {
         if cfg!(windows) {
-            format!("powershell -NoProfile -Command Start-Sleep -Seconds {seconds}")
+            format!("cmd /c ping -n {} 127.0.0.1 >nul", seconds + 1)
         } else {
             format!("sleep {seconds}")
         }
