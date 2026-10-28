@@ -8,8 +8,10 @@ use crate::{log, settings::Ignored};
 #[derive(Clone, Copy, crate::i18n::Fluent)]
 #[fluent(prefix = "collections")]
 pub(super) enum Text<'a> {
-    Directories {
-        dirs: &'a str,
+    Directories,
+    /// The current folder, among the profile folders.
+    Here {
+        dir: &'a str,
     },
     Sources,
     Repositories,

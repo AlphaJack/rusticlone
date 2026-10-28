@@ -290,15 +290,20 @@ fn a_failing_target_is_shown_with_its_issues() {
     insta::assert_snapshot!(readable(&sb, &run.stdout));
 }
 
-/// `collections`' text, the same on every system: the folders rustic searches differ, and so do sizes.
+/// `collections`' text, the same on every system: the folders rustic searches differ, and so do sizes. The
+/// current folder is checked to be named, last.
 fn readable(sb: &Sandbox, text: &str) -> String {
     let text = (text.replace(&sb.profile_dir().display().to_string(), "[profiles]"))
         .replace(&sb.path("").display().to_string(), "[sandbox]/")
         .replace('\\', "/");
-    let lines = text.lines().map(|l| match l.split_once("profile folders: ").or_else(|| l.split_once("size: ")) {
-        Some((before, _)) if l.contains("profile folders: ") => format!("{before}profile folders: [folders]"),
-        Some((before, _)) => format!("{before}size: [size]"),
+    let (folders, rest) = text.split_once("\n\n").unwrap_or_default();
+    assert!(
+        folders.starts_with("Profile folders\n") && folders.ends_with("└── [sandbox]/cwd (current folder)"),
+        "{text}"
+    );
+    let lines = rest.lines().map(|l| match l.split_once("Size: ") {
+        Some((before, _)) => format!("{before}Size: [size]"),
         None => l.to_owned(),
     });
-    lines.map(|l| l + "\n").collect()
+    std::iter::once("Profile folders\n[folders]\n\n".to_owned()).chain(lines.map(|l| l + "\n")).collect()
 }

@@ -2,43 +2,44 @@
 source: tests/integration/status.rs
 expression: "readable(&sb, &run.stdout)"
 ---
-profile folders: [folders]
+Profile folders
+[folders]
 
 Docs  ● degraded
-├──┐issues
+├──┐Issues
 │  └── ● copy to Docs-usb: cannot be reached: rustic snapshots failed (exit 1): No repository config file found for `local:[sandbox]/remote/unplugged/Docs`. Please check the repository.
-├──┐sources
+├──┐Sources
 │  └──┐[sandbox]/source/docs
-│     ├── files: 1
-│     └── size: [size]
-└──┐repositories
+│     ├── Files: 1
+│     └── Size: [size]
+└──┐Repositories
    ├──┐Docs
-   │  ├── profile: [profiles]/Docs.toml
-   │  ├── location: [sandbox]/local/Docs
-   │  ├── snapshots: 1
-   │  ├── size: [size]
-   │  ├── status: up to date, newest snapshot less than a minute ago
-   │  ├── backup: manual, last less than a minute ago
-   │  ├── check: manual, no check yet
-   │  └── prune: manual, no prune yet
+   │  ├── Profile: [profiles]/Docs.toml
+   │  ├── Location: [sandbox]/local/Docs
+   │  ├── Snapshots: 1
+   │  ├── Size: [size]
+   │  ├── Status: up to date, newest snapshot less than a minute ago
+   │  ├── Backup: manual, last less than a minute ago
+   │  ├── Check: manual, no check yet
+   │  └── Prune: manual, no prune yet
    ├──┐Docs-usb
-   │  ├── profile: [profiles]/Docs-usb.toml
-   │  ├── location: [sandbox]/remote/unplugged/Docs
-   │  ├── snapshots: unknown
-   │  ├── size: [size]
-   │  ├── status: COPY FAILING
-   │  ├── backup: manual, last FAILING 1
-   │  ├── check: manual, no check yet
-   │  └── prune: manual, no prune yet
+   │  ├── Profile: [profiles]/Docs-usb.toml
+   │  ├── Location: [sandbox]/remote/unplugged/Docs
+   │  ├── Snapshots: unknown
+   │  ├── Size: [size]
+   │  ├── Status: COPY FAILING
+   │  ├── Backup: manual, last FAILING 1
+   │  ├── Check: manual, no check yet
+   │  └── Prune: manual, no prune yet
    └──┐Docs-remote
-      ├── profile: [profiles]/Docs-remote.toml
-      ├── location: [sandbox]/remote/Docs
-      ├── snapshots: 1
-      ├── size: [size]
-      ├── status: up to date (listed less than a minute ago)
-      ├── backup: manual, last less than a minute ago
-      ├── check: manual, no check yet
-      └── prune: manual, no prune yet
+      ├── Profile: [profiles]/Docs-remote.toml
+      ├── Location: [sandbox]/remote/Docs
+      ├── Snapshots: 1
+      ├── Size: [size]
+      ├── Status: up to date (listed less than a minute ago)
+      ├── Backup: manual, last less than a minute ago
+      ├── Check: manual, no check yet
+      └── Prune: manual, no prune yet
 
-fragment profiles
+Fragment profiles
 └── common
