@@ -17,8 +17,8 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: sccache
+  SCCACHE_GHA_ENABLED: ${{ vars.CI_USE_SCCACHE == 'true' }}
+  RUSTC_WRAPPER: ${{ vars.CI_USE_SCCACHE == 'true' && 'sccache' || '' }}
 
 jobs:
   fmt:
@@ -51,11 +51,12 @@ jobs:
           toolchain: "stable"
           components: clippy, rust-analyzer
       - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-      - name: Cache cargo registry
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          cache-targets: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -78,9 +79,6 @@ jobs:
           - os: macos-14
             target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
-    env:
-      RUSTC_WRAPPER: ""
-      SCCACHE_GHA_ENABLED: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,7 +88,11 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "stable"
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -141,11 +143,13 @@ jobs:
         with:
           toolchain: "stable"
       - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-      - name: Cache cargo registry
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          cache-targets: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Turn off Defender's real-time scanning
