@@ -339,7 +339,7 @@ impl Rustic {
     #[cfg(feature = "server")]
     pub(crate) fn ls(&self, p: &RusticProfile, id: &SnapshotId) -> Result<super::Dirs> {
         let out = self.run(&Ctx::default(), p, &["ls", "--long", "--recursive", id.as_str()], None)?;
-        Ok(super::dirs(&out.stdout))
+        Ok(super::dirs(&with_slashes(&out.stdout)))
     }
 
     /// Snapshots of these groups with a path that contains `name`, ignoring case.
@@ -353,13 +353,13 @@ impl Rustic {
         let (glob, filters) = (format!("--iglob=*{name}*"), path_filters(groups));
         let mut args = vec!["find", glob.as_str()];
         args.extend(filters.iter().map(String::as_str));
-        Ok(super::found(&self.run(&Ctx::default(), p, &args, None)?.stdout))
+        Ok(super::found(&with_slashes(&self.run(&Ctx::default(), p, &args, None)?.stdout)))
     }
 
     #[cfg(feature = "server")]
     pub(crate) fn diff(&self, p: &RusticProfile, from: &SnapshotId, to: &SnapshotId) -> Result<super::Diff> {
         let args = ["diff", from.as_str(), to.as_str()];
-        Ok(super::diff(&self.run(&Ctx::default(), p, &args, None)?.stdout))
+        Ok(super::diff(&with_slashes(&self.run(&Ctx::default(), p, &args, None)?.stdout)))
     }
 
     /// A command that streams `path` of snapshot `id`: a file as it is, or a zip archive. An empty
@@ -372,6 +372,13 @@ impl Rustic {
         command.args(["dump", "--archive", archive, &spec]);
         command
     }
+}
+
+/// Rustic's paths in a snapshot's tree, which it prints in `{:?}` form, with `/` between their parts: on Windows,
+/// it prints `\\`, escaped, which is in no file name there.
+#[cfg(feature = "server")]
+fn with_slashes(stdout: &str) -> std::borrow::Cow<'_, str> {
+    if cfg!(windows) { stdout.replace(r"\\", "/").into() } else { stdout.into() }
 }
 
 /// Rustic's counts of files that a restore writes.
