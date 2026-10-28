@@ -22,7 +22,7 @@ jobs:
 
   chocolatey:
     name: Push to Chocolatey
-    runs-on: windows-2025
+    runs-on: windows-latest
     permissions:
       contents: read
     env:
