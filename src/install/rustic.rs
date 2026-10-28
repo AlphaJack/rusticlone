@@ -77,7 +77,7 @@ pub(crate) fn download(ask: bool) -> Result<()> {
         Ask::Download { .. } => t!("release-short-download", version = version.to_string()),
         Ask::Replace { found, .. } => t!("release-short-replace", found = found.clone(), version = version.to_string()),
     };
-    if ask && !crate::sys::ask(&question.to_string(), &short)? {
+    if ask && !crate::log::ask(&question.to_string(), &short)? {
         crate::log::did(&t!("release-declined"));
         return Ok(());
     }

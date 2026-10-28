@@ -116,31 +116,6 @@ pub(crate) fn writable(dir: &std::path::Path) -> bool {
     }
 }
 
-/// Asks `question` in a terminal, and whether the answer is yes. False without a terminal to ask in.
-pub(crate) fn confirm(question: &str) -> std::io::Result<bool> {
-    ask(question, question)
-}
-
-/// [`confirm`], as `short` in the step of a command that runs.
-pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
-    use std::io::IsTerminal;
-    if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
-        return Ok(false);
-    }
-    #[cfg(any(feature = "server", feature = "self-update"))]
-    if let Some(answer) = crate::log::ask(short) {
-        return answer;
-    }
-    #[cfg(not(any(feature = "server", feature = "self-update")))]
-    let _ = short;
-    crate::log::hold(|| {
-        eprint!("{question} [y/N] ");
-        let mut answer = String::new();
-        std::io::stdin().read_line(&mut answer)?;
-        Ok(answer.trim().eq_ignore_ascii_case("y"))
-    })
-}
-
 /// Empty if the system cannot tell.
 pub(crate) fn hostname() -> &'static str {
     static NAME: LazyLock<String> = LazyLock::new(|| read_hostname().unwrap_or_default());

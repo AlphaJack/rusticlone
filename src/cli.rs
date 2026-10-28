@@ -267,7 +267,7 @@ fn keep_profiles(engine: &Engine) -> Result<()> {
         .map(|p| format!("{}.toml", p.name))
         .collect();
     if files.is_empty()
-        || !crate::sys::confirm(&Ask::Keep { files: files.join(", "), dir: dir.display().to_string() }.to_string())?
+        || !log::confirm(&Ask::Keep { files: files.join(", "), dir: dir.display().to_string() }.to_string())?
     {
         return Ok(());
     }

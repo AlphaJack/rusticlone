@@ -280,11 +280,28 @@ pub(crate) fn did(text: &str) {
     }
 }
 
-/// Asks `question` in the step of a command that runs, if one does.
-#[cfg(any(feature = "server", feature = "self-update"))]
-pub(crate) fn ask(question: &str) -> Option<std::io::Result<bool>> {
-    let hooks = *HOOKS.lock();
-    hooks.map(|hooks| (hooks.ask)(question))
+/// Asks `question` in a terminal, and whether the answer is yes. False without a terminal to ask in.
+pub(crate) fn confirm(question: &str) -> std::io::Result<bool> {
+    ask(question, question)
+}
+
+/// [`confirm`], as `short` in the step of a command that runs.
+pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
+    if !std::io::stdin().is_terminal() || !stderr().is_terminal() {
+        return Ok(false);
+    }
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    if let Some(hooks) = *HOOKS.lock() {
+        return (hooks.ask)(short);
+    }
+    #[cfg(not(any(feature = "server", feature = "self-update")))]
+    let _ = short;
+    hold(|| {
+        eprint!("{question} [y/N] ");
+        let mut answer = String::new();
+        std::io::stdin().read_line(&mut answer)?;
+        Ok(answer.trim().eq_ignore_ascii_case("y"))
+    })
 }
 
 /// Shows `rows` as the runs, the last one open for the answer, and reads it. Nothing is redrawn meanwhile.
