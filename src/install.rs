@@ -20,6 +20,8 @@ pub(crate) mod update;
 #[cfg(any(feature = "desktop", feature = "self-update"))]
 pub(crate) fn managed(exe: &std::path::Path) -> bool {
     use std::path::Path;
+    // Where a link leads, as Homebrew's `bin` to its `Cellar`: macOS names the executable as it was started.
+    let exe = &exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
     let kept = exe.ancestors().any(|dir| {
         named(dir, "Cellar")
