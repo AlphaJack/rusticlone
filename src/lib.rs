@@ -69,16 +69,26 @@ pub use state::{Event, RunRecord, Store};
 #[cfg(test)]
 mod tests {
     /// Writes each file at its path in the repository, as its content renders in English, under a line that says
-    /// `source` generates it. Fails when that changes one, as they are committed. The `generated_*` tests call it,
-    /// and `cargo xtask generate` runs them.
+    /// `source` generates it: a comment in the file's own syntax, after what has to come first. Fails when that
+    /// changes one, as they are committed. The `generated_*` tests call it, and `cargo xtask generate` runs them.
     #[cfg(feature = "server")]
     #[expect(clippy::disallowed_methods, reason = "writes the generated files")]
     pub(crate) fn generated(source: &str, files: &[(String, &dyn Fn() -> String)]) {
+        // `file!()` separates with `\` on Windows.
+        let source = source.replace('\\', "/");
         let written: Vec<String> = (files.iter())
             .filter_map(|(path, content)| {
                 let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
                 let content = crate::i18n::Language::english().scope(content);
-                let file = format!("# Generated from {source} by cargo xtask generate\n{content}");
+                let header = format!("Generated from {source} by cargo xtask generate");
+                let file = match path.extension().and_then(|e| e.to_str()) {
+                    // XML opens with its declaration, and PowerShell reads UTF-8 only after a byte order mark.
+                    Some("nuspec") => {
+                        format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- {header} -->\n{content}")
+                    }
+                    Some("ps1") => format!("\u{feff}# {header}\n{content}"),
+                    _ => format!("# {header}\n{content}"),
+                };
                 if std::fs::read_to_string(&path).is_ok_and(|before| before == file) {
                     return None;
                 }
@@ -90,13 +100,14 @@ mod tests {
         assert!(written.is_empty(), "written anew, to commit: {}", written.join(", "));
     }
 
-    /// The Linux targets that dist builds, from Cargo.toml.
+    /// The targets that dist builds for `os`, such as `linux`, from Cargo.toml.
     #[cfg(feature = "server")]
     #[expect(clippy::disallowed_methods, reason = "reads Cargo.toml")]
-    pub(crate) fn linux_targets() -> Vec<String> {
+    pub(crate) fn dist_targets(os: &str) -> Vec<String> {
         let manifest = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap_or_default();
         let manifest: toml_edit::DocumentMut = manifest.parse().unwrap_or_default();
         let targets = manifest["workspace"]["metadata"]["dist"]["targets"].as_array().into_iter().flatten();
-        targets.filter_map(|t| t.as_str()).filter(|t| t.contains("-linux-")).map(ToOwned::to_owned).collect()
+        let os = format!("-{os}-");
+        targets.filter_map(|t| t.as_str()).filter(|t| t.contains(&os)).map(ToOwned::to_owned).collect()
     }
 }

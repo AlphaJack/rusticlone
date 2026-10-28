@@ -1003,9 +1003,86 @@ mod tests {
         assert!(super::desktop_entry(r#"/a b/c"d%"#).contains(r#"Exec="/a b/c\\"d%%" serve --open"#));
     }
 
+    /// The Chocolatey package of the Windows archive that dist builds.
+    #[test]
+    fn generated_windows_package() {
+        crate::tests::generated(
+            file!(),
+            &[
+                (format!("packaging/chocolatey/{}.nuspec", crate::NAME), &nuspec),
+                ("packaging/chocolatey/tools/chocolateyinstall.ps1".into(), &chocolatey_install),
+            ],
+        );
+    }
+
+    /// The Chocolatey package's metadata, from Cargo.toml, with the rustic that the tests run as its dependency.
+    fn nuspec() -> String {
+        let url = env!("CARGO_PKG_REPOSITORY");
+        format!(
+            r#"<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>{name}</id>
+    <!-- Set by .github/workflows/chocolatey.yml at each release. -->
+    <version>0</version>
+    <title>{title}</title>
+    <authors>AlphaJack</authors>
+    <owners>AlphaJack</owners>
+    <projectUrl>{url}</projectUrl>
+    <packageSourceUrl>{url}/tree/main/packaging/chocolatey</packageSourceUrl>
+    <docsUrl>{url}#readme</docsUrl>
+    <bugTrackerUrl>{url}/issues</bugTrackerUrl>
+    <licenseUrl>{url}/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <copyright>AlphaJack</copyright>
+    <iconUrl>https://cdn.jsdelivr.net/gh/{repository}@main/assets/images/icon.png</iconUrl>
+    <tags>{tags}</tags>
+    <summary>{description}</summary>
+    <description>{description}</description>
+    <releaseNotes>{url}/blob/main/CHANGELOG.md</releaseNotes>
+    <dependencies>
+      <dependency id="rustic" version="{rustic}" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
+"#,
+            name = crate::NAME,
+            title = crate::APP_NAME,
+            repository = url.trim_start_matches("https://github.com/"),
+            tags = env!("KEYWORDS").replace(';', " "),
+            description = env!("CARGO_PKG_DESCRIPTION"),
+            rustic = *crate::rustic::TESTED,
+        )
+    }
+
+    /// The Chocolatey package's install script, which unpacks the 64-bit Windows archive.
+    fn chocolatey_install() -> String {
+        let targets = crate::tests::dist_targets("windows");
+        let target = targets.iter().find(|t| t.starts_with("x86_64")).map_or("", String::as_str);
+        format!(
+            r"$ErrorActionPreference = 'Stop'
+
+# url64bit and checksum64: set by .github/workflows/chocolatey.yml at each release.
+$packageArgs = @{{
+  packageName    = $env:ChocolateyPackageName
+  unzipLocation  = Split-Path -Parent $MyInvocation.MyCommand.Definition
+  url64bit       = '{url}/releases/download/v0/{name}-{target}.zip'
+  checksum64     = 'XXXXXX'
+  checksumType64 = 'sha256'
+}}
+
+Install-ChocolateyZipPackage @packageArgs
+",
+            url = env!("CARGO_PKG_REPOSITORY"),
+            name = crate::NAME,
+        )
+    }
+
     /// The Arch package of the Linux archives that dist builds, from Cargo.toml.
     fn pkgbuild() -> String {
-        let targets = crate::tests::linux_targets();
+        let targets = crate::tests::dist_targets("linux");
         // Each Linux target, under Arch's name for its architecture.
         let arches: Vec<(&str, &str)> =
             (targets.iter().map(String::as_str)).map(|t| (t.split('-').next().unwrap_or(t), t)).collect();

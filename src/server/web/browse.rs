@@ -114,7 +114,7 @@ pub(super) async fn browse(
             };
             // A snapshot of one directory opens in that directory.
             let path = match (q.path.is_empty(), snapshot.paths.as_slice()) {
-                (true, [only]) if only.starts_with('/') => only.clone(),
+                (true, [only]) if std::path::Path::new(only).is_absolute() => rustic::in_tree(only),
                 _ => q.path.clone(),
             };
             let dirs = app.browsed.get(e, p, &id);
@@ -286,6 +286,10 @@ pub(super) async fn download(
     let mut command = tokio::process::Command::from(command);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = command.spawn().map_err(Fault::CannotRunRustic)?;
+    #[cfg(windows)]
+    if let Some(handle) = child.raw_handle() {
+        rustic::tie(handle);
+    }
     let (Some(out), Some(err)) = (child.stdout.take(), child.stderr.take()) else {
         return Err(Fault::NotPiped.into());
     };

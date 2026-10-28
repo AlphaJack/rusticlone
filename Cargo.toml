@@ -189,6 +189,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Console",
     "Win32_System_EventLog",
     "Win32_System_IO",
+    "Win32_System_JobObjects",
     "Win32_System_Ioctl",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
@@ -244,15 +245,15 @@ include = [
     "assets/images/logo.svg",
 ]
 github-build-setup = "../build-setup.yml"
-post-announce-jobs = ["./docker", "./aur", "./nix", "./scoop"]
-github-custom-job-permissions = { "crates" = { contents = "read" }, "docker" = { contents = "read", packages = "write" }, "aur" = { contents = "read" }, "nix" = { contents = "read" }, "scoop" = {} }
+post-announce-jobs = ["./docker", "./aur", "./nix", "./scoop", "./chocolatey"]
+github-custom-job-permissions = { "crates" = { contents = "read" }, "docker" = { contents = "read", packages = "write" }, "aur" = { contents = "read" }, "nix" = { contents = "read" }, "scoop" = {}, "chocolatey" = { contents = "read" } }
 
 [workspace.metadata.dist.github-custom-runners]
-global = "ubuntu-24.04"
-x86_64-unknown-linux-musl = "ubuntu-24.04"
+global = "ubuntu-latest"
+x86_64-unknown-linux-musl = "ubuntu-latest"
 aarch64-unknown-linux-musl = "ubuntu-24.04-arm"
-aarch64-apple-darwin = "macos-14"
-x86_64-pc-windows-msvc = "windows-2025"
+aarch64-apple-darwin = "macos-latest"
+x86_64-pc-windows-msvc = "windows-latest"
 
 [workspace.metadata.dist.dependencies.homebrew]
 rustic = { stage = ["run"] }

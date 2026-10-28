@@ -17,12 +17,12 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
-  SCCACHE_GHA_ENABLED: "true"
-  RUSTC_WRAPPER: sccache
+  SCCACHE_GHA_ENABLED: ${{ vars.CI_USE_SCCACHE == 'true' }}
+  RUSTC_WRAPPER: ${{ vars.CI_USE_SCCACHE == 'true' && 'sccache' || '' }}
 
 jobs:
   fmt:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       RUSTC_WRAPPER: ""
     steps:
@@ -39,7 +39,7 @@ jobs:
         run: cargo fmt --all --check
 
   clippy:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,11 +51,12 @@ jobs:
           toolchain: "stable"
           components: clippy, rust-analyzer
       - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-      - name: Cache cargo registry
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          cache-targets: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
@@ -72,15 +73,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
+          - os: ubuntu-latest
             target: x86_64-unknown-linux-musl
           # Its timers, disks and privacy rules differ: Linux runs none of that code.
-          - os: macos-14
+          - os: macos-latest
             target: aarch64-apple-darwin
     runs-on: ${{ matrix.os }}
-    env:
-      RUSTC_WRAPPER: ""
-      SCCACHE_GHA_ENABLED: "false"
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -90,7 +88,11 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "stable"
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
@@ -129,7 +131,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, windows-2025]
+        os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out repository
@@ -141,16 +143,42 @@ jobs:
         with:
           toolchain: "stable"
       - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
         uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-      - name: Cache cargo registry
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          cache-targets: "false"
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Turn off Defender's real-time scanning
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Set-MpPreference -DisableRealtimeMonitoring $true
+      - name: Install cargo-nextest
+        if: runner.os == 'Windows'
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest
+      - name: Install cargo-binstall
+        if: runner.os == 'Windows'
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-binstall
+      - name: Install rustic
+        if: runner.os == 'Windows'
+        shell: bash
+        run: cargo binstall --no-confirm "rustic-rs@$(sed -n '/^\[workspace.metadata.rustic\]/,/^\[/s/^version = "v\(.*\)"/\1/p' Cargo.toml)"
+      - name: Test
+        if: runner.os == 'Windows'
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: cargo nextest run --workspace --locked
 
   nix:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -162,7 +190,7 @@ jobs:
         run: nix eval --raw .#packages.x86_64-linux.default.drvPath
 
   deny:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       RUSTC_WRAPPER: ""
     steps:
@@ -175,7 +203,7 @@ jobs:
 
   workflows:
     name: Check workflows
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     env:
       ACTIONLINT: v1.7.12
       ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8

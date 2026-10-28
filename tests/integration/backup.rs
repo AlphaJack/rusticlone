@@ -2,7 +2,7 @@ use std::fs;
 
 use serde_json::json;
 
-use crate::common::{Sandbox, docs_with_remote};
+use crate::common::{Sandbox, docs_with_remote, set_readable};
 
 #[test]
 fn creates_snapshot_and_replicates_it() {
@@ -90,21 +90,20 @@ fn lost_local_repository_is_not_reinitialised_while_targets_are_unreachable() {
 
 #[test]
 fn what_a_backup_could_not_read_is_reported_until_it_can() {
-    use std::os::unix::fs::PermissionsExt;
     let sb = docs_with_remote("");
     sb.write("docs/locked.txt", "secret");
     let locked = sb.path("source/docs/locked.txt");
-    fs::set_permissions(&locked, fs::Permissions::from_mode(0o000)).unwrap();
+    set_readable(&locked, false);
     if fs::read(&locked).is_ok() {
         // Root can read any file.
+        set_readable(&locked, true);
         return;
     }
-    sb.run(&["backup", "--all"])
-        .assert_exit(2)
-        .assert_result("skipped", json!({"count": 1}))
-        .assert_output("Permission denied");
+    // In the system's language on Windows.
+    let denied = if cfg!(windows) { "(os error 5)" } else { "Permission denied" };
+    sb.run(&["backup", "--all"]).assert_exit(2).assert_result("skipped", json!({"count": 1})).assert_output(denied);
     sb.run(&["collections"]).assert_exit(2).assert_result("skipped", json!({"count": 1}));
-    fs::set_permissions(&locked, fs::Permissions::from_mode(0o644)).unwrap();
+    set_readable(&locked, true);
     sb.write("docs/a.txt", "version 2");
     sb.run(&["backup", "--all"]).assert_exit(0);
     sb.run(&["collections"]).assert_exit(0).assert_no_result("skipped", json!({}));

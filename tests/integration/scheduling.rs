@@ -2,7 +2,7 @@ use std::fs::{self, File};
 
 use serde_json::json;
 
-use crate::common::{KEEP, Sandbox, docs_with_remote, global_env, objects, var};
+use crate::common::{KEEP, Sandbox, cmd, docs_with_remote, global_env, objects, toml_str, var};
 
 const EVERY_MINUTE: &str = "* * * * *";
 
@@ -219,7 +219,7 @@ fn a_scheduled_backup_after_a_recorded_one_has_no_dry_run() {
 fn a_scheduled_first_backup_carries_on_when_a_hook_fills_the_source() {
     let sb = Sandbox::new();
     let file = sb.path("source/docs/a.txt");
-    let hook = format!("[backup.hooks]\nrun-before = [\"sh -c 'echo version 1 > {}'\"]\n", file.display());
+    let hook = format!("[backup.hooks]\nrun-before = [{}]\n", toml_str(&cmd::write("version 1", &file)));
     sb.backup_profile("Docs", &[&["docs"]], &["Docs-remote"], &hook);
     sb.target("Docs-remote", "Docs", "");
     sb.write("docs/a.txt", "version 1");
