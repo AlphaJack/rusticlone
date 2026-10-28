@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from src/install/autostart.rs by cargo xtask generate -->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>rusticlone</id>
+    <!-- Set by .github/workflows/chocolatey.yml at each release. -->
+    <version>0</version>
+    <title>Rusticlone</title>
+    <authors>AlphaJack</authors>
+    <owners>AlphaJack</owners>
+    <projectUrl>https://github.com/AlphaJack/rusticlone</projectUrl>
+    <packageSourceUrl>https://github.com/AlphaJack/rusticlone/tree/main/packaging/chocolatey</packageSourceUrl>
+    <docsUrl>https://github.com/AlphaJack/rusticlone#readme</docsUrl>
+    <bugTrackerUrl>https://github.com/AlphaJack/rusticlone/issues</bugTrackerUrl>
+    <licenseUrl>https://github.com/AlphaJack/rusticlone/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <copyright>AlphaJack</copyright>
+    <iconUrl>https://cdn.jsdelivr.net/gh/AlphaJack/rusticlone@main/assets/images/icon.png</iconUrl>
+    <tags>backup restore snapshot rustic restic</tags>
+    <summary>Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications</summary>
+    <description>Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications</description>
+    <releaseNotes>https://github.com/AlphaJack/rusticlone/blob/main/CHANGELOG.md</releaseNotes>
+    <dependencies>
+      <dependency id="rustic" version="0.11.4" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

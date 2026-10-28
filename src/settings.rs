@@ -310,7 +310,7 @@ mod tests {
         let listen = super::LISTEN.default.unwrap_or_default();
         let port = listen.rsplit_once(':').map_or(listen, |(_, port)| port);
         // Docker's name for each target's architecture.
-        let cases: String = (crate::tests::linux_targets().iter())
+        let cases: String = (crate::tests::dist_targets("linux").iter())
             .map(|target| {
                 let arch = match target.split('-').next() {
                     Some("x86_64") => "amd64",
