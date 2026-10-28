@@ -15,7 +15,7 @@ mod snapshot;
 pub(crate) use cli::Cli;
 pub(crate) use commands::{Reading, RestorePlan};
 #[cfg(feature = "server")]
-pub(crate) use contents::{Diff, Dirs, Found, NodeKind};
+pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
 #[cfg(feature = "server")]
 use contents::{diff, dirs, found};
 pub(crate) use ctx::{Ctx, Origin, RunHandle, Stop};
@@ -30,6 +30,8 @@ pub(crate) use output::Ended;
 pub(crate) use output::{Failure, Output, Progress, Pruned};
 #[cfg(feature = "server")]
 pub(crate) use process::kill;
+#[cfg(all(windows, feature = "server"))]
+pub(crate) use process::tie;
 #[cfg(test)]
 mod replay;
 #[cfg(test)]
@@ -230,12 +232,17 @@ impl Rustic {
         ok(self.exec(cx, &p.name, &p.dir, args, progress, Stdout::Text)?.0)
     }
 
-    /// Output that does not parse is reported with the rustic version.
+    /// Output that does not parse is reported with the rustic version. Hooks that run before rustic print to
+    /// the same output: its JSON starts at the first line from which a value parses.
     fn json<T: DeserializeOwned>(&self, cx: &Ctx, p: &RusticProfile, args: &[&str]) -> Result<T> {
         let out = self.run(cx, p, args, None)?;
+        let lines = std::iter::once(0).chain(out.stdout.match_indices('\n').map(|(i, _)| i + 1));
+        let parsed = lines
+            .filter_map(|i| out.stdout.get(i..).filter(|rest| rest.starts_with(['{', '['])))
+            .find_map(|rest| serde_json::Deserializer::from_str(rest).into_iter::<T>().next()?.ok());
         let unreadable =
             |source| Error::Unreadable { command: out.command.clone(), version: self.version.clone(), source };
-        Ok(serde_json::from_str(&out.stdout).map_err(unreadable)?)
+        parsed.map_or_else(|| Ok(serde_json::from_str(&out.stdout).map_err(unreadable)?), Ok)
     }
 }
 

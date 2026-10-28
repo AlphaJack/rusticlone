@@ -2,3 +2,7 @@
 # every core busy.
 [profile.default]
 slow-timeout = { period = "20s", terminate-after = 3 }
+
+[[profile.default.overrides]]
+platform = 'cfg(windows)'
+slow-timeout = { period = "30s", terminate-after = 4 }

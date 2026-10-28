@@ -5,19 +5,15 @@ use std::{fs, path::Path, time::Duration};
 
 use serde_json::json;
 
-use crate::common::{KEEP, Sandbox, wait_for};
+use crate::common::{KEEP, Sandbox, below_root, cmd, docs_with_remote, toml_str, wait_for};
 
 /// A profile `name` into `repo/<name>`, whose sources are links that its backup hook creates into
 /// `source/<target>`, each as `link-<source>`, and removes when rustic is done.
 fn hooked(sb: &Sandbox, name: &str, sources: &[(&str, &str)], extra: &str) {
-    let links: String = sources
+    let links: Vec<String> = sources
         .iter()
         .map(|(source, target)| {
-            format!(
-                "ln -sfn {} {}; ",
-                sb.path(&format!("source/{target}")).display(),
-                sb.path(&format!("link-{source}")).display()
-            )
+            toml_str(&cmd::link(&sb.path(&format!("source/{target}")), &sb.path(&format!("link-{source}"))))
         })
         .collect();
     let snapshots: String = sources
@@ -27,14 +23,15 @@ fn hooked(sb: &Sandbox, name: &str, sources: &[(&str, &str)], extra: &str) {
         })
         .collect();
     let unlink: Vec<String> =
-        sources.iter().map(|(s, _)| sb.path(&format!("link-{s}")).display().to_string()).collect();
+        sources.iter().map(|(s, _)| toml_str(&cmd::unlink(&sb.path(&format!("link-{s}"))))).collect();
     sb.profile(
         name,
         &format!(
             "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '{}'\n\n[backup.hooks]\n\
-             run-before = [\"sh -c '{links}'\"]\nrun-finally = ['rm -f {}']\n\n{snapshots}[forget]\nkeep-daily = 7\n\n{extra}",
+             run-before = [{}]\nrun-finally = [{}]\n\n{snapshots}[forget]\nkeep-daily = 7\n\n{extra}",
             sb.path(&format!("repo/{name}")).display(),
-            unlink.join(" ")
+            links.join(", "),
+            unlink.join(", ")
         ),
     );
 }
@@ -78,16 +75,17 @@ fn hooks_mount_the_repository_and_link_the_sources() {
     sb.profile(
         "Hooked",
         &format!(
-            "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '{disk}/repo'\n\n[repository.hooks]\n\
-             run-before = [\"sh -c 'test -d {away}/repo && mv {away}/repo {disk}; true'\"]\n\
-             run-finally = [\"sh -c 'test -d {disk}/repo && mv {disk}/repo {away}; true'\"]\n\n\
-             [backup.hooks]\nrun-before = ['ln -sfn {real} {link}']\nrun-finally = ['rm {link}']\n\n\
-             [[backup.snapshots]]\nsources = ['{link}/two']\n\n[[backup.snapshots]]\nsources = ['{link}/one']\n\n\
+            "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '{}'\n\n[repository.hooks]\n\
+             run-before = [{}]\nrun-finally = [{}]\n\n[backup.hooks]\nrun-before = [{}]\nrun-finally = [{}]\n\n\
+             [[backup.snapshots]]\nsources = ['{}']\n\n[[backup.snapshots]]\nsources = ['{}']\n\n\
              [forget]\nkeep-daily = 7\n",
-            away = away.display(),
-            disk = disk.display(),
-            real = real.display(),
-            link = link.display()
+            disk.join("repo").display(),
+            toml_str(&cmd::move_dir(&away.join("repo"), &disk)),
+            toml_str(&cmd::move_dir(&disk.join("repo"), &away)),
+            toml_str(&cmd::link(&real, &link)),
+            toml_str(&cmd::unlink(&link)),
+            link.join("two").display(),
+            link.join("one").display()
         ),
     );
     sb.run(&["backup", "--all"]).assert_exit(0).assert_result("backed-up", json!({}));
@@ -97,9 +95,22 @@ fn hooks_mount_the_repository_and_link_the_sources() {
     sb.remove("store");
     let to = sb.path("restored");
     sb.run(&["restore", "--all", "--to", to.to_str().unwrap()]).assert_exit(0);
-    let restored = sb.path(&format!("restored/{}", real.strip_prefix("/").unwrap().display()));
+    let restored = to.join(below_root(&real));
     assert_eq!(fs::read_to_string(restored.join("one/a.txt")).unwrap(), "a");
     assert_eq!(fs::read_to_string(restored.join("two/b.txt")).unwrap(), "b");
+}
+
+/// Hooks that run before rustic, as one that mounts a disk, may print into the output that rustic writes its
+/// JSON to. Not those that run after: rustic 0.11 has not written all of it yet, and their output lands inside.
+#[test]
+fn hooks_may_print() {
+    let sb = docs_with_remote("");
+    let print = if cfg!(windows) { "cmd /c echo [printed by a hook]" } else { "echo [printed by a hook]" };
+    let hooks = |kind| format!("[{kind}.hooks]\nrun-before = ['{print}']\n");
+    sb.backup_profile("Docs", &[&["docs"]], &["Docs-remote"], &(hooks("repository") + &hooks("backup")));
+    sb.target("Docs-remote", "Docs", &hooks("repository"));
+    sb.run(&["backup", "--all"]).assert_exit(0).assert_result("copied", json!({"snapshots": 1}));
+    sb.run(&["collections"]).assert_exit(0);
 }
 
 /// Another profile backs up into the same repository last. After the state is lost, a run that reads only
@@ -124,8 +135,8 @@ fn a_shared_repository_keeps_each_profile_its_snapshots() {
     sb.remove("store");
     let to = sb.path("restored");
     sb.run(&["restore", "--collection", "Hooked", "--to", to.to_str().unwrap()]).assert_exit(0);
-    assert_eq!(sb.tree(&format!("restored/{}", sb.path("source/real").strip_prefix("/").unwrap().display())).len(), 1);
-    assert!(!to.join(sb.path("source/plain").strip_prefix("/").unwrap()).exists(), "the other profile's data");
+    assert_eq!(sb.tree(&format!("restored/{}", below_root(&sb.path("source/real")).display())).len(), 1);
+    assert!(!to.join(below_root(&sb.path("source/plain"))).exists(), "the other profile's data");
 }
 
 /// Profiles that reach one repository by different URLs, here a path and `opendal:fs`, share its locks,
@@ -138,8 +149,9 @@ fn a_repository_reached_two_ways_is_locked_as_one() {
         "Slow",
         &format!(
             "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '{}'\n\n\
-             [[backup.snapshots]]\nsources = ['-']\nstdin-command = 'sleep 3'\n",
-            shared.display()
+             [[backup.snapshots]]\nsources = ['-']\nstdin-command = {}\n",
+            shared.display(),
+            toml_str(&cmd::sleep(3))
         ),
     );
     let opendal = |root: &Path| {
@@ -183,7 +195,7 @@ fn a_hook_that_links_elsewhere_is_learned_again() {
     sb.run(&["backup", "--all"]).assert_exit(0).assert_result("backed-up", json!({}));
     let to = sb.path("restored");
     sb.run(&["restore", "--all", "--to", to.to_str().unwrap()]).assert_exit(0);
-    let v2 = sb.path("restored").join(sb.path("source/real/v2/a.txt").strip_prefix("/").unwrap());
+    let v2 = to.join(below_root(&sb.path("source/real/v2/a.txt")));
     assert_eq!(fs::read_to_string(v2).unwrap(), "v2");
 }
 
@@ -199,7 +211,7 @@ fn a_failed_hooked_source_learns_nothing() {
     sb.run(&["backup", "--all"]).assert_exit(0).assert_result("backed-up", json!({}));
     let to = sb.path("restored");
     sb.run(&["restore", "--all", "--to", to.to_str().unwrap()]).assert_exit(0);
-    assert_eq!(sb.tree(&format!("restored/{}", sb.path("source/real").strip_prefix("/").unwrap().display())).len(), 2);
+    assert_eq!(sb.tree(&format!("restored/{}", below_root(&sb.path("source/real")).display())).len(), 2);
 }
 
 /// A copy target on an `opendal:` backend, here the local file system: created with the primary's chunker,
@@ -221,7 +233,7 @@ fn an_opendal_copy_target_is_created_and_restored_from() {
     sb.run(&["check", "--all"]).assert_exit(0);
     let to = sb.path("restored");
     sb.run(&["restore", "--repo", "Docs-fs", "--to", to.to_str().unwrap()]).assert_exit(0);
-    let restored = to.join(sb.path("source/docs/a.txt").strip_prefix("/").unwrap());
+    let restored = to.join(below_root(&sb.path("source/docs/a.txt")));
     assert_eq!(fs::read_to_string(restored).unwrap(), "a");
 }
 

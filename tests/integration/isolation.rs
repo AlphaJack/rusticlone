@@ -1,7 +1,5 @@
 use std::{
-    fs,
-    process::Command,
-    thread,
+    fs, thread,
     time::{Duration, Instant},
 };
 
@@ -9,7 +7,7 @@ use serde_json::json;
 
 use rusticlone::Status;
 
-use crate::common::{NAME, Sandbox, docs_with_remote, slow_profile, to_run, var, wait_for};
+use crate::common::{NAME, Sandbox, docs_with_remote, signal, slow_profile, to_run, var, wait_for};
 
 #[test]
 fn stray_rustic_environment_does_not_redirect_backups() {
@@ -148,9 +146,13 @@ fn a_killed_run_leaves_its_locks_with_rustic() {
     });
     first.kill().unwrap();
     first.wait().unwrap();
-    // Rustic still runs and holds the collection's lock.
-    sb.common_env(&[("BACKUP_CRON", "@daily")]);
-    sb.run(&["due", "--all"]).assert_exit(0).assert_result("running-already", json!({}));
+    // Rustic still runs and holds the collection's lock. Windows releases locks with the process that took
+    // them: there, rustic ended with it.
+    #[cfg(not(windows))]
+    {
+        sb.common_env(&[("BACKUP_CRON", "@daily")]);
+        sb.run(&["due", "--all"]).assert_exit(0).assert_result("running-already", json!({}));
+    }
     // Once it ends, the collection runs again, and quickly: the parent snapshot, if any, is not read.
     sb.kill_leftovers();
     slow_profile(&sb, "Sleepy", 0, "");
@@ -162,7 +164,6 @@ fn a_killed_run_leaves_its_locks_with_rustic() {
 }
 
 #[test]
-#[expect(clippy::disallowed_methods, reason = "observe external processes over a bounded interval")]
 fn interrupting_stops_rustic_and_what_it_started() {
     let sb = Sandbox::new();
     slow_profile(&sb, "Slow", 60, "");
@@ -173,7 +174,7 @@ fn interrupting_stops_rustic_and_what_it_started() {
         store.unfinished(Some("Slow")).iter().any(|r| store.alive(r) && running(r))
     });
     // Ctrl-C reaches only our process, because rustic has its own process group.
-    assert!(Command::new("kill").args(["-INT", &first.id().to_string()]).status().unwrap().success());
+    assert!(signal(first.id(), "INT"));
     let interrupted = Instant::now();
     to_run(&first.wait_with_output().unwrap()).assert_exit(130).assert_json(&json!({"stopped": true}));
     assert!(interrupted.elapsed() < Duration::from_secs(10));

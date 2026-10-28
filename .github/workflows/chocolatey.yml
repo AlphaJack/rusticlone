@@ -1,0 +1,75 @@
+name: Chocolatey
+
+# requirements:
+# - secret CHOCOLATEY_API_KEY, of the community.chocolatey.org account maintaining rusticlone
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v3.0.0)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+
+  chocolatey:
+    name: Push to Chocolatey
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      PLAN: ${{ inputs.plan }}
+      DISPATCH_TAG: ${{ inputs.tag }}
+    steps:
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve tag and version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_TAG}" ]; then
+            tag="${DISPATCH_TAG}"
+          else
+            tag="$(jq -r '.announcement_tag' <<<"${PLAN}")"
+            prerelease="$(jq -r '.announcement_is_prerelease' <<<"${PLAN}")"
+          fi
+          {
+            echo "tag=${tag}"
+            echo "version=${tag#v}"
+            echo "prerelease=${prerelease:-false}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set version and checksum
+        if: steps.v.outputs.prerelease != 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+          VERSION: ${{ steps.v.outputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sum="$(gh release download "${TAG}" -R "${GITHUB_REPOSITORY}" -p rusticlone-x86_64-pc-windows-msvc.zip.sha256 -O - | cut -d' ' -f1)"
+          sed -i "s|<version>0</version>|<version>${VERSION}</version>|" packaging/chocolatey/rusticlone.nuspec
+          sed -i "s|/download/v0/|/download/${TAG}/|; s|'XXXXXX'|'${sum}'|" packaging/chocolatey/tools/chocolateyinstall.ps1
+
+      - name: Push to Chocolatey
+        if: steps.v.outputs.prerelease != 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+        run: |
+          choco pack packaging/chocolatey/rusticlone.nuspec --output-directory build
+          choco push "build/rusticlone.$env:VERSION.nupkg" --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
