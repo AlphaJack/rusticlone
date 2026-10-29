@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.3](https://github.com/AlphaJack/rusticlone/compare/v2.0.2...v2.0.3) - 2026-10-29
+
+### Fixed
+
+#### Cli
+
+- Clearer collections output for unusual profiles ([#66](https://github.com/AlphaJack/rusticlone/pull/66))
+- List profile folders as a tree, and cover untested paths ([#65](https://github.com/AlphaJack/rusticlone/pull/65))
+
+#### Install
+
+- Start the macOS server at normal speed ([#61](https://github.com/AlphaJack/rusticlone/pull/61))
+
+#### Web
+
+- Widen the pointer target of the stop button ([#67](https://github.com/AlphaJack/rusticlone/pull/67))
+
 ## [2.0.2](https://github.com/AlphaJack/rusticlone/compare/v2.0.1...v2.0.2) - 2026-10-28
 
 ### Fixed
