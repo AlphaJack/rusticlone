@@ -75,30 +75,32 @@ collections-here = { $dir } ({ profile-here })
 collections-sources = Sources
 collections-repositories = Repositories
 collections-issues = Issues
-collections-reason = Reason
 collections-size = Size
 collections-files = Files
 collections-profile = Profile
 collections-location = Location
 collections-snapshots = Snapshots
-collections-status = Status
 collections-schedules = Schedules
+collections-primary = primary
+collections-copy-target = copy target
+collections-no-collections = No collections yet: no profile has both a [repository] and [[backup.snapshots]] with sources. Add them to a profile in one of the folders above, or run `{ -name } serve --open` to create one
+collections-other = Other profiles
+collections-no-sources = its [[backup.snapshots]] list no sources. Add the paths to back up
 collections-unknown = { repo-status-unknown }
-collections-failing = FAILING { $failures }
+collections-failing = { $failures ->
+    [one] failed
+   *[other] failed { $failures } times in a row
+}
 # A schedule and when its step last ran: `@weekly, last 2 days ago`.
 collections-scheduled = { $cron }, last { $ran }
 collections-not-yet = { $cron }, no { $step } yet
 collections-unscheduled = manual
 collections-unschedulable = invalid: { $error }
-# A repository's status with what a listing found: `up to date, newest snapshot 2 hours ago`.
-collections-newest = { $status }, newest snapshot { $taken }
-collections-behind = { $status }, { since-behind }
-collections-listed = { $status } (listed { $age } ago)
 collections-kind-backup-profile = Backup profiles
 collections-kind-copy-target = Copy targets
-collections-kind-unused = Unused profiles (no backup profile uses their repository)
-collections-kind-fragment = Fragment profiles
-collections-kind-broken = Broken profiles
+collections-kind-inherited = Inherited
+collections-kind-unused = Unused
+collections-kind-broken = Invalid
 collections-warning-hidden = { $read } hides { $hidden }: rustic reads only the first file with a profile's name. Rename or delete { $hidden }
 
 ## Runs and steps: what they do and what they did
@@ -285,6 +287,7 @@ change-type = type changed
 # Rustic's cause when it cannot resolve a source's path, as a user reads it.
 output-unresolved = it does not exist or cannot be reached
 # Why a file that another program holds open was left out: Windows says it in the user's language, without what to do.
+output-no-password = rustic asked for the repository's password, with no terminal to type it. Set password, password-file or password-command in the profile's [repository]
 output-in-use = another program has it open and locked. Close that program before the backup
 
 ## A collection's health
@@ -300,6 +303,8 @@ level-word = { $level ->
 fix-missing-repo = if its disk is unplugged, connect it; if it was deleted, re-create it with `{ -name } recreate --repo { $repo }`
 issue-prunes-on-forget = { $repo } prunes at every forget: slow and unscheduled. Remove `prune = true` from [forget] and set { $key } instead
 issue-setting-ignored = { $repo } { $setting }
+issue-no-password = { $repo } has no password, so rustic would ask for one with no one to type it. Set password, password-file or password-command in its [repository]
+issue-same-repository = { $target } is the same repository as { $primary }, so copying to it keeps no second copy, and its [forget] policy deletes the primary's snapshots. Give { $target } a repository of its own
 issue-never-backed-up = never backed up
 issue-no-disk-access = macOS does not let rustic read { $source }. In System Settings, give Full Disk Access to { $exe }, or to the terminal that runs it
 issue-missing = { $repo } is missing: { fix-missing-repo }
@@ -809,7 +814,7 @@ rustic-error-cannot-run = cannot run rustic: run { -name } in a terminal and let
 rustic-error-no-version = cannot read the rustic version from { $output }
 rustic-error-too-old = rustic { $found } is too old: install { $major }.{ $minor } or newer
 rustic-error-no-snapshot = cannot read snapshot { $id } of { $profile }
-rustic-error-invalid-profile = profile { $name } is invalid: { $error }
+rustic-error-invalid-profile = { $error }
 rustic-error-unreadable = cannot read the output of `rustic { $command }` (rustic { $version }): install the tested rustic version
 rustic-error-stalled = rustic { $command } killed: no output or disk activity for { $silent }. For a slow repository, raise { $key }
 rustic-error-no-status = rustic exited without a status
@@ -826,9 +831,9 @@ state-error-newer = a newer { -name } wrote { $path }: update { -name }, or move
 profile-here = current folder
 profile-dirs-or-here = { $dirs } or current folder
 profile-error-not-found = profile { $name } not found in { $dirs }
-profile-error-dry-run = profile { $name } sets dry-run = true, so its backups save nothing: remove dry-run from the profile
-profile-error-slashed-drive = profile { $name }: rustic reads { $location } as a backend named after its drive. Write { $native }
-profile-error-backslash-after-scheme = profile { $name }: on Windows, rustic reads { $location } as a local path because of its backslash. Write forward slashes after { $scheme }:
+profile-error-dry-run = it sets dry-run = true, so its backups save nothing: remove dry-run from the profile
+profile-error-slashed-drive = rustic reads { $location } as a backend named after its drive. Write { $native }
+profile-error-backslash-after-scheme = on Windows, rustic reads { $location } as a local path because of its backslash. Write forward slashes after { $scheme }:
 
 ## Times
 

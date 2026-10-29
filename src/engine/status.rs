@@ -93,7 +93,14 @@ impl Engine {
     pub(crate) fn refresh(&self, collection: &Collection<'_>) -> RunResults {
         let run = Run::new(collection, None);
         self.list_repos(collection, &collection.repos().collect::<Vec<_>>(), |_| {});
-        for repo in collection.repos() {
+        // Not yet created, as before the first backup: its status says so, and it is not unavailable.
+        let overview = self.status_of(collection);
+        let created = |name: &str| {
+            std::iter::once(&overview.primary)
+                .chain(&overview.targets)
+                .all(|r| r.name != name || r.status != RepoStatus::NotCreated)
+        };
+        for repo in collection.repos().filter(|r| created(&r.name)) {
             let Some(Err(error)) = self.store.inventory(collection.name(), &repo.name).map(|i| i.result) else {
                 continue;
             };
@@ -272,6 +279,12 @@ impl Engine {
         issues.extend(
             collection.repos().filter(|r| r.prunes_on_forget).map(|r| Issue::PrunesOnForget { repo: r.name.clone() }),
         );
+        issues
+            .extend(collection.repos().filter(|r| !r.has_password).map(|r| Issue::NoPassword { repo: r.name.clone() }));
+        issues.extend(
+            (collection.targets.iter().filter(|t| t.repo_key() == p.repo_key()))
+                .map(|t| Issue::SameRepository { target: t.name.clone(), primary: p.name.clone() }),
+        );
         // An unknown setting is likely a typo, which leaves a step unscheduled.
         issues.extend(collection.repos().flat_map(|r| {
             settings::ignored(r, &[p])
@@ -403,6 +416,7 @@ pub(crate) enum RepoStatus {
 }
 
 impl RepoStatus {
+    #[cfg(feature = "server")]
     pub(crate) fn level(self) -> Level {
         match self {
             Self::Missing { primary: true } => Level::Failure,
@@ -528,6 +542,16 @@ pub(crate) enum Issue {
         repo: String,
         setting: Ignored,
     },
+    /// Rustic would ask for the password, which fails without a terminal.
+    NoPassword {
+        repo: String,
+    },
+    /// A copy target that is the primary's repository, as through the same `use-profiles`: its copies keep no
+    /// second copy, and its `[forget]` policy applies to the primary.
+    SameRepository {
+        target: String,
+        primary: String,
+    },
     #[fluent(transparent = error)]
     Failed {
         step: StepKey,
@@ -646,6 +670,8 @@ impl Message for Issue {
         match self {
             Self::Unreadable { .. }
             | Self::CopyTargetUnusable(_)
+            | Self::NoPassword { .. }
+            | Self::SameRepository { .. }
             | Self::Failed { .. }
             | Self::Missing { primary: true, .. }
             | Self::InvalidSchedule { .. } => Level::Failure,

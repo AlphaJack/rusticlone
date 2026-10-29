@@ -164,6 +164,8 @@ const XATTRS: &str = "Error getting xattrs";
 const NOT_BACKED_UP: &str = "error backing up ";
 /// Rustic's cause when it cannot resolve a source's path.
 const UNRESOLVED: &str = "error sanitizing source";
+/// Rustic's error when it asks for a password without a terminal.
+const NO_TERMINAL: &str = "IO error: not a terminal";
 /// Rustic's sizes after a prune.
 const UNUSED: &str = "unused size after prune:";
 /// Windows's errors for a file that another program holds open: a sharing or a lock violation.
@@ -233,6 +235,8 @@ impl Output {
     pub(crate) fn failure(&self) -> Failure {
         let explained = self.stderr.explanation().filter(|_| !self.success);
         let said = explained.or_else(|| self.stderr.errors.last().map(|e| summary(e)));
+        // Rustic asks for a missing password, which fails without a terminal.
+        let said = said.map(|s| if s.contains(NO_TERMINAL) { t!("output-no-password") } else { s });
         Failure { command: self.command.clone(), ended: (!self.success).then(|| self.ended()), said }
     }
 
@@ -388,6 +392,13 @@ mod tests {
                       \"Permission denied\" }`\n";
         let skipped = output("backup", stderr, true).skipped();
         assert_eq!(skipped, [("/d/b".to_owned(), "Permission denied".to_owned())]);
+    }
+
+    /// Rustic asks for a missing password, and without a terminal says only that there is none.
+    #[test]
+    fn a_missing_password_says_where_to_set_it() {
+        let said = output("backup", "error: IO error: not a terminal\n", false).failure().to_string();
+        assert!(said.contains("password-command") && !said.contains("not a terminal"), "{said}");
     }
 
     #[test]

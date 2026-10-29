@@ -116,7 +116,6 @@ pub(crate) enum Error {
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     InvalidProfile {
-        name: String,
         error: Failure,
     },
     Unreadable {

@@ -40,6 +40,13 @@ pub(crate) struct RusticProfile {
     /// `skip-if-unchanged`: a backup of unchanged sources makes no snapshot.
     pub skip_unchanged: bool,
     pub env: BTreeMap<String, String>,
+    /// The profiles it reads through `use-profiles`, as rustic resolves them.
+    pub uses: Vec<String>,
+    /// `[[backup.snapshots]]` entries, none with a source: meant as a backup profile, which backs up nothing.
+    pub sourceless: bool,
+    /// A password, its file or command, or a key, as rustic shows its config, environment included. Without
+    /// one, rustic asks for it, which fails without a terminal.
+    pub has_password: bool,
     /// `[repository]` hooks run whenever rustic opens the repository, also as a copy's target; `[global]` ones
     /// only when it opens it with `-P`. Either may mount it.
     repository_hooks: bool,
@@ -222,16 +229,12 @@ pub(crate) enum Error {
         name: String,
         dirs: Vec<PathBuf>,
     },
-    DryRun {
-        name: String,
-    },
+    DryRun,
     #[fluent(native = native_drive(location))]
     SlashedDrive {
-        name: String,
         location: String,
     },
     BackslashAfterScheme {
-        name: String,
         location: String,
         scheme: String,
     },
@@ -289,18 +292,18 @@ fn searched(dirs: &[PathBuf]) -> String {
 /// read as a backend named after a drive.
 pub(crate) fn load(name: &str, dir: &Path, config: &Config) -> Result<RusticProfile, Error> {
     if set(config, &["global", "dry-run"]) {
-        return Err(Error::DryRun { name: name.to_owned() });
+        return Err(Error::DryRun);
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
         && slashed_drive(repository)
     {
-        return Err(Error::SlashedDrive { name: name.to_owned(), location: repository.to_owned() });
+        return Err(Error::SlashedDrive { location: repository.to_owned() });
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
         && let Some(scheme) = backslash_after_scheme(repository, cfg!(windows))
     {
-        let (name, location, scheme) = (name.to_owned(), repository.to_owned(), scheme.to_owned());
-        return Err(Error::BackslashAfterScheme { name, location, scheme });
+        let (location, scheme) = (repository.to_owned(), scheme.to_owned());
+        return Err(Error::BackslashAfterScheme { location, scheme });
     }
     Ok(from_config(name, dir, config))
 }
@@ -375,6 +378,7 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         .map(|(k, v)| (k.clone(), v.as_str().map_or_else(|| v.to_string(), str::to_owned)))
         .collect();
     let local = repository.and_then(|r| local_repo(r, &options, dir));
+    let sourceless = !snapshots.is_empty() && sources.is_empty();
     RusticProfile {
         name: name.to_owned(),
         dir: dir.to_owned(),
@@ -397,6 +401,11 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         skip_unchanged: set(config, &["backup", "skip-if-unchanged"])
             || snapshots.iter().any(|s| set(s, &["skip-if-unchanged"])),
         env: table(&["global", "env"]).filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned()))).collect(),
+        uses: strings(get(&["global", "use-profiles"])).into_iter().filter(|p| p != name).collect(),
+        sourceless,
+        has_password: ["password", "password-file", "password-command", "key"]
+            .iter()
+            .any(|k| get(&["repository", k]).is_some()),
         repository_hooks: runs_before(config, &["repository", "hooks"]),
         global_hooks: runs_before(config, &["global", "hooks"]),
     }

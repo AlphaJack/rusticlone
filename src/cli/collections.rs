@@ -1,8 +1,7 @@
 //! `collections`: each collection's status, with what its profiles configure, as a tree.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use jiff::Timestamp;
 use serde::Serialize;
 
 use super::{
@@ -11,7 +10,7 @@ use super::{
     tree::{Tree, tree},
 };
 use crate::{
-    engine::{CollectionOverview, Engine, Last, RepoOverview, RepoStatus, Schedule, StatusReport},
+    engine::{CollectionOverview, Engine, Last, RepoOverview, Schedule, StatusReport},
     fmt,
     i18n::t,
     log::{self, Level, Message},
@@ -43,15 +42,19 @@ pub(super) fn show(engine: &Engine, refresh: bool) -> Level {
     } else {
         Level::Success
     };
-    let mut profiles: Vec<ProfileInfo> = engine.rustic_profiles.values().map(|p| profile_info(engine, p)).collect();
+    let inherited: BTreeSet<&str> =
+        engine.rustic_profiles.values().flat_map(|p| p.uses.iter().map(String::as_str)).collect();
+    let mut profiles: Vec<ProfileInfo> =
+        engine.rustic_profiles.values().map(|p| profile_info(engine, p, &inherited)).collect();
     profiles.extend(engine.broken.iter().map(|(name, err)| ProfileInfo {
         name: name.clone(),
         error: Some(err.clone()),
         ..ProfileInfo::default()
     }));
     let warned = profiles.iter().any(|i| !i.warnings.is_empty()).then_some(Level::Warning);
+    let invalid = profiles.iter().any(|i| i.kind == Kind::Broken).then_some(Level::Failure);
     let status = engine.report();
-    let level = level.max(status.level).max(warned.unwrap_or_default());
+    let level = level.max(status.level).max(warned.unwrap_or_default()).max(invalid.unwrap_or_default());
     let repos =
         status.collections.iter().flat_map(|c| std::iter::once(&c.primary).chain(&c.targets).map(move |r| (c, r)));
     let listings = repos
@@ -88,36 +91,12 @@ impl Overview {
         self.listings.get(&(collection.primary.name.clone(), repo.to_owned()))
     }
 
-    fn age(&self, t: Timestamp) -> String {
-        fmt::human_age(t, self.status.time)
-    }
-
     fn last(&self, last: Last) -> String {
         match last {
             Last::At(t) => fmt::human_ago(t, self.status.time),
             Last::Never => Last::never(),
             Last::Unknown => unknown(),
             Last::Failing(n) => Text::Failing { failures: n }.to_string(),
-        }
-    }
-
-    fn state(&self, r: &RepoOverview, primary: bool) -> String {
-        let label = r.status.to_string();
-        let label = match r.status.level() {
-            Level::Success => label,
-            level @ (Level::Warning | Level::Failure) => log::paint(level, &label.to_uppercase()),
-        };
-        match (r.status, &r.lag) {
-            (RepoStatus::Stale { behind_since: Some(since) } | RepoStatus::Behind { since }, _) => {
-                Text::Behind { status: &label, age: &self.age(since) }.to_string()
-            }
-            (RepoStatus::InSync, Some(lag)) => {
-                Text::Listed { status: &label, age: &self.age(lag.checked_at) }.to_string()
-            }
-            _ => match r.latest_snapshot.filter(|_| primary) {
-                Some(at) => Text::Newest { status: &label, taken: &self.last(Last::At(at)) }.to_string(),
-                None => label,
-            },
         }
     }
 
@@ -146,7 +125,6 @@ impl Overview {
             field(Text::Location, r.repository.as_deref().unwrap_or_default()),
             field(Text::Snapshots, &count),
             field(Text::Size, &size),
-            field(Text::Status, &self.state(r, primary)),
         ];
         // Every repository is backed up on the collection's schedule, a target by a copy; checks and prunes
         // have the repository's own.
@@ -157,7 +135,8 @@ impl Overview {
             self.scheduled(RunKind::Prune, r.prune_schedule.as_ref(), r.pruned),
         ];
         below.push(Tree { line: section(Text::Schedules), below: schedules });
-        Tree { line: log::bold(&r.name), below }
+        let role = if primary { Text::Primary } else { Text::CopyTarget };
+        Tree { line: format!("{} ({role})", log::bold(&r.name)), below }
     }
 
     /// `check: @weekly, last 2 days ago`, `prune: manual, no prune yet`.
@@ -173,7 +152,7 @@ impl Overview {
                 Text::Scheduled { cron: &cron, ran: &self.last(last) }.to_string()
             }
         };
-        field(capitalized(&kind.label()), &when)
+        field(log::capitalized(&kind.label()), &when)
     }
 
     fn collection(&self, c: &CollectionOverview) -> Vec<Tree> {
@@ -200,34 +179,35 @@ impl Overview {
 
 impl std::fmt::Display for Overview {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.profiles.is_empty() {
-            let dirs = self.directories.clone();
-            writeln!(f, "{}", crate::engine::Error::NoCollections { dirs })?;
-        } else {
-            let folders: Vec<Tree> = self.folders.iter().cloned().map(Tree::leaf).collect();
-            writeln!(f, "{}", section(Text::Directories))?;
-            f.write_str(&tree(&folders))?;
-        }
+        let folders: Vec<Tree> = self.folders.iter().cloned().map(Tree::leaf).collect();
+        writeln!(f, "{}", section(Text::Directories))?;
+        f.write_str(&tree(&folders))?;
         if let Some(untested) = &self.status.untested {
             writeln!(f, "{} {}", Level::Warning.dot(), log::paint(Level::Warning, &untested.to_string()))?;
         }
         // Broken profiles are listed with the other profiles that are not collections.
         let readable = |c: &&CollectionOverview| self.profile(&c.primary.name).is_some_and(|i| i.error.is_none());
-        for c in self.status.collections.iter().filter(readable) {
+        let mut collections = self.status.collections.iter().filter(readable).peekable();
+        if collections.peek().is_none() {
+            writeln!(f, "\n{} {}", Level::Warning.dot(), log::paint(Level::Warning, &Text::NoCollections.to_string()))?;
+        }
+        for c in collections {
             writeln!(f, "\n{}  {} {}", log::bold(&c.title), c.level.dot(), log::paint(c.level, &c.level.word()))?;
             f.write_str(&tree(&self.collection(c)))?;
         }
-        for kind in [Kind::Fragment, Kind::Unused, Kind::Broken] {
+        let kinds = [Kind::Inherited, Kind::Unused, Kind::Broken].map(|kind| {
             let profiles: Vec<Tree> = (self.profiles.iter().filter(|p| p.kind == kind))
-                .map(|p| {
-                    let reason = p.error.as_deref().map(|e| field(Text::Reason, &log::paint(Level::Failure, e)));
-                    Tree { line: log::bold(&p.name), below: reason.into_iter().collect() }
+                .map(|p| match &p.error {
+                    Some(e) => Tree::leaf(format!("{}: {}", log::bold(&p.name), log::paint(Level::Failure, e))),
+                    None => Tree::leaf(log::bold(&p.name)),
                 })
                 .collect();
-            if !profiles.is_empty() {
-                writeln!(f, "\n{}", section(kind))?;
-                f.write_str(&tree(&profiles))?;
-            }
+            Tree { line: section(kind), below: profiles }
+        });
+        let other: Vec<Tree> = kinds.into_iter().filter(|k| !k.below.is_empty()).collect();
+        if !other.is_empty() {
+            writeln!(f, "\n{}", section(Text::Other))?;
+            f.write_str(&tree(&other))?;
         }
         Ok(())
     }
@@ -241,12 +221,6 @@ fn section(text: impl std::fmt::Display) -> String {
 /// `key: value`, with the key in bold.
 fn field(key: impl std::fmt::Display, value: &str) -> Tree {
     Tree::leaf(format!("{}: {value}", section(key)))
-}
-
-/// `backup` as a heading: `Backup`.
-fn capitalized(text: &str) -> String {
-    let mut chars = text.chars();
-    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
 }
 
 fn unknown() -> String {
@@ -273,14 +247,17 @@ struct ProfileInfo {
     error: Option<String>,
 }
 
-fn profile_info(engine: &Engine, p: &profile::RusticProfile) -> ProfileInfo {
+/// `inherited`: the profiles that others name in `use-profiles`.
+fn profile_info(engine: &Engine, p: &profile::RusticProfile, inherited: &BTreeSet<&str>) -> ProfileInfo {
     let copying: Vec<&profile::RusticProfile> =
         engine.rustic_profiles.values().filter(|j| j.is_backup_profile() && j.targets.contains(&p.name)).collect();
-    let kind = match (p.is_backup_profile(), copying.is_empty(), &p.repository) {
-        (true, ..) => Kind::BackupProfile,
-        (false, false, _) => Kind::CopyTarget,
-        (false, true, Some(_)) => Kind::Unused,
-        (false, true, None) => Kind::Fragment,
+    let kind = match (p.is_backup_profile(), copying.is_empty()) {
+        (true, _) => Kind::BackupProfile,
+        (false, false) => Kind::CopyTarget,
+        // Meant as a backup profile, which backs up nothing: invalid, with why.
+        (false, true) if p.sourceless => Kind::Broken,
+        (false, true) if inherited.contains(p.name.as_str()) => Kind::Inherited,
+        (false, true) => Kind::Unused,
     };
     let files = p.files();
     let mut warnings = Vec::new();
@@ -303,6 +280,6 @@ fn profile_info(engine: &Engine, p: &profile::RusticProfile) -> ProfileInfo {
         targets: if p.is_backup_profile() { p.targets.clone() } else { Vec::new() },
         forgets: p.has_keep,
         warnings,
-        error: None,
+        error: (kind == Kind::Broken).then(|| Text::NoSources.to_string()),
     }
 }

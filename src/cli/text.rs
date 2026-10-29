@@ -16,14 +16,20 @@ pub(super) enum Text<'a> {
     Sources,
     Repositories,
     Issues,
-    Reason,
     Size,
     Files,
     Profile,
     Location,
     Snapshots,
-    Status,
     Schedules,
+    Primary,
+    CopyTarget,
+    /// Where no profile is a collection.
+    NoCollections,
+    /// The profiles that are not collections.
+    Other,
+    /// Why a profile with `[[backup.snapshots]]` and no source is invalid.
+    NoSources,
     Unknown,
     Failing {
         failures: u32,
@@ -42,19 +48,6 @@ pub(super) enum Text<'a> {
     Unschedulable {
         error: &'a str,
     },
-    /// A repository's status, with what its last listing found.
-    Newest {
-        status: &'a str,
-        taken: &'a str,
-    },
-    Behind {
-        status: &'a str,
-        age: &'a str,
-    },
-    Listed {
-        status: &'a str,
-        age: &'a str,
-    },
 }
 
 /// What a profile is. `Display`: the heading of the profiles of a kind.
@@ -64,8 +57,9 @@ pub(super) enum Text<'a> {
 pub(super) enum Kind {
     BackupProfile,
     CopyTarget,
+    /// Named in another profile's `use-profiles`.
+    Inherited,
     Unused,
-    Fragment,
     #[default]
     Broken,
 }

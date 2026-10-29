@@ -75,30 +75,32 @@ collections-here = { $dir } ({ profile-here })
 collections-sources = Sorgenti
 collections-repositories = Archivi
 collections-issues = Problemi
-collections-reason = Motivo
 collections-size = Dimensione
 collections-files = File
 collections-profile = Profilo
 collections-location = Posizione
 collections-snapshots = Snapshot
-collections-status = Stato
 collections-schedules = Pianificazioni
+collections-primary = principale
+collections-copy-target = destinazione di copia
+collections-no-collections = Ancora nessuna raccolta: nessun profilo ha sia un [repository] sia [[backup.snapshots]] con sorgenti. Aggiungili a un profilo in una delle cartelle sopra, o esegui `{ -name } serve --open` per crearne una
+collections-other = Altri profili
+collections-no-sources = il suo [[backup.snapshots]] non elenca sorgenti. Aggiungi i percorsi di cui fare il backup
 collections-unknown = { repo-status-unknown }
-collections-failing = IN ERRORE { $failures }
+collections-failing = { $failures ->
+    [one] non riuscita
+   *[other] non riuscita { $failures } volte di fila
+}
 # Una pianificazione e quando il suo passaggio è stato eseguito l'ultima volta: `@weekly, ultima volta 2 giorni fa`.
 collections-scheduled = { $cron }, ultima volta { $ran }
 collections-not-yet = { $cron }, nessuna esecuzione di { $step } finora
 collections-unscheduled = manuale
 collections-unschedulable = non valida: { $error }
-# Lo stato di un archivio con ciò che un elenco ha trovato: `aggiornato, ultimo snapshot 2 ore fa`.
-collections-newest = { $status }, ultimo snapshot { $taken }
-collections-behind = { $status }, { since-behind }
-collections-listed = { $status } (elencato { $age } fa)
 collections-kind-backup-profile = Profili di backup
 collections-kind-copy-target = Destinazioni di copia
-collections-kind-unused = Profili inutilizzati (nessun profilo di backup usa il loro archivio)
-collections-kind-fragment = Profili frammento
-collections-kind-broken = Profili non validi
+collections-kind-inherited = Già in uso
+collections-kind-unused = Inutilizzati
+collections-kind-broken = Non validi
 collections-warning-hidden = { $read } nasconde { $hidden }: rustic legge solo il primo file con il nome di un profilo. Rinomina o elimina { $hidden }
 
 ## Esecuzioni e passaggi: cosa fanno e cosa hanno fatto
@@ -285,6 +287,7 @@ change-type = tipo cambiato
 # Il motivo di rustic quando non riesce a risolvere il percorso di una sorgente, come lo legge un utente.
 output-unresolved = non esiste o non è raggiungibile
 # Perché un file tenuto aperto da un altro programma è stato escluso: Windows lo dice nella lingua dell'utente, senza cosa fare.
+output-no-password = rustic ha chiesto la password dell'archivio, senza un terminale per digitarla. Imposta password, password-file o password-command nel [repository] del profilo
 output-in-use = un altro programma lo tiene aperto e bloccato. Chiudi quel programma prima del backup
 
 ## La salute di una raccolta
@@ -300,6 +303,8 @@ level-word = { $level ->
 fix-missing-repo = se il suo disco è scollegato, collegalo; se è stato eliminato, ricrealo con `{ -name } recreate --repo { $repo }`
 issue-prunes-on-forget = { $repo } pulisce a ogni rimozione: lento e non pianificato. Togli `prune = true` da [forget] e imposta invece { $key }
 issue-setting-ignored = { $repo } { $setting }
+issue-no-password = { $repo } non ha una password, quindi rustic la chiederebbe senza che nessuno possa digitarla. Imposta password, password-file o password-command nel suo [repository]
+issue-same-repository = { $target } è lo stesso archivio di { $primary }, quindi copiarvi non conserva una seconda copia, e la sua politica [forget] elimina gli snapshot del principale. Dai a { $target } un archivio suo
 issue-never-backed-up = nessun backup finora
 issue-no-disk-access = macOS non lascia che rustic legga { $source }. In Impostazioni di Sistema, concedi Accesso completo al disco a { $exe }, o al terminale che lo esegue
 issue-missing = { $repo } manca: { fix-missing-repo }
@@ -806,7 +811,7 @@ rustic-error-cannot-run = impossibile eseguire rustic: esegui { -name } in un te
 rustic-error-no-version = impossibile leggere la versione di rustic da { $output }
 rustic-error-too-old = rustic { $found } è troppo vecchio: installa { $major }.{ $minor } o successivo
 rustic-error-no-snapshot = impossibile leggere lo snapshot { $id } di { $profile }
-rustic-error-invalid-profile = il profilo { $name } non è valido: { $error }
+rustic-error-invalid-profile = { $error }
 rustic-error-unreadable = impossibile leggere l'output di `rustic { $command }` (rustic { $version }): installa la versione di rustic testata
 rustic-error-stalled = rustic { $command } ucciso: nessun output né attività su disco per { $silent }. Per un archivio lento, aumenta { $key }
 rustic-error-no-status = rustic è uscito senza uno stato
@@ -823,9 +828,9 @@ state-error-newer = un { -name } più recente ha scritto { $path }: aggiorna { -
 profile-here = cartella corrente
 profile-dirs-or-here = { $dirs } o nella cartella corrente
 profile-error-not-found = profilo { $name } non trovato in { $dirs }
-profile-error-dry-run = il profilo { $name } imposta dry-run = true, quindi i suoi backup non salvano nulla: togli dry-run dal profilo
-profile-error-slashed-drive = profilo { $name }: rustic legge { $location } come un backend con il nome della sua unità. Scrivi { $native }
-profile-error-backslash-after-scheme = profilo { $name }: su Windows, rustic legge { $location } come percorso locale a causa della sua barra rovesciata. Scrivi barre normali dopo { $scheme }:
+profile-error-dry-run = imposta dry-run = true, quindi i suoi backup non salvano nulla: togli dry-run dal profilo
+profile-error-slashed-drive = rustic legge { $location } come un backend con il nome della sua unità. Scrivi { $native }
+profile-error-backslash-after-scheme = su Windows, rustic legge { $location } come percorso locale a causa della sua barra rovesciata. Scrivi barre normali dopo { $scheme }:
 
 ## Tempi
 

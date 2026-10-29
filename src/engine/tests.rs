@@ -27,6 +27,7 @@ use crate::{
 const DOCS: &str = r#"
 [repository]
 repository = "rest:http://backup/docs"
+password = "test"
 [[backup.snapshots]]
 sources = ["-"]
 as-path = "/fixture/src/docs"
@@ -38,6 +39,7 @@ keep-last = 1
 const USB: &str = r#"
 [repository]
 repository = "rest:http://usb/docs"
+password = "test"
 [forget]
 keep-last = 1
 "#;
