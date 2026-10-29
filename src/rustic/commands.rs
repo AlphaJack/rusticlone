@@ -142,7 +142,7 @@ impl Rustic {
     pub(crate) fn config(&self, name: &str, dir: &Path) -> Result<crate::profile::Config> {
         let out = self.exec(&Ctx::default(), name, dir, &["show-config"], None, Stdout::Text)?.0;
         if !out.success {
-            return Err(Error::InvalidProfile { name: name.to_owned(), error: out.failure() }.into());
+            return Err(Error::InvalidProfile { error: out.failure() }.into());
         }
         Ok(toml_edit::de::from_str(&out.stdout)?)
     }

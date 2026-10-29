@@ -676,8 +676,29 @@ impl RunResults {
 
     pub(crate) fn print(&self) {
         for result in &self.results {
-            log::event(Some(&self.collection), result);
+            match result.subject() == Some(self.collection.as_str()) {
+                // `Docs: backed up`, not `Docs: Docs: backed up`.
+                true => log::event(Some(&self.collection), &Unnamed(result)),
+                false => log::event(Some(&self.collection), result),
+            }
         }
+    }
+}
+
+/// A result without its subject, after a prefix that names it already. Recorded as the result.
+#[derive(Serialize)]
+#[serde(transparent)]
+struct Unnamed<'a>(&'a StepResult);
+
+impl std::fmt::Display for Unnamed<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Detail(self.0).fmt(f)
+    }
+}
+
+impl Message for Unnamed<'_> {
+    fn level(&self) -> Level {
+        self.0.level()
     }
 }
 

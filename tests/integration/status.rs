@@ -289,6 +289,78 @@ fn a_failing_target_is_shown_with_its_issues() {
     insta::assert_snapshot!(readable(&sb, &run.stdout));
 }
 
+/// The repositories are created by the first backup: until then, a refresh finds none, and is not failing.
+#[test]
+fn a_refresh_before_the_first_backup_is_not_a_failure() {
+    let sb = hdd_and_remote(&["Docs-remote"]);
+    let run = sb.run_text(&["collections", "--refresh"]);
+    run.assert_exit(2);
+    assert!(!run.stdout.contains("unavailable") && run.stdout.contains("● never backed up"), "{}", run.stdout);
+}
+
+/// Rustic would ask for it, with no one to type it. The repository is not created, so that rustic, which
+/// reads its config first, asks nothing.
+#[test]
+fn a_repository_without_a_password_is_an_issue() {
+    let sb = Sandbox::new();
+    let (repo, source) = (sb.path("local/Docs").display().to_string(), sb.path("source/docs").display().to_string());
+    let docs = |password: &str| {
+        format!("[repository]\nrepository = '{repo}'\n{password}\n[[backup.snapshots]]\nsources = ['{source}']\n")
+    };
+    sb.profile("Docs", &docs(""));
+    sb.run(&["collections"]).assert_exit(1).assert_json(&json!({"kind": "no-password", "repo": "Docs"}));
+    sb.profile("Docs", &docs("password = 'x'"));
+    let run = sb.run(&["collections"]);
+    assert!(!run.stdout.contains("no-password"), "{}", run.stdout);
+}
+
+#[test]
+fn a_backup_profile_without_sources_is_invalid() {
+    let sb = Sandbox::new();
+    sb.profile("Docs", "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '/nowhere'\n\n[[backup.snapshots]]\nsources = []\n");
+    sb.run(&["collections"]).assert_exit(1).assert_json(&json!({"name": "Docs", "kind": "broken"}));
+    let text = sb.run_text(&["collections"]).stdout;
+    assert!(
+        text.contains("└──┐Invalid\n   └── Docs: its [[backup.snapshots]] list no sources") && !text.contains("Unused"),
+        "{text}"
+    );
+}
+
+/// Profiles, but none a collection: what is missing is said, as without any profile.
+#[test]
+fn profiles_without_a_collection_say_what_is_missing() {
+    let sb = Sandbox::new();
+    let text = sb.run_text(&["collections"]).stdout;
+    assert!(text.starts_with("Profile folders\n") && text.contains("No collections yet"), "{text}");
+    sb.target("Docs-remote", "Docs", "");
+    let text = sb.run_text(&["collections"]).stdout;
+    assert!(text.contains("No collections yet") && text.contains("Other profiles"), "{text}");
+}
+
+/// What a person reads after a backup: a line of its own starts with a capital, and a result about the
+/// collection's own repository does not name it twice.
+#[test]
+fn backup_lines_read_as_sentences() {
+    let sb = Sandbox::new();
+    let none = sb.run_text(&["backup", "--all"]).stdout;
+    assert!(none.starts_with("No profile with backup sources"), "{none}");
+    let sb = docs_with_remote("");
+    let backed_up = sb.run_text(&["backup", "--all"]).stdout;
+    assert!(backed_up.contains("Docs: backed up") && !backed_up.contains("Docs: Docs:"), "{backed_up}");
+}
+
+/// Profiles, none a collection: the hint, then every group of the other profiles.
+#[test]
+fn profiles_without_a_collection_are_shown_as_a_tree() {
+    let sb = Sandbox::new();
+    sb.profile("Docs", "[global]\nuse-profiles = ['common']\n\n[repository]\nrepository = '/nowhere'\n\n[[backup.snapshots]]\nsources = []\n");
+    sb.target("Music", "music", "");
+    sb.profile("broken", "[repository\n");
+    let run = sb.run_text(&["collections"]);
+    run.assert_exit(1);
+    insta::assert_snapshot!(readable(&sb, &run.stdout));
+}
+
 /// The collection `Docs`, as people name it: its primary `Docs-hdd`, copied to `targets`, and `Docs-remote`.
 fn hdd_and_remote(targets: &[&str]) -> Sandbox {
     let sb = Sandbox::new();
