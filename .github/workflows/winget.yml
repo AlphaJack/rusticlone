@@ -1,0 +1,57 @@
+name: WinGet
+
+# Opens a PR on microsoft/winget-pkgs that bumps AlphaJack.Rusticlone to the released version.
+# requirements:
+# - secret WINGET_TOKEN, a classic token with public_repo and workflow scopes
+# - a fork of microsoft/winget-pkgs under AlphaJack
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v3.0.0)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+
+  winget:
+    name: Submit to WinGet
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      PLAN: ${{ inputs.plan }}
+      DISPATCH_TAG: ${{ inputs.tag }}
+    steps:
+
+      - name: Resolve tag
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_TAG}" ]; then
+            tag="${DISPATCH_TAG}"
+          else
+            tag="$(jq -r '.announcement_tag' <<<"${PLAN}")"
+            prerelease="$(jq -r '.announcement_is_prerelease' <<<"${PLAN}")"
+          fi
+          {
+            echo "tag=${tag}"
+            echo "prerelease=${prerelease:-false}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Submit manifest
+        if: steps.v.outputs.prerelease != 'true'
+        uses: vedantmgoyal9/winget-releaser@b7370d4d152efdce803a26cc6ca9eee58cb2ad54 # v2
+        with:
+          identifier: AlphaJack.Rusticlone
+          installers-regex: 'rusticlone-x86_64-pc-windows-msvc\.zip$'
+          release-tag: ${{ steps.v.outputs.tag }}
+          token: ${{ secrets.WINGET_TOKEN }}
