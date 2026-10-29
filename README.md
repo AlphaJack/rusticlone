@@ -41,6 +41,12 @@ Arch Linux (AUR):
 yay -S rusticlone-bin
 ```
 
+WinGet:
+
+```pwsh
+winget install AlphaJack.Rusticlone
+```
+
 Scoop:
 
 ```pwsh

@@ -423,3 +423,12 @@ jobs:
     secrets: inherit
     permissions:
       "contents": "read"
+
+  custom-winget:
+    needs:
+      - plan
+      - announce
+    uses: ./.github/workflows/winget.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
