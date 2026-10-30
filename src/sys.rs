@@ -672,3 +672,33 @@ mod tests {
         assert_eq!(super::device(&root.join("not yet").join("created")), super::device(&root));
     }
 }
+
+/// Whether `path` is an absolute path of a system other than this one: a Windows drive's elsewhere, or a Unix
+/// root's on Windows. Its folder has no place here.
+pub(crate) fn foreign_path(path: &str) -> bool {
+    if cfg!(windows) { path.starts_with('/') } else { windows_drive(path).is_some() }
+}
+
+/// The drive letter of a Windows path such as `C:\Users`, and what follows it.
+pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
+    let mut chars = path.chars();
+    let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
+    let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
+    windows.then(|| (letter, path.get(2..).unwrap_or_default()))
+}
+
+#[cfg(test)]
+mod path_tests {
+    use super::foreign_path;
+
+    /// Another system's absolute folders, which have no place here. Relative ones are this system's.
+    #[test]
+    fn another_systems_folders_are_told_apart() {
+        if cfg!(windows) {
+            assert!(foreign_path("/home/me") && !foreign_path(r"C:\Users\me"));
+        } else {
+            assert!(foreign_path(r"C:\Users\me") && foreign_path("d:/data") && !foreign_path("/home/me"));
+        }
+        assert!(!foreign_path("C:relative") && !foreign_path(""));
+    }
+}

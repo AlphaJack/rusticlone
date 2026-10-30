@@ -60,6 +60,9 @@ pub(crate) struct Sources {
     pub sources: Vec<String>,
     /// The paths rustic records in the snapshot, as derived from the profile.
     derived: Vec<String>,
+    /// The paths as the profile writes them, without following this computer's links: what another computer
+    /// recorded, where a link here leads elsewhere, as `/home` on macOS.
+    written: Vec<String>,
     /// Its `host`, else `[backup] host`, else this computer's name.
     pub host: String,
     /// Its own or `[backup]` hooks run before it is backed up: they may mount it, and a restore runs none.
@@ -80,12 +83,25 @@ fn remote(sources: &[String]) -> bool {
 impl Sources {
     #[cfg(all(test, feature = "server"))]
     pub(crate) fn new(sources: Vec<String>, paths: Vec<String>, host: String) -> Self {
-        Self { sources, derived: paths, host, hooked: false, resolved: true, learned: Arc::default() }
+        Self {
+            sources,
+            written: paths.clone(),
+            derived: paths,
+            host,
+            hooked: false,
+            resolved: true,
+            learned: Arc::default(),
+        }
     }
 
     /// The paths rustic records in the snapshot, which identify its group: learned, else derived.
     pub(crate) fn paths(&self) -> Vec<String> {
         self.learned.read().clone().unwrap_or_else(|| self.derived.clone())
+    }
+
+    /// [`Self::paths`] as the profile writes them, for snapshots made on another computer.
+    pub(crate) fn written_paths(&self) -> Vec<String> {
+        self.learned.read().clone().unwrap_or_else(|| self.written.clone())
     }
 
     /// Whether its paths must be learned from what rustic records: a hook creates the source.
@@ -120,6 +136,12 @@ impl RusticProfile {
     /// [`Self::groups`], or only that of entry `source`.
     pub(crate) fn groups_of(&self, source: Option<usize>) -> Vec<Vec<String>> {
         self.groups().enumerate().filter(|(i, _)| source.is_none_or(|s| s == *i)).map(|(_, g)| g).collect()
+    }
+
+    /// [`Self::groups_of`] as the profile writes them: see [`Sources::written_paths`].
+    pub(crate) fn written_groups_of(&self, source: Option<usize>) -> Vec<Vec<String>> {
+        let groups = self.sources.iter().map(Sources::written_paths).enumerate();
+        groups.filter(|(i, _)| source.is_none_or(|s| s == *i)).map(|(_, g)| g).collect()
     }
 
     /// Whether every backup makes a snapshot, so that the newest snapshot dates the last backup.
@@ -344,7 +366,9 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         .iter()
         .map(|s| {
             let sources = strings(s.get("sources"));
-            let mut resolved = true;
+            // Folders on disk, whose paths rustic records as it finds them there.
+            let on_disk = s.get("as-path").is_none() && sources != ["-"] && !remote(&sources);
+            let resolved = !on_disk || sources.iter().all(|s| dir.join(s).exists());
             let paths = match s.get("as-path").and_then(Value::as_str) {
                 Some(as_path) => vec![as_path.to_owned()],
                 None if sources == ["-"] => vec![
@@ -355,15 +379,13 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
                         .to_owned(),
                 ],
                 None if remote(&sources) => vec![String::new()],
-                None => {
-                    resolved = sources.iter().all(|s| dir.join(s).exists());
-                    snapshot_paths(&sources, dir)
-                }
+                None => snapshot_paths(&sources, dir),
             };
+            let written = if on_disk { snapshot_paths_written(&sources, dir) } else { paths.clone() };
             let host = s.get("host").or_else(|| get(&["backup", "host"])).and_then(Value::as_str);
             let host = host.unwrap_or_else(|| sys::hostname()).to_owned();
             let hooked = runs_before(s, &["hooks"]) || runs_before(config, &["backup", "hooks"]);
-            Sources { sources, derived: paths, host, hooked, resolved, learned: Arc::default() }
+            Sources { sources, derived: paths, written, host, hooked, resolved, learned: Arc::default() }
         })
         .filter(|s| !s.derived.is_empty())
         .collect();
@@ -414,6 +436,18 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
 /// The paths rustic records for `sources`: canonicalized and sorted. Missing sources (before a
 /// restore) can only be normalized.
 fn snapshot_paths(sources: &[String], dir: &Path) -> Vec<String> {
+    // Another system's folders, as one restored from its backups: recorded there, as written.
+    if sources.iter().any(|s| sys::foreign_path(s)) {
+        // Without the trailing separators rustic drops, keeping a root's.
+        let trim = |s: &String| match s.trim_end_matches(['/', '\\']) {
+            t if t.is_empty() || t.ends_with(':') => s.get(..t.len() + 1).unwrap_or(s).to_owned(),
+            t => t.to_owned(),
+        };
+        let mut paths: Vec<String> = sources.iter().map(trim).collect();
+        paths.sort_unstable();
+        paths.dedup();
+        return paths;
+    }
     let normalized: Vec<PathBuf> = sources.iter().map(|s| normalize(Path::new(s))).collect();
     // Rustic keeps paths relative unless one is absolute or outside its working directory.
     let absolute = normalized.iter().any(|p| p.is_absolute() || p.starts_with(".."));
@@ -423,6 +457,21 @@ fn snapshot_paths(sources: &[String], dir: &Path) -> Vec<String> {
             let path = if absolute { resolve(&dir.join(&path)) } else { path };
             path.to_string_lossy().into_owned()
         })
+        .collect();
+    paths.sort_unstable();
+    paths.dedup();
+    paths
+}
+
+/// [`snapshot_paths`] without following this computer's links.
+fn snapshot_paths_written(sources: &[String], dir: &Path) -> Vec<String> {
+    if sources.iter().any(|s| sys::foreign_path(s)) {
+        return snapshot_paths(sources, dir);
+    }
+    let normalized: Vec<PathBuf> = sources.iter().map(|s| normalize(Path::new(s))).collect();
+    let absolute = normalized.iter().any(|p| p.is_absolute() || p.starts_with(".."));
+    let mut paths: Vec<String> = (normalized.into_iter())
+        .map(|path| if absolute { normalize(&dir.join(path)) } else { path }.to_string_lossy().into_owned())
         .collect();
     paths.sort_unstable();
     paths.dedup();
@@ -497,6 +546,12 @@ mod tests {
         assert_eq!(paths(&["./sub"]), ["sub"]);
         assert_eq!(paths(&["../other"]), [abs("a/other")]);
         assert_eq!(paths(&["sub", "../other"]), [abs("a/b/sub"), abs("a/other")]);
+        // Another system's folders stay as that system recorded them.
+        let foreign = if cfg!(windows) { "/home/me/Docs" } else { r"C:\Users\me\Docs" };
+        assert_eq!(paths(&[foreign]), [foreign]);
+        let (separator, root) = if cfg!(windows) { ("/", "/") } else { ("\\", "D:\\") };
+        assert_eq!(paths(&[&format!("{foreign}{separator}")]), [foreign], "rustic drops a trailing separator");
+        assert_eq!(paths(&[root]), [root]);
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -528,13 +583,12 @@ mod tests {
         assert!(p.is_backup_profile() && p.has_keep);
         assert_eq!(p.targets, ["Pictures-offsite"]);
         assert_eq!(p.env[crate::settings::BACKUP.key], "@hourly");
-        // Sources with the system's separators, as rustic records them; `as-path` as written.
-        let native = |p: &str| p.replace('/', std::path::MAIN_SEPARATOR_STR);
+        // Sources as rustic records them, which are another system's on Windows; `as-path` as written.
         assert_eq!(
             p.groups().collect::<Vec<_>>(),
             [
-                &[native("/nonexistent/pics")][..],
-                &[native("/nonexistent/a"), native("/nonexistent/b")],
+                &["/nonexistent/pics".to_owned()][..],
+                &["/nonexistent/a".to_owned(), "/nonexistent/b".to_owned()],
                 &["/srv/old-name".to_owned()],
             ]
         );
