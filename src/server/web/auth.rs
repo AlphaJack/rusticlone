@@ -89,8 +89,8 @@ impl FromRequestParts<Arc<App>> for Here {
     async fn from_request_parts(parts: &mut Parts, app: &Arc<App>) -> Result<Self, Infallible> {
         let session = Access::from_request_parts(parts, app).await? == Access::Session;
         let peer = parts.extensions.get::<ConnectInfo<std::net::SocketAddr>>();
-        let forwarded = std::iter::once(header::FORWARDED).chain(PROXIED.map(HeaderName::from_static));
-        let forwarded = forwarded.into_iter().any(|h| parts.headers.contains_key(h));
+        // Cloudflare Tunnel, ngrok, Tailscale Serve and Funnel, Caddy and Traefik all send it.
+        let forwarded = parts.headers.contains_key("x-forwarded-for");
         let host = parts.headers.get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or_default();
         let local = peer.is_some_and(|p| p.0.ip().is_loopback()) && addressed_locally(host);
         Ok(Self(cfg!(feature = "desktop") && session && local && !forwarded))
@@ -106,10 +106,6 @@ fn addressed_locally(host: &str) -> bool {
     let name = name.trim_start_matches('[').trim_end_matches(']');
     name.eq_ignore_ascii_case("localhost") || name.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
-
-/// What reverse proxies add besides the standard `Forwarded`. nginx sets `x-real-ip` and Cloudflare's edge sets
-/// `cf-connecting-ip`: a Cloudflare Tunnel passes it on.
-const PROXIED: [&str; 3] = ["x-forwarded-for", "x-real-ip", "cf-connecting-ip"];
 
 /// Computed once per request.
 impl FromRequestParts<Arc<App>> for Access {
