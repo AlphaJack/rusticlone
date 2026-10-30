@@ -1,6 +1,6 @@
 ---
 source: src/engine/tests.rs
-expression: "outcome(&replay, &report, &engine, &collections[0])"
+expression: "forgets_sorted(outcome(&replay, &report, &engine, &collections[0]))"
 ---
 {
   "rustic": [
@@ -12,8 +12,8 @@ expression: "outcome(&replay, &report, &engine, &collections[0])"
     "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
     "-P Docs-usb snapshots --json --group-by host,label,paths --filter-paths-exact /fixture/src/docs",
     "-P Docs-usb repoinfo --only-index --json",
-    "-P Docs-usb forget --json --filter-paths-exact /fixture/src/docs",
-    "-P Docs forget --json --filter-paths-exact /fixture/src/docs"
+    "-P Docs forget --json --filter-paths-exact /fixture/src/docs",
+    "-P Docs-usb forget --json --filter-paths-exact /fixture/src/docs"
   ],
   "report": [
     [

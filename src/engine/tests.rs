@@ -91,6 +91,19 @@ struct Outcome {
     status: CollectionOverview,
 }
 
+/// The forgets that end a run in sorted order. Each repository forgets once it has the copies and in parallel
+/// with the others: they end in no particular order.
+fn forgets_sorted(mut outcome: Outcome) -> Outcome {
+    let start =
+        |lines: &[String], word: &str| lines.len() - lines.iter().rev().take_while(|l| l.contains(word)).count();
+    let at = start(&outcome.rustic, " forget ");
+    outcome.rustic[at..].sort();
+    let lines: Vec<String> = outcome.report.iter().map(|(_, l)| l.clone()).collect();
+    let at = start(&lines, ": forgot ");
+    outcome.report[at..].sort_by(|a, b| a.1.cmp(&b.1));
+    outcome
+}
+
 /// Asserts that every answer was used.
 fn outcome(replay: &Replay, report: &RunResults, engine: &Engine, collection: &Collection<'_>) -> Outcome {
     assert!(replay.unused().is_empty(), "never asked: {:?}", replay.unused());
@@ -141,7 +154,7 @@ fn a_backup_is_copied_then_forgotten_where_every_target_has_it() {
     let engine = engine("backup", &replay);
     let collections = engine.collections();
     let report = asked(&engine, &collections[0], &Request::Backup);
-    insta::assert_json_snapshot!(outcome(&replay, &report, &engine, &collections[0]));
+    insta::assert_json_snapshot!(forgets_sorted(outcome(&replay, &report, &engine, &collections[0])));
 }
 
 /// Runs the request as a command would.
@@ -191,7 +204,7 @@ fn a_lagging_listing_is_waited_for() {
     let engine = engine("lagging-listing", &replay);
     let collections = engine.collections();
     let report = asked(&engine, &collections[0], &Request::Copy("Docs".into()));
-    insta::assert_json_snapshot!(outcome(&replay, &report, &engine, &collections[0]));
+    insta::assert_json_snapshot!(forgets_sorted(outcome(&replay, &report, &engine, &collections[0])));
 }
 
 /// A notification that cannot be sent is attempted again once its backoff has passed, not before.
