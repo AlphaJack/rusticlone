@@ -807,6 +807,7 @@ engine-error-not-copied = { $failed } of { $of ->
    *[other] { $of } snapshots
 } not copied: { $error }
 engine-error-no-snapshot-of-them = { $repo } has no snapshot of these sources: back up first, or restore from another repository with --repo
+engine-error-unreadable = no repository of { $collection } could be read: { $repos }. If its disk is mounted elsewhere on this computer, write its new place as `repository` in { $files }
 engine-error-no-matching-snapshot = no matching snapshot in { $repo } or its targets: use a later --at-time, or back up first
 engine-error-no-time = cannot parse time { $time }: use 2026-10-01, "2026-10-01 12:00" or RFC 3339
 rustic-error-dry-run-creates = a dry run creates no repository
