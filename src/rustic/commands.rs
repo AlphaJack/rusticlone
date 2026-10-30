@@ -307,7 +307,7 @@ impl Rustic {
         dest: &Path,
         progress: &mut dyn FnMut(&Progress),
     ) -> Result<()> {
-        let (spec, dest) = (format!("{id}:{path}"), dest.to_string_lossy());
+        let (spec, dest) = (format!("{id}:{}", super::tree_path(path)), dest.to_string_lossy());
         let args = ["restore", "--verify-existing", &spec, &dest];
         self.run(cx, p, &args, Some(progress)).map(drop)
     }
@@ -322,7 +322,7 @@ impl Rustic {
         path: &str,
         progress: &mut dyn FnMut(&Progress),
     ) -> Result<Option<RestorePlan>> {
-        let spec = format!("{id}:{path}");
+        let spec = format!("{id}:{}", super::tree_path(path));
         let args = ["restore", "--dry-run", "--verify-existing", &spec, path];
         let out = self.run(cx, p, &args, Some(progress))?;
         Ok(restore_plan(&out.stdout))
