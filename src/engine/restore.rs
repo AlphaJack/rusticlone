@@ -198,7 +198,9 @@ impl Engine {
             let source = run.collection.primary.sources.iter().find(|s| s.paths() == sn.paths);
             let unplaced = source.filter(|_| options.to.is_none()).and_then(|s| {
                 let source = s.sources.join(", ");
-                if s.in_place() {
+                // A folder of another system has no place on this one.
+                let foreign = s.sources.iter().any(|p| crate::rustic::foreign_path(p));
+                if s.in_place() && !foreign {
                     s.hooked.then_some(StepResult::Hooked { source })
                 } else {
                     Some(StepResult::NoPlace { source })

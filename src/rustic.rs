@@ -283,6 +283,12 @@ mod tests {
     }
 }
 
+/// Whether `path` is an absolute path of a system other than this one: a Windows drive's elsewhere, or a Unix
+/// root's on Windows. Its folder has no place here.
+pub(crate) fn foreign_path(path: &str) -> bool {
+    if cfg!(windows) { path.starts_with('/') } else { windows_drive(path).is_some() }
+}
+
 /// The drive letter of a Windows path such as `C:\Users`, and what follows it.
 fn windows_drive(path: &str) -> Option<(char, &str)> {
     let mut chars = path.chars();
@@ -302,18 +308,21 @@ pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
 
 #[cfg(test)]
 mod path_tests {
-    use super::tree_path;
+    use super::{foreign_path, tree_path};
 
     /// A Windows folder restores on macOS and Linux by its name in the tree. Each system's own stays as it is.
     #[test]
     fn windows_folders_are_named_as_the_tree_names_them() {
         if cfg!(windows) {
             assert_eq!(tree_path(r"C:\Users\me"), r"C:\Users\me");
+            assert!(foreign_path("/home/me") && !foreign_path(r"C:\Users\me"));
         } else {
             assert_eq!(tree_path(r"C:\Users\me\Résumé"), "/C/Users/me/Résumé");
             assert_eq!(tree_path("d:/data"), "/d/data");
+            assert!(foreign_path(r"C:\Users\me") && !foreign_path("/home/me"));
         }
         assert_eq!(tree_path("/home/me"), "/home/me");
         assert_eq!(tree_path("C:relative"), "C:relative");
+        assert!(!foreign_path("C:relative") && !foreign_path(""));
     }
 }
