@@ -651,6 +651,8 @@ first-run-error-not-a-choice = the { $role ->
 } location's { $field } must be one of: { $choices }
 first-run-error-no-dir = no profile folder that can be written in
 first-run-error-exists = { $path } already exists
+first-run-error-inside = the backup folder { $folder } and the folder { $backed_up } are inside one another: the backup would hold itself and grow at every run. Choose a backup folder elsewhere, ideally on another disk
+first-run-error-not-empty = { $folder } holds other files: choose an empty or new folder, or the folder of an existing backup
 
 ## The server, its installation and updates
 

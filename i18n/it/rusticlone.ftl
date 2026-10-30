@@ -651,6 +651,8 @@ first-run-error-not-a-choice = { $field } della posizione { $role ->
 } deve essere uno tra: { $choices }
 first-run-error-no-dir = nessuna cartella dei profili in cui si possa scrivere
 first-run-error-exists = { $path } esiste già
+first-run-error-inside = la cartella di backup { $folder } e la cartella { $backed_up } sono una dentro l'altra: il backup conterrebbe sé stesso e crescerebbe a ogni esecuzione. Scegli una cartella di backup altrove, meglio su un altro disco
+first-run-error-not-empty = { $folder } contiene altri file: scegli una cartella vuota o nuova, oppure la cartella di un backup esistente
 
 ## Il server, la sua installazione e gli aggiornamenti
 
