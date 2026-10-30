@@ -275,6 +275,7 @@ integrity = "sha512-T/171FUY93Kdfp8t+DnHdk45QvKRiBhVhhrwSzrXgUi4pHKvhp77dUA/qg8F
 [workspace.lints.rust]
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
+unfulfilled_lint_expectations = "deny"
 rust_2018_idioms = { level = "warn", priority = -1 }
 unreachable_pub = "warn"
 unused_qualifications = "warn"
@@ -297,7 +298,7 @@ equatable_if_let = "warn"
 branches_sharing_code = "warn"
 map_err_ignore = "warn"
 allow_attributes_without_reason = "deny"
-allow_attributes = "warn"
+allow_attributes = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"
