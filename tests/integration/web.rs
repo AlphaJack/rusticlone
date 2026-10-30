@@ -712,6 +712,10 @@ fn the_profile_folder_opens_for_this_computer_only() {
     assert!(here.body.contains(button), "{}", here.body);
     let proxied = server.request("POST", "/setup", &[form, &cookie, "X-Forwarded-For: 192.0.2.1"], &setup("Proxied"));
     assert!(proxied.code == 200 && !proxied.body.contains(button), "{}", proxied.body);
+    // A Cloudflare Tunnel connects from this computer too, with the visitor's address.
+    let tunneled =
+        server.request("POST", "/setup", &[form, &cookie, "Cf-Connecting-Ip: 192.0.2.1"], &setup("Tunneled"));
+    assert!(tunneled.code == 200 && !tunneled.body.contains(button), "{}", tunneled.body);
     let scripted = server.post_form("/setup", &setup("Scripted"));
     assert!(scripted.code == 200 && !scripted.body.contains(button), "{}", scripted.body);
     // Elsewhere, the folder's path is there to copy.
