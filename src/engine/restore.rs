@@ -275,10 +275,10 @@ pub(crate) fn parse_at(s: &str) -> Result<Timestamp, Error> {
         .map_err(|source| Error::NoTime { time: s.to_owned(), source })
 }
 
-/// `/home/me/docs` becomes `home/me/docs`, `C:\Users\me` becomes `C/Users/me`.
+/// `/home/me/docs` becomes `home/me/docs`, `C:\Users\me` becomes `C/Users/me`, on any system.
 fn below_root(path: &str) -> PathBuf {
     let mut out = PathBuf::new();
-    for c in Path::new(path).components() {
+    for c in Path::new(crate::rustic::tree_path(path).as_ref()).components() {
         match c {
             Component::Normal(part) => out.push(part),
             Component::Prefix(prefix) => {
