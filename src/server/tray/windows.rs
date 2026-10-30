@@ -7,6 +7,7 @@ use windows_sys::{
     Win32::{
         Foundation::ERROR_SUCCESS,
         System::{
+            LibraryLoader::{GetProcAddress, LoadLibraryW},
             Registry::{
                 HKEY, HKEY_CURRENT_USER, KEY_NOTIFY, REG_NOTIFY_CHANGE_LAST_SET, RRF_RT_REG_DWORD, RegGetValueW,
                 RegNotifyChangeKeyValue, RegOpenKeyExW,
@@ -70,6 +71,7 @@ fn run(started: &mpsc::Sender<u32>, received: &mpsc::Receiver<Shown>) {
     if started.send(unsafe { GetCurrentThreadId() }).is_err() {
         return;
     }
+    follow_theme();
     icon::open_clicked();
     while unsafe { GetMessageW(&raw mut message, std::ptr::null_mut(), 0, 0) } > 0 {
         if message.hwnd.is_null() && message.message == WM_APP {
@@ -105,6 +107,37 @@ fn dark() -> bool {
     read != ERROR_SUCCESS || light == 0
 }
 
+/// Has the menu dark or light as the taskbar is, as the icon is. Windows has no public call for this: uxtheme
+/// exports `SetPreferredAppMode` and `FlushMenuThemes` by ordinal only, since Windows 10 1903. Before that,
+/// or if they move, the menu stays light.
+#[expect(unsafe_code, reason = "calls two functions of uxtheme that it exports by ordinal")]
+fn follow_theme() {
+    type Exported = unsafe extern "system" fn() -> isize;
+    type SetPreferredAppMode = unsafe extern "system" fn(i32) -> i32;
+    type FlushMenuThemes = unsafe extern "system" fn();
+    const SET_PREFERRED_APP_MODE: usize = 135;
+    const FLUSH_MENU_THEMES: usize = 136;
+    /// `SetPreferredAppMode`'s `ForceDark` and `ForceLight`.
+    const FORCE_DARK: i32 = 2;
+    const FORCE_LIGHT: i32 = 3;
+    // SAFETY: a system library, loaded for the rest of the process.
+    let uxtheme = unsafe { LoadLibraryW(w!("uxtheme.dll")) };
+    if uxtheme.is_null() {
+        return;
+    }
+    let mode = if dark() { FORCE_DARK } else { FORCE_LIGHT };
+    // SAFETY: an ordinal is passed in place of the name, as GetProcAddress allows, and both functions have
+    // had these signatures since uxtheme exported them.
+    unsafe {
+        if let Some(set) = GetProcAddress(uxtheme, std::ptr::without_provenance(SET_PREFERRED_APP_MODE)) {
+            std::mem::transmute::<Exported, SetPreferredAppMode>(set)(mode);
+        }
+        if let Some(flush) = GetProcAddress(uxtheme, std::ptr::without_provenance(FLUSH_MENU_THEMES)) {
+            std::mem::transmute::<Exported, FlushMenuThemes>(flush)();
+        }
+    }
+}
+
 /// Has the icon drawn again whenever the theme changes.
 #[expect(unsafe_code, reason = "waits for changes to a registry key")]
 fn watch_theme() {
@@ -117,6 +150,7 @@ fn watch_theme() {
     while unsafe { RegNotifyChangeKeyValue(key, 0, REG_NOTIFY_CHANGE_LAST_SET, std::ptr::null_mut(), 0) }
         == ERROR_SUCCESS
     {
+        follow_theme();
         super::REDRAW.notify_one();
     }
 }
