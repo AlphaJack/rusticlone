@@ -12,6 +12,7 @@ arch=('x86_64' 'aarch64')
 url="https://github.com/AlphaJack/rusticlone"
 license=('AGPL-3.0-or-later')
 depends=('rustic')
+optdepends=('rclone: use rclone remotes for rustic repositories')
 provides=("$_name")
 conflicts=("$_name")
 options=('!strip' '!debug')
