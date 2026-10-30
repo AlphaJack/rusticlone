@@ -1241,6 +1241,7 @@ arch=({arch})
 url="{url}"
 license=('{license}')
 depends=('rustic')
+optdepends=('rclone: use rclone remotes for rustic repositories')
 provides=("$_name")
 conflicts=("$_name")
 options=('!strip' '!debug')
