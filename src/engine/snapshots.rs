@@ -108,7 +108,14 @@ impl Engine {
             crate::log::doing(run.collection.title, &doing);
         }
         let collection = run.collection.primary;
-        let listed = self.rustic.snapshots(&run.cx, p, collection.groups(), &collection.group_by);
+        // Also as the profile writes them: another computer recorded its paths without this one's links.
+        let mut groups: Vec<Vec<String>> = collection.groups().collect();
+        for written in collection.sources.iter().map(Sources::written_paths) {
+            if !groups.contains(&written) {
+                groups.push(written);
+            }
+        }
+        let listed = self.rustic.snapshots(&run.cx, p, groups, &collection.group_by);
         if in_step {
             run.idle();
         } else {
@@ -131,9 +138,11 @@ const SETTLE: [u64; 3] = [5, 15, 40];
 pub(super) fn own(collection: &RusticProfile, groups: &[SnapshotGroup]) -> Vec<Snapshot> {
     let mut own = Vec::new();
     for s in &collection.sources {
-        let source = rustic::source_key(&s.paths());
-        let of_source =
-            |g: &SnapshotGroup| g.snapshots.iter().filter(|sn| sn.source() == source).cloned().collect::<Vec<_>>();
+        // As this computer derives its paths, or as the profile writes them for another computer's snapshots.
+        let sources = [rustic::source_key(&s.paths()), rustic::source_key(&s.written_paths())];
+        let of_source = |g: &SnapshotGroup| {
+            g.snapshots.iter().filter(|sn| sources.contains(&sn.source())).cloned().collect::<Vec<_>>()
+        };
         let here = |g: &SnapshotGroup| g.group_key.hostname.as_ref().is_none_or(|h| *h == s.host);
         let chosen = groups
             .iter()

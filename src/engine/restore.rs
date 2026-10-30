@@ -86,7 +86,17 @@ impl Engine {
         }
         self.learn_from_repositories(run);
         let groups = collection.primary.groups_of(options.source);
-        let (src, picks) = self.newest_repo(run, options.from.as_deref(), &groups, options.at)?;
+        let found = self.newest_repo(run, options.from.as_deref(), &groups, options.at);
+        // Made on another computer, where this one's links lead elsewhere: as the profile writes the paths.
+        let written = collection.primary.written_groups_of(options.source);
+        let unmatched = |e: &anyhow::Error| matches!(e.downcast_ref(), Some(Error::NoMatchingSnapshot { .. }));
+        let (groups, (src, picks)) = match found {
+            Err(e) if unmatched(&e) && written != groups => {
+                let found = self.newest_repo(run, options.from.as_deref(), &written, options.at)?;
+                (written, found)
+            }
+            found => (groups, found?),
+        };
         // Every source, as it is now, to where it was.
         let all = options.at.is_none() && options.source.is_none() && options.to.is_none();
         // Asked for everything and the primary was lost with the sources: it is re-created from where they come
@@ -199,7 +209,7 @@ impl Engine {
             let unplaced = source.filter(|_| options.to.is_none()).and_then(|s| {
                 let source = s.sources.join(", ");
                 // A folder of another system has no place on this one.
-                let foreign = s.sources.iter().any(|p| crate::rustic::foreign_path(p));
+                let foreign = s.sources.iter().any(|p| sys::foreign_path(p));
                 if s.in_place() && !foreign {
                     s.hooked.then_some(StepResult::Hooked { source })
                 } else {

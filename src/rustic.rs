@@ -283,24 +283,10 @@ mod tests {
     }
 }
 
-/// Whether `path` is an absolute path of a system other than this one: a Windows drive's elsewhere, or a Unix
-/// root's on Windows. Its folder has no place here.
-pub(crate) fn foreign_path(path: &str) -> bool {
-    if cfg!(windows) { path.starts_with('/') } else { windows_drive(path).is_some() }
-}
-
-/// The drive letter of a Windows path such as `C:\Users`, and what follows it.
-fn windows_drive(path: &str) -> Option<(char, &str)> {
-    let mut chars = path.chars();
-    let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
-    let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
-    windows.then(|| (letter, path.get(2..).unwrap_or_default()))
-}
-
 /// `path` as rustic names it in a snapshot's tree from any system. rustic on Windows records `C:\Users\me`
 /// as `C/Users/me` in the tree. Elsewhere it finds it only as `/C/Users/me`.
 pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
-    match windows_drive(path).filter(|_| !cfg!(windows)) {
+    match crate::sys::windows_drive(path).filter(|_| !cfg!(windows)) {
         Some((letter, rest)) => format!("/{letter}{}", rest.replace('\\', "/")).into(),
         None => path.into(),
     }
@@ -308,21 +294,18 @@ pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
 
 #[cfg(test)]
 mod path_tests {
-    use super::{foreign_path, tree_path};
+    use super::tree_path;
 
     /// A Windows folder restores on macOS and Linux by its name in the tree. Each system's own stays as it is.
     #[test]
     fn windows_folders_are_named_as_the_tree_names_them() {
         if cfg!(windows) {
             assert_eq!(tree_path(r"C:\Users\me"), r"C:\Users\me");
-            assert!(foreign_path("/home/me") && !foreign_path(r"C:\Users\me"));
         } else {
             assert_eq!(tree_path(r"C:\Users\me\Résumé"), "/C/Users/me/Résumé");
             assert_eq!(tree_path("d:/data"), "/d/data");
-            assert!(foreign_path(r"C:\Users\me") && !foreign_path("/home/me"));
         }
         assert_eq!(tree_path("/home/me"), "/home/me");
         assert_eq!(tree_path("C:relative"), "C:relative");
-        assert!(!foreign_path("C:relative") && !foreign_path(""));
     }
 }
