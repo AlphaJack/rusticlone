@@ -9,7 +9,7 @@ use crate::{request::Trigger, result::Doing, settings, state::Holds, sys};
 /// What scheduled runs wait for when [`settings::SKIP_ON_BATTERY`] and [`settings::SKIP_ON_METERED`] ask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, crate::i18n::Fluent)]
 pub(crate) enum Waiting {
-    Power,
+    PowerSupply,
     UnmeteredNetwork,
 }
 
@@ -17,7 +17,7 @@ impl Waiting {
     /// Its name as runs show what they wait for, untranslated like the other resources: `cpu`, `upload`.
     pub(super) fn resource(self) -> &'static str {
         match self {
-            Self::Power => "power",
+            Self::PowerSupply => "power",
             Self::UnmeteredNetwork => "unmetered",
         }
     }
@@ -40,7 +40,7 @@ pub(crate) fn waiting(remote: bool) -> Option<Waiting> {
 /// setting turns on: reading a connection's cost starts a process on Windows.
 fn waiting_for(battery: (bool, impl FnOnce() -> bool), metered: (bool, impl FnOnce() -> bool)) -> Option<Waiting> {
     if battery.0 && battery.1() {
-        Some(Waiting::Power)
+        Some(Waiting::PowerSupply)
     } else if metered.0 && metered.1() {
         Some(Waiting::UnmeteredNetwork)
     } else {
@@ -79,7 +79,7 @@ mod tests {
     /// The settings to skip on battery and on a metered network, what the system says, and what runs wait for.
     #[test]
     fn runs_wait_only_for_what_a_setting_turns_on() {
-        let (power, network) = (Some(Waiting::Power), Some(Waiting::UnmeteredNetwork));
+        let (power, network) = (Some(Waiting::PowerSupply), Some(Waiting::UnmeteredNetwork));
         let cases = [
             ((false, false), (true, true), None),
             ((true, false), (true, true), power),
