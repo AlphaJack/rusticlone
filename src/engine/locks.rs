@@ -69,7 +69,9 @@ impl Engine {
         let (last, since) = (RefCell::new(None), self.store.now());
         let (live, step) = (run.live.as_deref(), run.cx.step());
         #[cfg(feature = "server")]
-        let held_back = super::waiting::wait(run, keys.iter().any(|(k, ..)| k == "upload" || k == "download"));
+        let remote = keys.iter().any(|(k, ..)| k == "upload" || k == "download");
+        #[cfg(feature = "server")]
+        let held_back = super::waiting::wait_while(run, || super::waiting::waiting(self.conditions, remote));
         #[cfg(not(feature = "server"))]
         let held_back = false;
         let locks = self.store.lock(

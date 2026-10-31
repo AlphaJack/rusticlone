@@ -409,6 +409,14 @@ async fn run(build: Build, listen: &str, open: bool, tray: Option<Tray>) -> Resu
     // Watch before reporting ready, so that a collection saved right after is seen.
     let reload = Arc::new(Reload::default());
     let _watcher = watch_files(&store.dir, &app, &reload);
+    // Waiting runs and the overview hear of each change, only when a setting has them wait.
+    if [&settings::SKIP_ON_BATTERY, &settings::SKIP_ON_METERED].iter().any(|s| s.enabled().unwrap_or_default()) {
+        let app = app.clone();
+        crate::sys::watch_conditions(move || {
+            crate::clock::wake();
+            app.pages.changed();
+        });
+    }
     if let Some(tray) = tray {
         tokio::spawn(tray.follow(app.clone(), url.clone(), login_url(&url, &app.tokens)));
     }

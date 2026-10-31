@@ -125,7 +125,18 @@ impl Engine {
         profiles: Vec<String>,
         named: Named,
     ) -> Self {
-        Self { rustic, store, runs, rustic_profiles, broken, profiles, named, tz: TimeZone::system() }
+        Self {
+            rustic,
+            store,
+            runs,
+            rustic_profiles,
+            broken,
+            profiles,
+            named,
+            tz: TimeZone::system(),
+            #[cfg(feature = "server")]
+            conditions: &crate::sys::ThisComputer,
+        }
     }
 
     pub(crate) fn collections(&self) -> Vec<Collection<'_>> {

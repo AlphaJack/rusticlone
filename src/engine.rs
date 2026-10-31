@@ -350,6 +350,9 @@ pub(crate) struct Engine {
     /// What the command line names. Nothing named: every collection.
     pub named: Named,
     tz: TimeZone,
+    /// What scheduled runs may wait for.
+    #[cfg(feature = "server")]
+    pub conditions: &'static dyn crate::sys::Conditions,
 }
 
 impl Engine {

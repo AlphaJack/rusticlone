@@ -361,7 +361,7 @@ pub(super) fn index_main(app: &App) -> IndexMain {
         untested: engine.rustic.untested(),
         blocked,
         unconfigured: engine.unconfigured(),
-        waiting: crate::engine::waiting::waiting(true),
+        waiting: crate::engine::waiting::waiting(engine.conditions, true),
         ..IndexMain::build(inputs)
     }
 }

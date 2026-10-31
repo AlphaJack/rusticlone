@@ -144,7 +144,7 @@ sd-notify = { version = "0.5.0", optional = true }
 ksni = { version = "0.3.7", optional = true }
 # Whether the panel is light or dark, from the desktop portal: the bus that ksni uses.
 zbus = { version = "5.19.0", default-features = false, features = ["tokio"], optional = true }
-nix = { version = "0.31.3", features = ["time"], optional = true }
+nix = { version = "0.31.3", features = ["time", "socket"], optional = true }
 
 # The tray icon in macOS's menu bar and Windows's taskbar.
 [target."cfg(any(target_vendor = \"apple\", windows))".dependencies]
@@ -187,8 +187,10 @@ windows-sys = { version = "0.61.2", features = [
     "Wdk_System_SystemServices",
     "Win32_Foundation",
     "Win32_Security",
-    "Win32_System_Com",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+    "Win32_System_SystemServices",
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
     "Win32_System_EventLog",
