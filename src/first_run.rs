@@ -691,6 +691,16 @@ impl Setup {
         (self.kind(role).fields().iter()).any(|f| f.key == Key::Immutable && !self.value(role, f).is_empty())
     }
 
+    /// Whether any repository forgets backups. Otherwise how long they are kept is not asked.
+    pub(crate) fn forgets(&self) -> bool {
+        <Role as strum::IntoEnumIterator>::iter().any(|r| self.kind(r) != Kind::None && !self.immutable(r))
+    }
+
+    /// How long backups are kept: all of them when no repository forgets any.
+    fn keep(&self) -> Keep {
+        if self.forgets() { self.keep } else { Keep::All }
+    }
+
     #[cfg(any(feature = "server", test))]
     fn check(&self) -> Result<(), Error> {
         let name = self.name.trim();
@@ -738,7 +748,7 @@ impl Setup {
         [
             (settings::BACKUP, "every", self.every, Question::WhenBackUp),
             (settings::CHECK, "check", self.every.check(), Question::HowOftenCheck),
-            (settings::PRUNE, "prune", self.keep.prune(), Question::HowLongKeep),
+            (settings::PRUNE, "prune", self.keep().prune(), Question::HowLongKeep),
         ]
     }
 
@@ -801,9 +811,9 @@ impl Setup {
         backup["snapshots"] = Item::ArrayOfTables(snapshots.collect());
         primary["backup"] = Item::Table(backup);
         primary["repository"] = self.repository(Role::Primary, section(Question::WhereSaved));
-        let forget = (!self.keep.rules().is_empty()).then(|| {
+        let forget = (!self.keep().rules().is_empty()).then(|| {
             let mut forget = section(Question::HowLongKeep);
-            for (keep, n) in self.keep.rules() {
+            for (keep, n) in self.keep().rules() {
                 forget[keep] = value(*n);
             }
             Item::Table(forget)
@@ -1033,6 +1043,11 @@ mod tests {
         locked.values.insert("primary.s3.immutable".into(), "on".into());
         let profiles = locked.profiles();
         assert!(!profiles[0].1.contains("keep-") && profiles[1].1.contains("keep-last"), "{profiles:?}");
+        // Neither forgets, so how long to keep is not asked and nothing is pruned.
+        locked.values.insert("target.rest.immutable".into(), "on".into());
+        assert!(!locked.forgets());
+        let profiles = locked.profiles();
+        assert!(profiles.iter().all(|(_, t)| !t.contains("keep-") && !t.contains(settings::PRUNE.key)), "{profiles:?}");
     }
 
     #[test]

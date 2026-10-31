@@ -58,12 +58,20 @@ const urlsOf = (text) => text.split(/[\s,;]+(?=[a-z0-9]+:\/\/)/i).map((url) => u
 /** @param {string} url @param {string} schemes space-separated */
 const ofSchemes = (url, schemes) => url.includes("://") && schemes.split(" ").includes(url.split("://")[0].toLowerCase());
 
-/** Shows the fields of each choice made in `form`. @param {HTMLFormElement} form */
+/** Whether `role`'s repository forgets backups: it is chosen and does not refuse deletes. @param {HTMLFormElement} form @param {string} role */
+const forgets = (form, role) => {
+  const kind = form.elements[role]?.value;
+  return Boolean(kind) && kind !== "none" && !form.elements[`${role}.${kind}.immutable`]?.checked;
+};
+
+/** Shows the fields of each choice made in `form`, and how long backups are kept while a repository forgets them. @param {HTMLFormElement} form */
 const showChosen = (form) => {
   for (const fields of form.querySelectorAll("[data-choice]")) {
     const chosen = form.elements[fields.dataset.choice];
     if (chosen) fields.hidden = fields.dataset.value !== chosen.value;
   }
+  const keep = form.querySelector("[data-keep]");
+  if (keep) keep.hidden = !["primary", "target"].some((role) => forgets(form, role));
 };
 document.addEventListener("change", (event) => event.target.form && showChosen(event.target.form));
 // Firefox fills a reloaded form with the choices made before, without a change event.

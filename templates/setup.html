@@ -72,7 +72,7 @@
     <h2>{{ Question::WhenBackUp }}</h2>
     {% call schedule("every", setup.every, Question::WhenBackUp) %}{% endcall %}
   </section>
-  <section class="card">
+  <section class="card" data-keep{% if !setup.forgets() %} hidden{% endif %}>
     <h2>{{ Question::HowLongKeep }}</h2>
     <select name="keep" aria-label="{{ Question::HowLongKeep }}">{% for k in keeps %}<option value="{{ k.id() }}"{% if *k == setup.keep %} selected{% endif %}>{{ k }}</option>{% endfor %}</select>
   </section>
