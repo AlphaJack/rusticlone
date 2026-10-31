@@ -489,6 +489,15 @@ pub(crate) enum Logged {
     NotCopied {
         error: String,
     },
+    /// `--kit`: how many of its profiles were saved and where.
+    KitUnpacked {
+        saved: u64,
+        dir: String,
+    },
+    /// After a restore, profiles whose folders are not on this computer.
+    ProfilesElsewhere {
+        files: String,
+    },
 }
 
 impl Message for Logged {
@@ -501,10 +510,11 @@ impl Message for Logged {
             | Self::ListingNotKept { .. }
             | Self::RunNotSaved { .. }
             | Self::NotMeasured { .. }
-            | Self::NoProfiles { .. } => Level::Warning,
+            | Self::NoProfiles { .. }
+            | Self::ProfilesElsewhere { .. } => Level::Warning,
             #[cfg(feature = "server")]
             Self::NotScheduled { .. } => Level::Warning,
-            Self::NotCopied { .. } => Level::Success,
+            Self::NotCopied { .. } | Self::KitUnpacked { .. } => Level::Success,
         }
     }
 }

@@ -16,6 +16,8 @@ mod status;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "server")]
+pub(crate) use collection::title;
 pub(crate) use collection::{Blocked, Collection};
 pub(crate) use load::Named;
 use locks::Use;
@@ -23,6 +25,8 @@ use plan::{follows, plan};
 use record::behind;
 pub(crate) use restore::parse_at;
 pub(crate) use schedule::Schedule;
+#[cfg(feature = "server")]
+pub(crate) use schedule::kit_restore;
 use snapshots::{each, newest, newest_by_source, pick, shrunk};
 pub(crate) use status::{CollectionOverview, Last, RepoOverview, StatusReport};
 #[cfg(feature = "server")]
@@ -574,8 +578,19 @@ impl Engine {
                 }
             }
             Step::Restore { options } => {
-                if let Err(e) = self.restore_inner(run, options) {
-                    run.push(run.failed(&e));
+                let before = run.failures();
+                let restored = self.restore_inner(run, options);
+                if let Err(e) = &restored {
+                    run.push(run.failed(e));
+                }
+                // Only a restore of every source, in place, ends the hold of a kit's collection.
+                let every = options.snapshot.is_none() && options.source.is_none() && options.path.is_none();
+                if every && options.to.is_none() && options.at.is_none() && !options.dry_run {
+                    let ok = restored.is_ok() && run.failures() == before;
+                    let event = Event::Restored { collection: collection.name().to_owned(), at: self.store.now(), ok };
+                    if let Err(e) = self.store.apply(&[event]) {
+                        run.push(run.failed(&e));
+                    }
                 }
             }
             Step::TestRestore { from, tested } => {

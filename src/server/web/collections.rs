@@ -12,8 +12,9 @@ use axum::{
 };
 
 use super::{
-    Access, Age, App, Base, Button, Error, Heading, Hint, Label, LiveQuery, Missing, Route, RunPath, Size, blocking,
-    layout, live, now, render_str,
+    Access, Age, App, Base, Button, Error, Heading, Hint, Label, LiveQuery, Missing, Route, RunPath, Size,
+    auth::Here,
+    blocking, layout, live, now, render_str,
     runs::{LogView, RunRow, collection_run_rows, log_view},
 };
 use crate::{
@@ -323,8 +324,10 @@ struct Overview {
 /// No collections yet: where to put them, and examples.
 struct Empty {
     dir: String,
-    /// The setup form can save there.
+    /// The setup form can save there, and an uploaded kit.
     writable: bool,
+    /// [`super::auth::Here`]: the browser can open it on this computer's desktop.
+    here: bool,
 }
 
 #[derive(Template)]
@@ -340,7 +343,8 @@ pub(super) struct IndexMain {
     unconfigured: Option<Unconfigured>,
 }
 
-pub(super) fn index_main(app: &App) -> IndexMain {
+/// `here`: [`super::auth::Here`].
+pub(super) fn index_main(app: &App, here: bool) -> IndexMain {
     let engine = app.engine();
     let inputs: Vec<CollectionInput> = engine
         .status()
@@ -350,6 +354,7 @@ pub(super) fn index_main(app: &App) -> IndexMain {
     let empty = inputs.is_empty().then(|| Empty {
         dir: profile::own_dir().map(|d| d.display().to_string()).unwrap_or_default(),
         writable: first_run::dir().is_some(),
+        here,
     });
     #[cfg(feature = "desktop")]
     let blocked = crate::install::autostart::blocked().map(|b| b.to_string());
@@ -383,10 +388,11 @@ impl IndexMain {
     }
 }
 
-pub(super) async fn index(State(app): State<Arc<App>>, access: Access, base: Base) -> Response {
+pub(super) async fn index(State(app): State<Arc<App>>, access: Access, Here(here): Here, base: Base) -> Response {
     blocking(move || {
         let live = live(&app, None, None, None);
-        Ok(layout(&Heading::Collections.to_string(), Some(live), access, &base, render_str(&index_main(&app), &base)))
+        let main = render_str(&index_main(&app, here), &base);
+        Ok(layout(&Heading::Collections.to_string(), Some(live), access, &base, main))
     })
     .await
 }

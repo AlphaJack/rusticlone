@@ -306,6 +306,8 @@ issue-prunes-on-forget = { $repo } prunes at every forget: slow and unscheduled.
 issue-setting-ignored = { $repo } { $setting }
 issue-no-password = { $repo } has no password, so rustic would ask for one with no one to type it. Set password, password-file or password-command in its [repository]
 issue-same-repository = { $target } is the same repository as { $primary }, so copying to it keeps no second copy, and its [forget] policy deletes the primary's snapshots. Give { $target } a repository of its own
+issue-restore-pending = from an emergency kit: backups wait for its restore
+issue-restore-failed = from an emergency kit, and its restore failed: backups wait for one that succeeds. If its sources or repositories have another place on this computer, write it in { $files }, then restore
 issue-never-backed-up = never backed up
 issue-no-disk-access = macOS does not let rustic read { $source }. In System Settings, give Full Disk Access to { $exe }, or to the terminal that runs it
 issue-missing = { $repo } is missing: { fix-missing-repo }
@@ -455,6 +457,8 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copy folder path
 button-see-how = See how
 button-cron-syntax = Cron syntax
+button-emergency-kit = Emergency kit
+button-restore-from-kit = Restore from a kit
 
 ## The web UI: words and states, in the tables and the breadcrumbs
 
@@ -514,6 +518,8 @@ hint-more-holding = { $more ->
 hint-no-snapshot-here = No snapshot of { $collection } here
 hint-create-profiles-in = Answer a few questions, or write your rustic profiles in { $dir }
 hint-write-profiles-in = Write your rustic profiles in { $dir }: the web UI cannot save them there
+hint-upload-kit = Installing again? Upload your emergency kit, { $file }: its profiles go in this folder, and each collection is restored before it is backed up again. Nothing that is on this computer is overwritten.
+hint-not-sent = not sent: the server did not answer
 hint-keep-a-copy = Keep a copy of these profiles away from this computer, for example in a password manager: you need them to restore after a disaster
 hint-now-visible = Your collection is now in { $app }. Put the profiles of other collections in the same folder
 hint-profiles-step = Put your profiles in { $dir } or another folder
@@ -532,6 +538,7 @@ hint-cross-site = refused: another site sent it. Open { -name } directly and try
 hint-name-or-path = part of a name or path
 hint-where-it-was = where it was, or a folder such as /tmp/restored
 hint-now = now, or a time such as 2026-10-01 12:00
+hint-kit-help = Download every profile, with its password, in one zip to keep away from this computer
 hint-notify = notification URLs, or nothing
 notice-started = { $collection }: { $what }
 notice-refreshing = { $collection }: refreshing
@@ -542,6 +549,13 @@ notice-notified = { $collection }: notification sent
 notice-not-notified = { $collection }: { notification-undelivered }
 notice-test-notified = test notification sent
 notice-test-not-notified = test notification failed: { $error }
+notice-kit-saved = { $saved ->
+    [0] the kit's profiles are in { $dir } already
+    [one] 1 profile saved in { $dir }
+   *[other] { $saved } profiles saved in { $dir }
+}
+notice-kit-restoring = { notice-kit-saved }: restoring { $collections }
+notice-kit-not-saved = kit not saved: { $error }
 notice-folder-not-opened = the folder did not open: the server's log says why
 notice-run-failed = { $collection }: { $line }
 notice-destination-not-absolute = the destination must be an absolute path
@@ -559,6 +573,27 @@ missing-run = run not found
 missing-repository = repository not found
 missing-snapshot = snapshot not found
 free-missing = folder or disk not found
+kit-header =
+    Emergency kit of { $host }, made on { $time } by { $user }
+
+    The .toml files next to this one are the rustic profiles and passwords that open your backups: without them, the backups cannot be read. Keep this zip away from this computer, for example in a password manager or a cloud drive. Anyone with it can access your backup files.
+
+    To restore on a new computer:
+    1. Install { -name }: { $url }
+    2. Run: { $restore }
+    3. Once restored, run { $resume } to resume your backups on this computer
+kit-collections = Collections that this kit can restore:
+kit-restores = Files will be copied from { $from } to { $to }.
+kit-falls-back = If { $missing } is missing, files will be copied from { $from } instead.
+kit-falls-back-again = If { $missing } is missing too, files will be copied from { $from } instead.
+kit-list = { $rest } and { $last }
+kit-error-name = { $name } is not the name of a profile
+kit-error-empty = no profile in this kit
+kit-error-not-a-kit = not an emergency kit: neither a zip nor a folder of rustic profiles
+kit-error-twice = { $name } is twice in this kit, in different folders
+kit-error-too-many-files = not an emergency kit: it holds too many files
+kit-error-too-large = not an emergency kit: { $name } is too large
+kit-error-differs = { $path } exists already, with other contents: move it away to use the kit's
 free-bytes = { $size } free
 
 ## The metrics' help
@@ -782,6 +817,8 @@ log-no-profiles = no profile with backup sources found in { $dirs }
 log-not-copied = not copied: { $error }
 log-note-left-out = [... { $lines } lines left out ...]
 log-note-cut = ... (the first { $size } of the log are in the file)
+log-kit-unpacked = saved { $saved } profiles of the emergency kit in { $dir }
+log-profiles-elsewhere = these profiles describe another computer: give their sources and repositories their places on this one before backing up with them: { $files }
 engine-error-no-collection = { $name } is not a collection. The collections are: { $known }
 engine-error-no-collections = no collections yet. Run `{ -name } serve --open` to create one. Or add rustic profiles with [[backup.snapshots]] to one of these folders: { $dirs }
 engine-error-not-a-source = { $path } is not a source of the collections named

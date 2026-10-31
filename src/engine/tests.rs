@@ -276,6 +276,35 @@ fn a_pending_failure_shows_the_last_success() {
     assert!(checked() == super::status::Last::Failing(1));
 }
 
+/// A kit's collection says what it waits for: its restore, and once that failed, the profiles to adapt. A
+/// restore that succeeds ends it.
+#[test]
+fn a_kits_collection_says_it_waits_for_its_restore() {
+    use super::status::Issue;
+    use crate::state::Event;
+    let engine = engine("restore-first", &Replay::new());
+    let status = || engine.status_of(&engine.collections()[0]);
+    let held = |status: &CollectionOverview| {
+        status.issues.iter().filter(|i| matches!(i, Issue::RestorePending | Issue::RestoreFailed { .. })).count()
+    };
+    assert_eq!(held(&status()), 0);
+    engine.store.apply(&[Event::RestoreFirst { collections: vec!["Docs".into()], asked: None }]).unwrap();
+    let pending = status();
+    assert!(pending.issues.iter().any(|i| matches!(i, Issue::RestorePending)), "{:?}", pending.issues);
+    assert!(!pending.issues.iter().any(|i| matches!(i, Issue::NeverBackedUp)));
+    assert_eq!(held(&pending), 1);
+    let at = engine.store.now();
+    engine.store.apply(&[Event::Restored { collection: "Docs".into(), at, ok: false }]).unwrap();
+    let failed = status();
+    let files =
+        failed.issues.iter().find_map(|i| if let Issue::RestoreFailed { files } = i { Some(files) } else { None });
+    assert!(files.is_some_and(|f| f.contains("Docs.toml") && f.contains("Docs-usb.toml")), "{:?}", failed.issues);
+    assert_eq!((held(&failed), failed.level), (1, Level::Failure));
+    assert!(failed.issues.iter().any(|i| i.to_string().contains("Docs.toml")), "the text names the files");
+    engine.store.apply(&[Event::Restored { collection: "Docs".into(), at, ok: true }]).unwrap();
+    assert_eq!(held(&status()), 0);
+}
+
 /// Of the groups rustic makes, one per source belongs to the collection: this host's, else the newest one.
 #[test]
 fn a_job_keeps_its_own_hosts_snapshots() {
@@ -443,6 +472,8 @@ fn a_repository_narrows_the_collection_named_with_it() {
 fn issue_kinds_match_their_json() {
     let issues = [
         super::Issue::NeverBackedUp,
+        super::Issue::RestorePending,
+        super::Issue::RestoreFailed { files: String::new() },
         super::Issue::Missing { repo: "Docs".into(), primary: true },
         super::Issue::Unreadable { error: String::new() },
     ];

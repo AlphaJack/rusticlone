@@ -16,6 +16,7 @@ mod collections;
 mod events;
 mod forms;
 mod free;
+mod kit;
 mod label;
 mod metrics;
 mod repo;
@@ -84,6 +85,7 @@ pub(super) fn router(app: Arc<App>) -> Router {
         .route(&at(Route::Setup), get(forms::setup).post(actions::save_setup))
         .route(&at(Route::SetupFree), get(free::free))
         .route(&at(Route::ProfileFolder), post(actions::open_profile_folder))
+        .route(&at(Route::Kit), get(kit::kit_download).post(kit::kit_upload))
         .route(&at(Route::CollectionRuns("")), post(actions::run).delete(actions::cancel))
         .route(&at(Route::NewRun("")), get(forms::form))
         .route(&at(Route::CollectionRefresh("")), post(actions::refresh))

@@ -6,7 +6,7 @@ use jiff::{SignedDuration, Timestamp, tz::TimeZone};
 use serde::Serialize;
 
 use super::{Collection, Engine, behind};
-use crate::request::{Request, RunKind, StepKey};
+use crate::request::{Request, RestoreOptions, RunKind, StepKey};
 use crate::{
     profile::RusticProfile,
     settings,
@@ -43,13 +43,25 @@ pub(super) struct Due {
     pub unscheduled: Vec<StepKey>,
 }
 
+/// The restore of a collection from an emergency kit: every source, in place, only where nothing is.
+pub(crate) fn kit_restore() -> RestoreOptions {
+    RestoreOptions { missing: true, ..RestoreOptions::default() }
+}
+
 /// In order: a backup (with its copies), copies a target lacks, then prune and check of each
 /// repository.
 pub(super) fn due(collection: &Collection<'_>, state: &Ledger, now: Timestamp, tz: &TimeZone) -> Due {
     let mut due = Due::default();
     let p = collection.primary;
-    let backup = due.at(&[p], RunKind::Backup, StepKey::Snapshot(p.name.clone()), state, now, tz);
-    due.requests.push((Request::Backup, backup));
+    // From an emergency kit: restored once, without overwriting anything, instead of backed up, unless the web UI
+    // asked for that restore. Nothing backs it up or prunes it until a restore succeeds or someone backs it up.
+    let held = state.restore_first.get(&p.name);
+    if let Some(hold) = held {
+        due.requests.push((Request::Restore(kit_restore()), hold.restore_due().then_some(now)));
+    } else {
+        let backup = due.at(&[p], RunKind::Backup, StepKey::Snapshot(p.name.clone()), state, now, tz);
+        due.requests.push((Request::Backup, backup));
+    }
     // Snapshots pending a copy, and those a target is known to lack (made by rustic directly), are copied
     // at once, or with backoff after a failure. Not to a target that cannot be listed: if it is
     // unmounted, the copy would create it in the mount point.
@@ -67,8 +79,8 @@ pub(super) fn due(collection: &Collection<'_>, state: &Ledger, now: Timestamp, t
             (Request::Prune(vec![name()]), StepKey::Prune(name())),
             (Request::Check(vec![(name(), None)]), StepKey::Check(name())),
         ] {
-            // The prune waits for the copy that brings the target up to date.
-            if matches!(request, Request::Prune(_)) && behind(state, collection, repo) {
+            // The prune waits for the copy that brings the target up to date, and for the restore.
+            if matches!(request, Request::Prune(_)) && (held.is_some() || behind(state, collection, repo)) {
                 continue;
             }
             let at = due.at(&[repo, p], request.kind(), key, state, now, tz);
@@ -245,7 +257,7 @@ mod tests {
     use super::*;
     use crate::{
         profile,
-        state::{Lag, LastStep},
+        state::{Hold, Lag, LastStep},
     };
 
     fn ts(s: &str) -> Timestamp {
@@ -285,7 +297,7 @@ mod tests {
             behind_since: Some(ts("2026-10-16T09:00:00Z")),
             listed: true,
         };
-        let cases: [(&str, &str, Ledger); 8] = [
+        let cases: [(&str, &str, Ledger); 10] = [
             // Never backed up: due now; never checked nor pruned: at their next time.
             ("never_run", daily, Ledger::default()),
             ("never_maintained", maintained, Ledger::default()),
@@ -311,6 +323,21 @@ mod tests {
             ("target_lacks_snapshots", "", Ledger { pending: [usb.clone()].into(), ..Ledger::default() }),
             // The target's prune waits for its copy.
             ("target_behind", maintained, Ledger { lag: [(usb, behind)].into(), ..Ledger::default() }),
+            // From a kit: restored instead of backed up, and not pruned; once that failed, nothing until asked.
+            (
+                "restore_first",
+                maintained,
+                Ledger { restore_first: [("Docs".into(), Hold::default())].into(), ..Ledger::default() },
+            ),
+            (
+                "restore_first_failed",
+                maintained,
+                Ledger {
+                    restore_first: [("Docs".into(), Hold { asked: None, failed: Some(ts("2026-10-16T11:00:00Z")) })]
+                        .into(),
+                    ..Ledger::default()
+                },
+            ),
         ];
         for (name, env, state) in cases {
             let [docs, usb] = collections(env);

@@ -116,6 +116,16 @@ pub(crate) fn writable(dir: &std::path::Path) -> bool {
     }
 }
 
+/// The name of the account this runs as, as `whoami` prints it: from the variables the system sets at login,
+/// else the home folder's name.
+#[cfg(feature = "server")]
+#[expect(clippy::disallowed_methods, reason = "the account's name, not a setting")]
+pub(crate) fn user() -> String {
+    let set = ["USER", "USERNAME", "LOGNAME"].iter().find_map(|v| std::env::var(v).ok().filter(|u| !u.is_empty()));
+    let home = || Some(etcetera::home_dir().ok()?.file_name()?.to_string_lossy().into_owned());
+    set.or_else(home).unwrap_or_default()
+}
+
 /// Empty if the system cannot tell.
 pub(crate) fn hostname() -> &'static str {
     static NAME: LazyLock<String> = LazyLock::new(|| read_hostname().unwrap_or_default());
@@ -182,17 +192,25 @@ pub(crate) fn is_root() -> bool {
 pub(crate) enum Presence {
     /// Not empty: left as it is.
     Present,
-    /// Absent, or an empty directory: restored.
+    /// Absent, or an empty directory: restored. A directory that holds only what the system puts in a new
+    /// account's folders, as [`PLACEHOLDERS`], counts as empty.
     Missing,
     /// An empty directory where `/etc/fstab` mounts a device that is not mounted. A restore there would
     /// fill the disk below and be hidden once the device mounts.
     Unmounted,
 }
 
+/// What macOS, Windows and KDE put in a new account's folders, as `~/Documents/.localized`, or leave in any
+/// folder that was opened. A folder that holds only these has none of the user's files.
+const PLACEHOLDERS: [&str; 5] = [".localized", ".DS_Store", "desktop.ini", "Thumbs.db", ".directory"];
+
 #[expect(clippy::disallowed_methods, reason = "inspects `path` and the mount table")]
 pub(crate) fn presence(path: &std::path::Path) -> Presence {
+    let placeholder = |e: &std::fs::DirEntry| {
+        e.file_type().is_ok_and(|t| t.is_file()) && PLACEHOLDERS.iter().any(|p| e.file_name() == *p)
+    };
     let empty = match std::fs::read_dir(path) {
-        Ok(mut entries) => entries.next().is_none(),
+        Ok(entries) => entries.flatten().all(|e| placeholder(&e)),
         Err(_) => !path.exists(),
     };
     if !empty {
@@ -685,6 +703,30 @@ pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
     let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
     let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
     windows.then(|| (letter, path.get(2..).unwrap_or_default()))
+}
+
+#[cfg(test)]
+mod presence_tests {
+    use super::{Presence, presence};
+
+    /// A new account's folder holds only the system's files: a restore with `--missing` fills it.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "lays out the folders")]
+    fn a_folder_of_placeholders_is_missing() {
+        let dir = super::test_dir("presence");
+        let folder = dir.join("Documents");
+        assert_eq!(presence(&folder), Presence::Missing, "absent");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join(".localized"), "").unwrap();
+        std::fs::write(folder.join(".DS_Store"), "").unwrap();
+        assert_eq!(presence(&folder), Presence::Missing, "only placeholders");
+        std::fs::write(folder.join("notes.txt"), "mine").unwrap();
+        assert_eq!(presence(&folder), Presence::Present);
+        // A folder of that name is the user's.
+        let other = dir.join("Pictures");
+        std::fs::create_dir_all(other.join(".localized")).unwrap();
+        assert_eq!(presence(&other), Presence::Present);
+    }
 }
 
 #[cfg(test)]
