@@ -110,6 +110,7 @@ pub(super) enum Button<'a> {
     CopyFolderPath,
     SeeHow,
     CronSyntax,
+    EmergencyKit,
 }
 
 /// A word or a state, in a table or a breadcrumb.
@@ -234,4 +235,5 @@ pub(super) enum Hint<'a> {
     WhereItWas,
     Now,
     Notify,
+    KitHelp,
 }

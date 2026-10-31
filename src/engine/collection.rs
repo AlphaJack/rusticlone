@@ -99,7 +99,7 @@ pub(super) fn continues(name: &str, start: &str) -> bool {
 /// What the collection of `primary` is called: the start of its name, up to a separator, that every copy
 /// target continues and no other profile does. `Documents-usb` copying to `Documents-s3` is `Documents`.
 /// Otherwise the backup profile's name, which stays the collection's key: a title changes with targets.
-pub(super) fn title<'a>(primary: &'a str, targets: &[String], profiles: &[String]) -> &'a str {
+pub(crate) fn title<'a>(primary: &'a str, targets: &[String], profiles: &[String]) -> &'a str {
     let ours = |name: &String| name == primary || targets.contains(name);
     let shared = |start: &&str| !start.is_empty() && !targets.is_empty() && targets.iter().all(|t| continues(t, start));
     let mut starts = primary.match_indices(SEPARATORS).rev().filter_map(|(i, _)| primary.get(..i));

@@ -455,6 +455,7 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copia il percorso della cartella
 button-see-how = Vedi come
 button-cron-syntax = Sintassi cron
+button-emergency-kit = Kit di emergenza
 
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 
@@ -532,6 +533,7 @@ hint-cross-site = rifiutato: l'ha inviato un altro sito. Apri { -name } direttam
 hint-name-or-path = parte di un nome o di un percorso
 hint-where-it-was = dov'era, o una cartella come /tmp/restored
 hint-now = adesso, o un momento come 2026-10-01 12:00
+hint-kit-help = Scarica tutti i profili, con le loro password, in un solo zip da conservare lontano da questo computer
 hint-notify = URL di notifica, o niente
 notice-started = { $collection }: { $what }
 notice-refreshing = { $collection }: aggiornamento in corso
@@ -559,6 +561,28 @@ missing-run = esecuzione non trovata
 missing-repository = archivio non trovato
 missing-snapshot = snapshot non trovato
 free-missing = cartella o disco non trovato
+kit-header =
+    Kit di emergenza di { $host }, creato il { $time } da { $user }
+
+    I file .toml accanto a questo sono i profili di rustic e le password che aprono i tuoi backup: senza di essi i backup non si possono leggere. Conserva questo zip lontano da questo computer, per esempio in un gestore di password o in un cloud. Chiunque lo abbia può accedere ai file dei tuoi backup.
+
+    Per ripristinare su un nuovo computer:
+    1. Installa { -name }: { $url }
+    2. Esegui: { $restore }
+    3. A ripristino concluso, esegui { $resume } per riprendere i backup su questo computer
+kit-collections = Raccolte che questo kit può ripristinare:
+kit-restores = I file verranno copiati da { $from } a { $to }.
+kit-falls-back = Se { $missing } manca, i file verranno copiati da { $from }.
+kit-falls-back-again = Se manca anche { $missing }, i file verranno copiati da { $from }.
+kit-list = { $rest } e { $last }
+kit-error-name = { $name } non è il nome di un profilo
+kit-error-empty = nessun profilo in questo kit
+kit-error-not-a-kit = non è un kit di emergenza: uno zip con un info.txt
+kit-error-no-layout = non è un kit di emergenza: il suo info.txt non inizia con la versione del formato
+kit-error-too-many-files = non è un kit di emergenza: contiene troppi file
+kit-error-too-large = non è un kit di emergenza: { $name } è troppo grande
+kit-error-newer = questo kit è nel formato { $version }, di un { -name } più recente: aggiorna { -name } per leggerlo
+kit-error-differs = { $path } esiste già, con un contenuto diverso: spostalo per usare quello del kit
 free-bytes = { $size } liberi
 
 ## L'aiuto delle metriche
@@ -782,6 +806,8 @@ log-no-profiles = nessun profilo con sorgenti di backup trovato in { $dirs }
 log-not-copied = non copiato: { $error }
 log-note-left-out = [... { $lines } righe omesse ...]
 log-note-cut = ... (i primi { $size } del log sono nel file)
+log-kit-unpacked = salvati { $saved } profili del kit di emergenza in { $dir }
+log-profiles-elsewhere = questi profili descrivono un altro computer: dai alle loro sorgenti e ai loro archivi un posto su questo prima di farci i backup: { $files }
 engine-error-no-collection = { $name } non è una raccolta. Le raccolte sono: { $known }
 engine-error-no-collections = ancora nessuna raccolta. Esegui `{ -name } serve --open` per crearne una. Oppure aggiungi profili rustic con [[backup.snapshots]] a una di queste cartelle: { $dirs }
 engine-error-not-a-source = { $path } non è una sorgente delle raccolte indicate

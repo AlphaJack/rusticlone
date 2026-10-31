@@ -26,6 +26,8 @@ pub(crate) struct Response {
     pub code: u16,
     pub head: String,
     pub body: String,
+    /// The body as sent, for a download that is not text.
+    pub bytes: Vec<u8>,
 }
 
 impl Sandbox {
@@ -98,11 +100,13 @@ impl Server {
         stream.write_all(request.as_bytes()).unwrap();
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).unwrap();
-        // Downloads may be binary.
+        // Downloads may be binary: the body is kept as sent too.
+        let end = bytes.windows(4).position(|w| w == b"\r\n\r\n").map_or(bytes.len(), |i| i + 4);
+        let raw = bytes.get(end..).unwrap_or_default().to_vec();
         let response = String::from_utf8_lossy(&bytes);
         let (head, body) = response.split_once("\r\n\r\n").unwrap_or((&response, ""));
         let code = head.split_whitespace().nth(1).unwrap().parse().unwrap();
-        Response { code, head: head.to_owned(), body: body.to_owned() }
+        Response { code, head: head.to_owned(), body: body.to_owned(), bytes: raw }
     }
 
     /// With the token, as a script would.

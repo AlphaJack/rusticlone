@@ -16,6 +16,8 @@ mod status;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "server")]
+pub(crate) use collection::title;
 pub(crate) use collection::{Blocked, Collection};
 pub(crate) use load::Named;
 use locks::Use;

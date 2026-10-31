@@ -455,6 +455,7 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copy folder path
 button-see-how = See how
 button-cron-syntax = Cron syntax
+button-emergency-kit = Emergency kit
 
 ## The web UI: words and states, in the tables and the breadcrumbs
 
@@ -532,6 +533,7 @@ hint-cross-site = refused: another site sent it. Open { -name } directly and try
 hint-name-or-path = part of a name or path
 hint-where-it-was = where it was, or a folder such as /tmp/restored
 hint-now = now, or a time such as 2026-10-01 12:00
+hint-kit-help = Download every profile, with its password, in one zip to keep away from this computer
 hint-notify = notification URLs, or nothing
 notice-started = { $collection }: { $what }
 notice-refreshing = { $collection }: refreshing
@@ -559,6 +561,28 @@ missing-run = run not found
 missing-repository = repository not found
 missing-snapshot = snapshot not found
 free-missing = folder or disk not found
+kit-header =
+    Emergency kit of { $host }, made on { $time } by { $user }
+
+    The .toml files next to this one are the rustic profiles and passwords that open your backups: without them, the backups cannot be read. Keep this zip away from this computer, for example in a password manager or a cloud drive. Anyone with it can access your backup files.
+
+    To restore on a new computer:
+    1. Install { -name }: { $url }
+    2. Run: { $restore }
+    3. Once restored, run { $resume } to resume your backups on this computer
+kit-collections = Collections that this kit can restore:
+kit-restores = Files will be copied from { $from } to { $to }.
+kit-falls-back = If { $missing } is missing, files will be copied from { $from } instead.
+kit-falls-back-again = If { $missing } is missing too, files will be copied from { $from } instead.
+kit-list = { $rest } and { $last }
+kit-error-name = { $name } is not the name of a profile
+kit-error-empty = no profile in this kit
+kit-error-not-a-kit = not an emergency kit: a zip with an info.txt
+kit-error-no-layout = not an emergency kit: its info.txt does not start with the layout
+kit-error-too-many-files = not an emergency kit: it holds too many files
+kit-error-too-large = not an emergency kit: { $name } is too large
+kit-error-newer = this kit is in layout { $version }, from a newer rusticlone: update rusticlone to read it
+kit-error-differs = { $path } exists already, with other contents: move it away to use the kit's
 free-bytes = { $size } free
 
 ## The metrics' help
@@ -782,6 +806,8 @@ log-no-profiles = no profile with backup sources found in { $dirs }
 log-not-copied = not copied: { $error }
 log-note-left-out = [... { $lines } lines left out ...]
 log-note-cut = ... (the first { $size } of the log are in the file)
+log-kit-unpacked = saved { $saved } profiles of the emergency kit in { $dir }
+log-profiles-elsewhere = these profiles describe another computer: give their sources and repositories their places on this one before backing up with them: { $files }
 engine-error-no-collection = { $name } is not a collection. The collections are: { $known }
 engine-error-no-collections = no collections yet. Run `{ -name } serve --open` to create one. Or add rustic profiles with [[backup.snapshots]] to one of these folders: { $dirs }
 engine-error-not-a-source = { $path } is not a source of the collections named
