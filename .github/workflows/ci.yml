@@ -136,11 +136,17 @@ jobs:
       - name: Check vendored htmx
         if: runner.os == 'Linux'
         run: cargo xtask vendor --check
-      - name: Keep the computer awake as the system's server does, as root
+      - name: Keep the computer awake as root, and as a user logged in at the computer's console
         if: runner.os == 'Linux'
         run: |
           tests=$(cargo test --lib --no-run --locked --message-format=json | jq -r 'select(.profile.test and .target.kind == ["lib"]) | .executable')
-          sudo "$tests" --exact sys::awake_tests::logind_lists_the_inhibitor_until_dropped
+          test=sys::awake_tests::logind_lists_the_inhibitor_until_dropped
+          sudo "$tests" --exact "$test"
+          # A login on seat0's third console, as pam_systemd makes one.
+          sudo systemd-run --uid="$USER" --property=PAMName=login --property=TTYPath=/dev/tty3 --property=StandardInput=tty \
+            --property=StandardOutput=file:"$RUNNER_TEMP/console.log" --property=StandardError=file:"$RUNNER_TEMP/console.log" \
+            --setenv=XDG_SEAT=seat0 --setenv=XDG_VTNR=3 --wait --quiet "$tests" --exact "$test" || { cat "$RUNNER_TEMP/console.log"; exit 1; }
+          cat "$RUNNER_TEMP/console.log"
       - name: Check the systemd units, as the system's and a user's
         if: runner.os == 'Linux'
         run: |
