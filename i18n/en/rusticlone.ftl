@@ -709,6 +709,7 @@ app-description = { -description }
 tray-open = Open { -app }
 tray-quit = Quit (pause automatic backups)
 switch-at-login = Start at login
+awake-why = A backup is running
 switch-auto-update = Update automatically
 attest-over-digest = { $scheme } over a digest
 update-current = { -name } { $current } is up to date
