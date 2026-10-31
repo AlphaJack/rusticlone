@@ -81,25 +81,31 @@ enum LogNote {
 
 /// A run of a collection and its report. Its log is a separate file. It keeps what is shown, not the
 /// types that made it, so that a later version can still show it. Its request is stored beside it.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunRecord {
     /// When it was requested, in milliseconds. Also its position in the queue.
     pub id: i64,
+    /// The collection it runs.
     pub collection: String,
     /// `prune primary`, `check primary 3/10`.
     pub label: String,
+    /// What it does.
     pub kind: RunKind,
     /// The repository it acts on, if one.
     pub scope: Option<String>,
+    /// What started it.
     pub trigger: Trigger,
+    /// The process that runs it.
     pub pid: u32,
     /// When it started. While queued: when it was requested.
     pub started: Timestamp,
     /// Unset while it runs, or if the process stopped before its end.
     pub finished: Option<Timestamp>,
+    /// How far it got.
     pub status: Status,
     /// Results that no step produced, such as a request that could not be planned.
     pub results: Vec<ResultRecord>,
+    /// The rustic calls it made, in the order they started.
     pub calls: Vec<Call>,
     /// Its planned steps, and how far each got.
     pub steps: Vec<StepRecord>,
@@ -200,7 +206,7 @@ fn stored<T: DeserializeOwned>(text: &str) -> Option<T> {
 }
 
 /// A stored run read back with its request, to queue or wait for it.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Queued {
     #[serde(flatten)]
     pub record: RunRecord,
@@ -656,6 +662,7 @@ impl Store {
         runs.unwrap_or_default()
     }
 
+    /// The collection's run with this id, if stored.
     pub fn run(&self, collection: &str, id: i64) -> Option<RunRecord> {
         let run = self.read(|r| {
             let table = r.open_table(RUNS)?;

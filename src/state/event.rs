@@ -19,77 +19,112 @@ use crate::{
 pub enum Event {
     /// A step that started at `started` ended at `at`.
     Attempted {
+        /// The step.
         key: StepKey,
+        /// When it started.
         started: Timestamp,
+        /// When it ended.
         at: Timestamp,
+        /// How it ended.
         result: Outcome,
+        /// The run it was part of. `None` if it ran alone.
         #[serde(default)]
         by: Option<RunStep>,
     },
     /// What a successful backup left out, such as unreadable items. Cleared by a backup without
     /// warnings.
     Warned {
+        /// The backup step.
         key: StepKey,
+        /// What it left out. Empty clears earlier warnings.
         warnings: Vec<ResultRecord>,
     },
     /// The user dismissed a step's failure, cancellation or warning.
     Dismissed {
+        /// The step.
         key: StepKey,
     },
     /// New schedules. A step never done is due at its first scheduled time after `at`.
     FirstSeen {
+        /// The newly scheduled steps.
         keys: Vec<StepKey>,
+        /// When they were first seen.
         at: Timestamp,
     },
     /// A schedule was removed. If set again, it starts from scratch.
     Unscheduled {
+        /// The step.
         key: StepKey,
     },
     /// A backup ran, so the collection's targets may lack snapshots.
     Pending {
+        /// The collection that was backed up.
         collection: String,
+        /// Its targets, now possibly behind.
         targets: Vec<String>,
     },
     /// A target has every snapshot of the collection's primary.
     Copied {
+        /// The collection.
         collection: String,
+        /// The target that caught up.
         target: String,
     },
+    /// The newest snapshot seen in a repository.
     Newest {
+        /// The repository.
         repo: String,
+        /// When that snapshot was taken.
         at: Timestamp,
     },
     /// How far a target is behind its primary, measured at `at`.
     Lag {
+        /// The collection.
         collection: String,
+        /// The target.
         target: String,
+        /// When the lag was measured.
         at: Timestamp,
+        /// What the target lacks.
         behind: Behind,
     },
     /// A check of a repository took a data subset (of `of`): an owed one first, else the next one.
     CheckTaken {
+        /// The repository.
         repo: String,
+        /// How many subsets its data is split into.
         of: u32,
     },
+    /// A check of a repository read one data subset, or did not.
     CheckRead {
+        /// The repository.
         repo: String,
+        /// The subset.
         n: u32,
+        /// How the read went.
         read: Read,
     },
     /// Snapshots of the collection that a target's own forget removed. Copying them again would only remove them
     /// again. Snapshots older than the oldest one kept do not matter.
     Dropped {
+        /// The collection.
         collection: String,
+        /// The target whose forget removed them.
         target: String,
+        /// The removed snapshots and when each was taken.
         removed: Vec<(SnapshotId, Timestamp)>,
+        /// When the oldest snapshot the forget kept was taken. `None` if unknown.
         oldest_kept: Option<Timestamp>,
     },
 }
 
+/// How a check read a data subset.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Read {
+    /// Read without errors.
     Through,
+    /// Read with errors: owed, and failing until read through.
     Failed,
     /// Stopped or never run: owed.
     Not,
@@ -108,7 +143,9 @@ pub enum Behind {
 /// What is known of every collection: all events applied so far, read in one piece.
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Ledger {
+    /// How each step last went.
     pub last_steps: BTreeMap<StepKey, LastStep>,
+    /// The subsets each repository's checks read, owe and failed.
     pub checks: BTreeMap<String, Checks>,
     /// By collection and target.
     #[serde(with = "entries")]
@@ -142,10 +179,12 @@ impl Ledger {
         shape::read(serde_json::from_str(text).ok()?)
     }
 
+    /// The ledger as stored, in this version's shape.
     pub(super) fn to_stored(&self) -> anyhow::Result<String> {
         Ok(shape::to_value(self)?.to_string())
     }
 
+    /// How the step last went. `None` if it never ran.
     pub fn last_step(&self, key: &StepKey) -> Option<&LastStep> {
         self.last_steps.get(key)
     }
@@ -160,14 +199,17 @@ impl Ledger {
         self.pending.contains(&(collection.to_owned(), target.to_owned()))
     }
 
+    /// Whether the step ever succeeded.
     pub fn succeeded(&self, key: &StepKey) -> bool {
         self.last_step(key).is_some_and(|l| l.last_ok.is_some())
     }
 
+    /// How far `target` is behind the collection's primary, if measured.
     pub fn lag(&self, collection: &str, target: &str) -> Option<&Lag> {
         self.lag.get(&(collection.to_owned(), target.to_owned()))
     }
 
+    /// Records the event.
     pub fn apply(&mut self, event: &Event) {
         match event.clone() {
             Event::Attempted { key, started, at, result, by } => {

@@ -73,7 +73,7 @@ pub struct RepoInfo {
 
 /// The repository's snapshots and size at its last listing, or why the listing failed. Runs list
 /// repositories too, which keeps the snapshots current but not the size.
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Inventory {
     pub listed: Timestamp,
     pub result: Result<RepoInfo, String>,
@@ -178,8 +178,10 @@ fn at(ms: i64) -> Timestamp {
     Timestamp::from_millisecond(ms).unwrap_or_default()
 }
 
+/// The state: the ledger, the runs, the listings and the sessions, in one database.
 #[derive(Clone)]
 pub struct Store {
+    /// The directory that holds the database.
     pub dir: PathBuf,
     db: Arc<Database>,
     clock: Arc<dyn Clock>,
@@ -188,6 +190,12 @@ pub struct Store {
     /// The temporary directory of a dry run without a state, removed with the last store.
     _scratch: Option<Arc<Scratch>>,
     parsed: Arc<Parsed>,
+}
+
+impl std::fmt::Debug for Store {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Store").field("dir", &self.dir).field("dry_run", &self.dry_run).finish_non_exhaustive()
+    }
 }
 
 /// What tells the server that another process changed the state, and what.
@@ -237,6 +245,7 @@ fn one_at_a_time() -> parking_lot::ReentrantMutexGuard<'static, ()> {
 }
 
 impl Store {
+    /// The state in the state directory.
     pub fn open() -> Result<Self> {
         Self::at(settings::state_dir()?)
     }
@@ -291,14 +300,17 @@ impl Store {
         Self { clock, ..self }
     }
 
+    /// The time now, by the store's clock.
     pub fn now(&self) -> Timestamp {
         self.clock.now()
     }
 
+    /// Waits for `for_`, or until `stop` returns true.
     pub fn wait(&self, for_: std::time::Duration, stop: &dyn Fn() -> bool) {
         self.clock.wait(for_, stop);
     }
 
+    /// The state in `dir`.
     pub fn at(dir: PathBuf) -> Result<Self> {
         #[cfg(windows)]
         let _one = one_at_a_time();
@@ -379,6 +391,7 @@ impl Store {
         Ok(kept.as_ref().map(|(_, ledger)| ledger.clone()).unwrap_or_default())
     }
 
+    /// The ledger. Empty if unreadable.
     pub fn load(&self) -> Ledger {
         self.read(|r| self.ledger(&r.open_table(LEDGER)?)).unwrap_or_else(|e| {
             crate::log::event(None, &Logged::StateUnread { error: format!("{e:#}") });
@@ -460,6 +473,7 @@ impl Store {
         })
     }
 
+    /// The repository's last listing for the collection, if any.
     pub fn inventory(&self, collection: &str, repo: &str) -> Option<Inventory> {
         self.read(|r| Ok(r.open_table(INVENTORIES)?.get((collection, repo))?.and_then(|l| json(l.value()))))
             .ok()
@@ -471,6 +485,7 @@ impl Store {
         self.inventory(collection, repo).and_then(|l| l.result.ok()).map(|i| i.snapshots).unwrap_or_default()
     }
 
+    /// Replaces the repository's listing for the collection.
     pub fn save_inventory(&self, collection: &str, repo: &str, inventory: &Inventory) -> Result<()> {
         self.write(Shown::Of(collection), |w| {
             Ok(w.open_table(INVENTORIES)?.insert((collection, repo), to_json(inventory)?.as_str()).map(drop)?)
@@ -518,6 +533,7 @@ impl Store {
         }
     }
 
+    /// Records the repository's size, measured now.
     pub fn measured(&self, collection: &str, repo: &str, stored: u64, data: u64) {
         _ = self.update_inventory(collection, repo, |inventory| {
             let mut inventory = inventory?;
@@ -545,6 +561,7 @@ impl Store {
         session.ok().flatten().filter(|&(ms, _)| at(ms) > self.now()).map(|(_, token)| token)
     }
 
+    /// Removes the session.
     pub fn remove_session(&self, hash: &str) -> Result<()> {
         self.write(Shown::Nothing, |w| Ok(w.open_table(SESSIONS)?.remove(hash).map(drop)?))
     }

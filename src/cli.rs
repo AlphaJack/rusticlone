@@ -27,6 +27,7 @@ use crate::{
 /// The exit code a shell uses for a command stopped by SIGINT.
 const INTERRUPTED: u8 = 130;
 
+/// Runs the command given on the command line.
 pub fn main() -> ExitCode {
     clap_complete::CompleteEnv::with_factory(args::command).complete();
     let args = std::env::args_os();
