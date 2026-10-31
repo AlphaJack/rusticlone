@@ -651,7 +651,7 @@ first-run-error-not-a-choice = { $field } della posizione { $role ->
 } deve essere uno tra: { $choices }
 first-run-error-no-dir = nessuna cartella dei profili in cui si possa scrivere
 first-run-error-exists = { $path } esiste già
-first-run-error-inside = il repository deve stare in una cartella separata dalla sorgente { $backed_up }
+first-run-error-inside = il repository deve stare in una cartella separata dalla sorgente
 first-run-error-not-empty = { $folder } contiene altri file: scegli una cartella vuota o nuova, oppure la cartella di un backup esistente
 
 ## Il server, la sua installazione e gli aggiornamenti

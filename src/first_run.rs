@@ -507,10 +507,7 @@ pub(crate) enum Error {
     },
     /// rustic would back up the repository into itself and grow it at every run.
     #[cfg(feature = "server")]
-    Inside {
-        folder: String,
-        backed_up: String,
-    },
+    Inside,
     /// Neither empty nor a repository: rustic would mix its files in with others.
     #[cfg(feature = "server")]
     NotEmpty {
@@ -798,7 +795,7 @@ impl Setup {
                     .flatten()
                     .any(|f| forms(source).iter().flatten().any(|s| f.starts_with(s) || s.starts_with(f)));
                 if nested {
-                    return Err(Error::Inside { folder, backed_up: source.clone() });
+                    return Err(Error::Inside);
                 }
             }
             let dir = Path::new(&folder);
@@ -900,8 +897,8 @@ mod tests {
             setup.values.insert("primary.local.repository".into(), folder.to_owned());
             setup.check_folders()
         };
-        assert!(matches!(into(&path(&["docs", "backup"])), Err(Error::Inside { .. })));
-        assert!(matches!(into(&dir.display().to_string()), Err(Error::Inside { .. })), "it would hold the source");
+        assert!(matches!(into(&path(&["docs", "backup"])), Err(Error::Inside)));
+        assert!(matches!(into(&dir.display().to_string()), Err(Error::Inside)), "it would hold the source");
         assert!(matches!(into(&path(&["full"])), Err(Error::NotEmpty { .. })));
         assert!(into(&path(&["repo"])).is_ok(), "an existing repository");
         assert!(into(&path(&["new", "backup"])).is_ok());

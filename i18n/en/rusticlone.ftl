@@ -651,7 +651,7 @@ first-run-error-not-a-choice = the { $role ->
 } location's { $field } must be one of: { $choices }
 first-run-error-no-dir = no profile folder that can be written in
 first-run-error-exists = { $path } already exists
-first-run-error-inside = the repository must be in a folder separate from the source { $backed_up }
+first-run-error-inside = the repository must be in a folder separate from the source
 first-run-error-not-empty = { $folder } holds other files: choose an empty or new folder, or the folder of an existing backup
 
 ## The server, its installation and updates
