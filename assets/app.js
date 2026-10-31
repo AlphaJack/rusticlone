@@ -80,7 +80,10 @@ document.addEventListener("click", (event) => {
   if (add) {
     const row = rows().at(-1).cloneNode(true);
     row.querySelector("input").value = "";
+    row.querySelector(".measured")?.replaceChildren();
     rows().at(-1).after(row);
+    // The clone's size request is wired like the original's.
+    htmx.process(row);
   } else remove.closest(".source").remove();
   rows().forEach((row, i) => {
     Object.assign(row.querySelector("input"), { name: `${list.dataset.field}.${i}`, id: `setup-${list.dataset.field}-${i}` });

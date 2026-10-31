@@ -89,7 +89,10 @@ pub(super) async fn setup(access: Access, base: Base) -> Response {
         if first_run::dir().is_none() {
             return Ok(axum::response::Redirect::to(&base.to(Route::Index)).into_response());
         }
-        let view = SetupFormView::new(Setup::default());
+        // A further collection backs up another folder.
+        let profiles: Vec<String> =
+            crate::profile::profile_files().unwrap_or_default().into_iter().map(|(n, _)| n).collect();
+        let view = SetupFormView::new(Setup::next(&profiles));
         Ok(layout(&Heading::SetUp.to_string(), None, access, &base, render_str(&view, &base)))
     })
     .await

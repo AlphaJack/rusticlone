@@ -92,6 +92,18 @@ pub(crate) enum Keep {
     All,
 }
 
+impl Every {
+    /// How often the repositories are checked for damage: often enough to find it before many backups depend
+    /// on a damaged one. Rarely enough not to read them over and over. Never without a schedule.
+    fn check(self) -> Self {
+        match self {
+            Self::Manual => Self::Manual,
+            Self::Hourly | Self::Daily | Self::Custom => Self::Weekly,
+            Self::Weekly | Self::Monthly => Self::Monthly,
+        }
+    }
+}
+
 impl Keep {
     /// How often what it no longer keeps is removed: often enough that a month's backups do not pile up, and
     /// never when it keeps everything.
@@ -404,13 +416,11 @@ pub(crate) struct Setup {
     pub values: BTreeMap<String, String>,
     pub every: Every,
     pub keep: Keep,
-    /// How often the repositories are checked.
-    pub check: Every,
     pub notify: String,
 }
 
 /// `path` with a leading `~` as the home folder: rustic would read it as a folder named `~`.
-fn home(path: &str) -> String {
+pub(crate) fn home(path: &str) -> String {
     let rest =
         path.strip_prefix('~').filter(|rest| rest.is_empty() || rest.starts_with(['/', std::path::MAIN_SEPARATOR]));
     match (rest, etcetera::home_dir()) {
@@ -434,8 +444,28 @@ pub(crate) fn repository_folder(text: &str) -> String {
 /// The first backup works without a second disk.
 impl Default for Setup {
     fn default() -> Self {
+        Self::of_folder(FOLDERS[0])
+    }
+}
+
+/// The home folders a collection is first suggested for in this order.
+const FOLDERS: [&str; 6] = ["Documents", "Pictures", "Desktop", "Music", "Videos", "Downloads"];
+
+impl Setup {
+    /// A further collection: for the first home folder that exists and that no profile is named after yet.
+    #[cfg(feature = "server")]
+    #[expect(clippy::disallowed_methods, reason = "looks for the user's folders")]
+    pub(crate) fn next(profiles: &[String]) -> Self {
+        let home = etcetera::home_dir().unwrap_or_default();
+        let taken = |name: &str| profiles.iter().any(|p| p == name || p.starts_with(&format!("{name}-")));
+        let free = FOLDERS.iter().find(|name| !taken(name) && home.join(name).is_dir());
+        free.map_or_else(|| Self { name: String::new(), ..Self::default() }, |name| Self::of_folder(name))
+    }
+
+    /// The answers for backing up the home folder `name` (the system's files for root) to a folder named
+    /// after it.
+    fn of_folder(name: &str) -> Self {
         let home = etcetera::home_dir().unwrap_or_else(|_| "/home/me".into());
-        let name = "Documents";
         let source = match (sys::is_root(), cfg!(windows), cfg!(target_vendor = "apple")) {
             (false, ..) => home.join(name).display().to_string(),
             // Every account's files, which the system service reads.
@@ -459,7 +489,6 @@ impl Default for Setup {
             .into(),
             every: Every::Daily,
             keep: Keep::default(),
-            check: Every::Weekly,
             notify: desktop().unwrap_or_default().into(),
         }
     }
@@ -684,12 +713,11 @@ impl Setup {
         Ok(())
     }
 
-    /// Each step's setting, the form's name for it, and how often it runs.
     /// Each schedule's setting, the form's field, its answer and the question it answers.
     fn schedules(&self) -> [(settings::Setting, &'static str, Every, Question); 3] {
         [
             (settings::BACKUP, "every", self.every, Question::WhenBackUp),
-            (settings::CHECK, "check", self.check, Question::HowOftenCheck),
+            (settings::CHECK, "check", self.every.check(), Question::HowOftenCheck),
             (settings::PRUNE, "prune", self.keep.prune(), Question::HowLongKeep),
         ]
     }
@@ -994,10 +1022,10 @@ mod tests {
         assert!(primary.contains(&format!("{} = \"@monthly\"", settings::PRUNE.key)), "{primary}");
         let month = Setup { keep: Keep::Month, ..setup.clone() }.profiles();
         assert!(month[0].1.contains(&format!("{} = \"@weekly\"", settings::PRUNE.key)), "{}", month[0].1);
-        let manual = Setup { keep: Keep::All, check: Every::Manual, ..setup.clone() }.profiles();
+        let manual = Setup { keep: Keep::All, every: Every::Manual, ..setup.clone() }.profiles();
         assert!(!manual[0].1.contains(settings::PRUNE.key), "{}", manual[0].1);
         assert!(!manual[0].1.contains(settings::CHECK_SUBSETS.key), "{}", manual[0].1);
-        let mut custom = Setup { check: Every::Custom, ..setup.clone() };
+        let mut custom = Setup { every: Every::Custom, ..setup.clone() };
         assert!(matches!(custom.check(), Err(Error::NoCustom)));
         let signal = Setup { notify: "signal://localhost/+1 555 123 4567 macosx://".into(), ..setup.clone() };
         assert!(signal.check().is_ok(), "{:?}", signal.check());
@@ -1007,8 +1035,13 @@ mod tests {
                 "{notify}"
             );
         }
-        custom.values.insert("check.custom".into(), "0 3 * * 1".into());
-        assert!(custom.profiles()[0].1.contains(&format!("{} = \"0 3 * * 1\"", settings::CHECK.key)));
+        custom.values.insert("every.custom".into(), "0 3 * * 1".into());
+        let custom = &custom.profiles()[0].1;
+        assert!(custom.contains(&format!("{} = \"0 3 * * 1\"", settings::BACKUP.key)), "{custom}");
+        // Checks follow the backups: weekly for a custom schedule and monthly for weekly backups.
+        assert!(custom.contains(&format!("{} = \"@weekly\"", settings::CHECK.key)), "{custom}");
+        let weekly = &Setup { every: Every::Weekly, ..setup.clone() }.profiles()[0].1;
+        assert!(weekly.contains(&format!("{} = \"@monthly\"", settings::CHECK.key)), "{weekly}");
         assert!(<Every as strum::IntoEnumIterator>::iter().all(|e| Every::try_from(e.id()).is_ok_and(|c| c == e)));
         assert!(setup.check().is_ok());
         assert!(matches!(

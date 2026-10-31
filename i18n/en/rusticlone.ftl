@@ -455,6 +455,7 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copy folder path
 button-see-how = See how
 button-cron-syntax = Cron syntax
+button-new-collection = New collection
 
 ## The web UI: words and states, in the tables and the breadcrumbs
 
@@ -560,6 +561,9 @@ missing-repository = repository not found
 missing-snapshot = snapshot not found
 free-missing = folder or disk not found
 free-bytes = { $size } free
+measured-missing = { free-missing }
+measured-bytes = { $size } in { $files } files{ $largest }
+measured-at-least = more than { $size } in { $files } files, still counting{ $largest }
 
 ## The metrics' help
 

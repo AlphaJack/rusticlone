@@ -48,7 +48,8 @@
         {% let fields = setup.source_fields() %}
         {% for (i, source) in fields.iter().enumerate() %}
         <div class="field-row source">
-          <input type="text" name="{{ crate::first_run::SOURCE }}.{{ i }}" id="setup-source-{{ i }}" value="{{ source }}" aria-label="{{ Heading::Folders }}" autocomplete="off">
+          <input type="text" name="{{ crate::first_run::SOURCE }}.{{ i }}" id="setup-source-{{ i }}" value="{{ source }}" aria-label="{{ Heading::Folders }}" autocomplete="off" hx-get="{{ base }}{{ Route::SetupSize }}" hx-trigger="load, input delay:800ms" hx-target="next .measured" hx-swap="innerHTML">
+          <span class="muted measured"></span>
           <button type="button" class="icon-btn small" data-remove title="{{ Button::RemoveFolder }}" aria-label="{{ Button::RemoveFolder }}">×</button>
         </div>
         {% endfor %}
@@ -71,10 +72,6 @@
   <section class="card">
     <h2>{{ Question::HowLongKeep }}</h2>
     <select name="keep" aria-label="{{ Question::HowLongKeep }}">{% for k in keeps %}<option value="{{ k.id() }}"{% if *k == setup.keep %} selected{% endif %}>{{ k }}</option>{% endfor %}</select>
-  </section>
-  <section class="card">
-    <h2>{{ Question::HowOftenCheck }}</h2>
-    {% call schedule("check", setup.check, Question::HowOftenCheck) %}{% endcall %}
   </section>
   <section class="card">
     <h2>{{ Question::WhereNotify }}</h2>

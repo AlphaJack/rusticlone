@@ -233,7 +233,8 @@
   input.command { font: 13px var(--mono); }
   /* the first folder stays; its button keeps its place, so that the fields line up */
   .source:first-child [data-remove] { visibility: hidden; }
-  .free { font-size: 13px; }
+  .free, .measured { font-size: 13px; }
+  .measured { flex: none; max-width: 40%; }
   .free .warning-text { color: var(--warning); }
   .form-grid label:has(+ .sources) { align-self: start; margin-top: 9px; }
   .sources .source { width: 100%; }

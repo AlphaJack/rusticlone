@@ -110,6 +110,7 @@ pub(super) enum Button<'a> {
     CopyFolderPath,
     SeeHow,
     CronSyntax,
+    NewCollection,
 }
 
 /// A word or a state, in a table or a breadcrumb.

@@ -455,6 +455,7 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copia il percorso della cartella
 button-see-how = Vedi come
 button-cron-syntax = Sintassi cron
+button-new-collection = Nuova raccolta
 
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 
@@ -560,6 +561,9 @@ missing-repository = archivio non trovato
 missing-snapshot = snapshot non trovato
 free-missing = cartella o disco non trovato
 free-bytes = { $size } liberi
+measured-missing = { free-missing }
+measured-bytes = { $size } in { $files } file{ $largest }
+measured-at-least = più di { $size } in { $files } file, conteggio in corso{ $largest }
 
 ## L'aiuto delle metriche
 
