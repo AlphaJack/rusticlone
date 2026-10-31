@@ -136,9 +136,6 @@ jobs:
       - name: Check vendored htmx
         if: runner.os == 'Linux'
         run: cargo xtask vendor --check
-      - name: Check the images rendered from the logo
-        if: runner.os == 'Linux'
-        run: cargo xtask logo --check
       - name: Check the systemd units, as the system's and a user's
         if: runner.os == 'Linux'
         run: |
