@@ -600,9 +600,16 @@ impl Setup {
         }
     }
 
-    /// The folders to back up, in the order of their fields, with `~` as the home folder.
+    /// The folders to back up, in the order of their fields, with `~` as the home folder. One given twice counts
+    /// once.
     pub(crate) fn sources(&self) -> Vec<String> {
-        self.source_fields().into_iter().filter(|source| !source.is_empty()).map(home).collect()
+        let mut sources: Vec<String> = Vec::new();
+        for source in self.source_fields().into_iter().filter(|source| !source.is_empty()).map(home) {
+            if !sources.contains(&source) {
+                sources.push(source);
+            }
+        }
+        sources
     }
 
     /// The folder of `role`'s repository on a disk the system mounts, if given, with `~` as the home folder.
@@ -725,14 +732,19 @@ impl Setup {
     /// Their shared start names the collection.
     pub(crate) fn profiles(&self) -> Vec<(String, String)> {
         let mut primary = DocumentMut::new();
-        let mut snapshot = section(Question::WhatToBackUp);
-        snapshot["sources"] = value(self.sources().into_iter().collect::<Array>());
+        // One entry per folder: each has its own snapshots and history, so adding a folder later leaves the
+        // others' alone. The first one says what the entries answer.
+        let snapshots = self.sources().into_iter().enumerate().map(|(i, source)| {
+            let mut snapshot = if i == 0 { section(Question::WhatToBackUp) } else { Table::new() };
+            snapshot["sources"] = value([source].into_iter().collect::<Array>());
+            snapshot
+        });
         let mut backup = Table::new();
         // Without the domain that each network gives it, which would start a new snapshot group there.
         if let Some(host) = sys::hostname().split('.').next().filter(|h| !h.is_empty()) {
             backup["host"] = value(host);
         }
-        backup["snapshots"] = Item::ArrayOfTables([snapshot].into_iter().collect());
+        backup["snapshots"] = Item::ArrayOfTables(snapshots.collect());
         primary["backup"] = Item::Table(backup);
         primary["repository"] = self.repository(Role::Primary, section(Question::WhereSaved));
         let target = (self.target != Kind::None).then(|| {
@@ -902,6 +914,20 @@ mod tests {
         assert!(matches!(into(&path(&["full"])), Err(Error::NotEmpty { .. })));
         assert!(into(&path(&["repo"])).is_ok(), "an existing repository");
         assert!(into(&path(&["new", "backup"])).is_ok());
+    }
+
+    /// Each folder is its own entry, with its own snapshots. One given twice is backed up once.
+    #[test]
+    fn each_folder_is_its_own_entry() {
+        let mut setup = target(Kind::None, &[]);
+        setup.values.insert("source.0".into(), "/home/me/Documents".into());
+        setup.values.insert("source.1".into(), "/home/me/Desktop".into());
+        setup.values.insert("source.2".into(), "/home/me/Documents".into());
+        let text = &setup.profiles()[0].1;
+        let entries: Vec<Vec<String>> =
+            profile::parse("Documents", text).sources.into_iter().map(|s| s.sources).collect();
+        assert_eq!(entries, [["/home/me/Documents"], ["/home/me/Desktop"]], "{text}");
+        assert_eq!(text.matches("# What do you want to back up?").count(), 1, "{text}");
     }
 
     #[test]
