@@ -13,6 +13,7 @@
 <nav class="crumbs"></nav>
 {% if let Some(untested) = untested %}<div class="notice warning">{{ untested }}</div>{% endif %}
 {% if let Some(blocked) = blocked %}<div class="notice warning">{{ blocked }}</div>{% endif %}
+{% if let Some(waiting) = waiting %}<div class="notice warning">{{ waiting }}</div>{% endif %}
 <section class="card">{% include "collections.html" %}</section>
 <section class="card" id="recent-runs">
   <div class="card-head"><div><h2>{{ Heading::RecentRuns }}</h2></div></div>
