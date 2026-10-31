@@ -306,7 +306,15 @@ impl Engine {
                     _ => root.join(below_root(path)),
                 };
                 let dest = options.to.as_deref().map_or_else(|| PathBuf::from(path), below);
-                match if options.missing { sys::presence(&dest) } else { Presence::Missing } {
+                // Falling back, `--missing` keeps what the first attempt found: the paths it left alone stay so, and
+                // the next repository's files overwrite what the failed one wrote in the others.
+                let left = || run.reported(|r| matches!(r, StepResult::LeftAsItIs { path: p } if p == path));
+                let retry = run.reported(|r| matches!(r, StepResult::FallingBack { .. }));
+                if options.missing && retry && left() {
+                    continue;
+                }
+                let presence = if options.missing && !retry { sys::presence(&dest) } else { Presence::Missing };
+                match presence {
                     Presence::Present => {
                         run.push(StepResult::LeftAsItIs { path: path.clone() });
                         continue;

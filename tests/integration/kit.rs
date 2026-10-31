@@ -103,6 +103,28 @@ fn a_kit_restores_from_the_copy_when_the_primary_is_corrupted() {
         .assert_result("restored", json!({"repo": "Docs-remote"}));
 }
 
+/// As the web UI restores a kit: only where nothing is. The damaged primary writes some folders before it
+/// fails, and the copy's files still go there.
+#[test]
+fn a_kit_restores_missing_folders_from_the_copy_when_the_primary_is_corrupted() {
+    if as_root() {
+        return;
+    }
+    let (sb, kit, original) = backed_up();
+    for pack in walk(&sb.path("local/Docs/data")) {
+        fs::write(pack, b"damaged").unwrap();
+    }
+    // A new Mac's folder: empty but for the system's file.
+    fs::create_dir_all(sb.path("source/docs")).unwrap();
+    fs::write(sb.path("source/docs/.DS_Store"), "").unwrap();
+    let run = sb.run(&["restore", "--all", "--missing", "--kit", &kit.display().to_string()]);
+    let restored: std::collections::BTreeMap<_, _> =
+        sb.tree("source").into_iter().filter(|(p, _)| !p.ends_with(".DS_Store")).collect();
+    assert_eq!(restored, original, "{}", run.stdout);
+    run.assert_result("falling-back", json!({"repo": "Docs", "to": "Docs-remote"}))
+        .assert_result("restored", json!({"repo": "Docs-remote"}));
+}
+
 /// The disk is mounted elsewhere on the new computer: the restore says which profile names the old place.
 #[test]
 fn a_kit_says_where_it_looked_when_no_repository_is_there() {
