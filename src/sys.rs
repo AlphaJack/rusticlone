@@ -762,7 +762,8 @@ impl Drop for Awake {
     }
 }
 
-/// A logind inhibitor, held by the file it hands over: closing it lets go.
+/// A logind inhibitor, held by the file it hands over: closing it lets go. Polkit grants it to root, and to a user
+/// logged in at the computer's screen, whose server runs as a user service.
 #[cfg(all(feature = "server", target_os = "linux"))]
 pub(crate) struct Awake(#[expect(dead_code, reason = "held until dropped")] std::os::fd::OwnedFd);
 
@@ -864,12 +865,13 @@ mod awake_tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    /// As root, as the system's server runs. Polkit asks another user to authenticate, which no server can: CI
-    /// runs this test again as root.
+    /// As root, as the system's server runs, or as a user logged in at the screen. Polkit refuses a user without a
+    /// local session, as CI's: CI runs this test again as root.
     fn logind_lists_the_inhibitor_until_dropped() {
         let awake = match stay_awake() {
             Err(e) if !super::is_root() => {
-                assert!(format!("{e:#}").contains("InteractiveAuthorizationRequired"), "{e:#}");
+                let refused = ["InteractiveAuthorizationRequired", "AccessDenied"];
+                assert!(refused.iter().any(|r| format!("{e:#}").contains(r)), "{e:#}");
                 return;
             }
             awake => awake.unwrap(),
@@ -877,7 +879,8 @@ mod awake_tests {
         // logind lists it before it answers the call.
         let held = inhibitors();
         assert!(!held.is_empty(), "logind lists no inhibitor: the system bus refused it");
-        assert!(held.iter().all(|l| l.contains("idle:sleep") && l.contains("block")), "{held:?}");
+        // In logind's order, which is not the request's.
+        assert!(held.iter().all(|l| l.contains("sleep:idle") && l.contains("block")), "{held:?}");
         drop(awake);
         assert!(inhibitors().is_empty(), "the inhibitor outlived the run");
     }
