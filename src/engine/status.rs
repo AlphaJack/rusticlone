@@ -307,7 +307,9 @@ impl Engine {
         issues.extend(held.map(|hold| match hold.failed {
             None => Issue::RestorePending,
             Some(_) => {
-                let files = collection.repos().filter_map(|r| Some(r.files().first()?.display().to_string()));
+                // Its name alone if its file cannot be found, as for a profile of `use-profiles` only.
+                let file = |r: &RusticProfile| r.files().first().map(|f| f.display().to_string());
+                let files = collection.repos().map(|r| file(r).unwrap_or_else(|| format!("{}.toml", r.name)));
                 Issue::RestoreFailed { files: files.collect::<Vec<_>>().join(", ") }
             }
         }));

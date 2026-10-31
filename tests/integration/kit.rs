@@ -103,6 +103,29 @@ fn a_kit_restores_from_the_copy_when_the_primary_is_corrupted() {
         .assert_result("restored", json!({"repo": "Docs-remote"}));
 }
 
+/// A kit whose repositories are all gone: the upload saves its profiles, the restore fails, and the collection
+/// says that its backups wait and which profiles to adapt.
+#[test]
+fn a_failed_restore_of_an_uploaded_kit_is_shown() {
+    if as_root() {
+        return;
+    }
+    let (sb, kit, _) = backed_up();
+    sb.remove("local/Docs");
+    sb.remove("remote/Docs");
+    let server = sb.server(&[]);
+    let auth = format!("Authorization: Bearer {}", server.token);
+    let saved =
+        server.request_bytes("POST", "/kit", &[&auth, "Content-Type: application/zip"], &fs::read(&kit).unwrap());
+    assert_eq!(saved.code, 201, "{}", saved.head);
+    let mut status = String::new();
+    crate::common::wait_for(60, "the failed restore", || {
+        status = server.get("/status").body;
+        status.contains(r#""kind":"restore-failed""#)
+    });
+    assert!(status.contains("Docs.toml") && !status.contains("never-backed-up"), "{status}");
+}
+
 /// As the web UI restores a kit: only where nothing is. The damaged primary writes some folders before it
 /// fails, and the copy's files still go there.
 #[test]
