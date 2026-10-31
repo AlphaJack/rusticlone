@@ -51,8 +51,8 @@
         {% let fields = setup.source_fields() %}
         {% for (i, source) in fields.iter().enumerate() %}
         <div class="field-row source">
-          <input type="text" name="{{ crate::first_run::SOURCE }}.{{ i }}" id="setup-source-{{ i }}" value="{{ source }}" aria-label="{{ Heading::Folders }}" autocomplete="off" hx-get="{{ base }}{{ Route::SetupSize }}" hx-trigger="load, input delay:800ms" hx-sync="this:replace" hx-indicator="next .measured" hx-target="next .measured" hx-swap="innerHTML">
-          <span class="muted measured"></span>
+          <input type="text" name="{{ crate::first_run::SOURCE }}.{{ i }}" id="setup-source-{{ i }}" value="{{ source }}" aria-label="{{ Heading::Folders }}" autocomplete="off" hx-get="{{ base }}{{ Route::SetupSize }}" hx-trigger="load, input delay:800ms" hx-sync="this:replace" hx-indicator="next .measured" hx-config='{"timeout": "0"}' hx-target="next .measured" hx-swap="innerHTML">
+          <span class="muted measured" data-measuring="{{ Hint::Measuring }}"></span>
           <button type="button" class="icon-btn small" data-remove title="{{ Button::RemoveFolder }}" aria-label="{{ Button::RemoveFolder }}">×</button>
         </div>
         {% endfor %}

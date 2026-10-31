@@ -74,7 +74,7 @@ impl Drop for Stop {
 
 #[derive(Template)]
 #[template(
-    source = "<span{% if let Measured::Missing = measured %} class=\"warning-text\"{% endif %}>{{ measured }}</span>",
+    source = "<span{% if let Measured::Missing = measured %} class=\"warning-text\"{% endif %}{% if let Measured::Bytes { bytes, .. } = measured %} data-bytes=\"{{ bytes }}\"{% endif %}>{{ measured }}</span>",
     ext = "html"
 )]
 struct MeasuredView {

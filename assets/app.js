@@ -77,6 +77,20 @@ document.addEventListener("change", (event) => event.target.form && showChosen(e
 // Firefox fills a reloaded form with the choices made before, without a change event.
 window.addEventListener("pageshow", () => [...document.forms].forEach(showChosen));
 
+/**
+ * Warns where the folders to back up, as far as measured, are larger than the free space. Compression and
+ * deduplication may still make them fit. @param {HTMLFormElement | null} form
+ */
+const compareSizes = (form) => {
+  if (!form) return;
+  const total = [...form.querySelectorAll(".measured [data-bytes]")].reduce((sum, size) => sum + Number(size.dataset.bytes), 0);
+  for (const free of form.querySelectorAll(".free [data-bytes]")) {
+    const short = free.parentElement.querySelector("[data-short]");
+    if (short) short.hidden = total <= Number(free.dataset.bytes);
+  }
+};
+document.addEventListener("htmx:after:swap", (event) => compareSizes(event.target.closest?.("form")));
+
 // Folder rows: Add appends an empty one, Remove drops one but the first. Their fields are numbered again, as
 // the server reads them in order.
 document.addEventListener("click", (event) => {
@@ -92,7 +106,10 @@ document.addEventListener("click", (event) => {
     rows().at(-1).after(row);
     // The clone's size request is wired like the original's.
     htmx.process(row);
-  } else remove.closest(".source").remove();
+  } else {
+    remove.closest(".source").remove();
+    compareSizes(list.closest("form"));
+  }
   rows().forEach((row, i) => {
     Object.assign(row.querySelector("input"), { name: `${list.dataset.field}.${i}`, id: `setup-${list.dataset.field}-${i}` });
   });

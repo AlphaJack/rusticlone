@@ -235,4 +235,6 @@ pub(super) enum Hint<'a> {
     WhereItWas,
     Now,
     Notify,
+    /// While a folder to back up is measured.
+    Measuring,
 }

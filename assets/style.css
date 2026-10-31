@@ -212,7 +212,7 @@
   .form-grid .hint, .form-grid .wide { grid-column: 1 / -1; }
   .form-grid .wide { display: flex; align-items: center; gap: 8px; }
   .measured.htmx-request > * { display: none; }
-  .measured.htmx-request::after { content: "\2026"; }
+  .measured.htmx-request::after { content: attr(data-measuring); }
   /* a repository's password, apart from its service's fields, and only if there is a repository */
   .location .password { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
   .location:has(input[value=none]:checked) .password { display: none; }
@@ -239,6 +239,7 @@
   .free, .measured { font-size: 13px; }
   .measured { flex: none; max-width: 40%; }
   .free .warning-text { color: var(--warning); }
+  .free [data-short] { margin-left: 6px; }
   .form-grid label:has(+ .sources) { align-self: start; margin-top: 9px; }
   .sources .source { width: 100%; }
   .field-row { display: flex; gap: 8px; align-items: center; }

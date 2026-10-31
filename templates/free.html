@@ -1,1 +1,2 @@
-<span{% if let Free::Missing = free %} class="warning-text"{% endif %}>{{ free }}</span>
+<span{% if let Free::Missing = free %} class="warning-text"{% endif %}{% if let Free::Bytes { bytes } = free %} data-bytes="{{ bytes }}"{% endif %}>{{ free }}</span>
+{% if let Free::Bytes { .. } = free %}<span class="warning-text" data-short hidden>{{ short }}</span>{% endif %}
