@@ -366,6 +366,28 @@ fn open_on_desktop(target: String) -> bool {
     open::that_detached(target).map_err(|e| log::event(None, &Logged::NotOpened { error: e.to_string() })).is_ok()
 }
 
+/// Whether the file manager showed `file` selected in its folder. Where no file manager selects files, as on a
+/// Linux desktop without the `FileManager1` service, it opens the folder.
+#[expect(clippy::disallowed_methods, reason = "asks the file manager to show a file, not rustic")]
+fn reveal_on_desktop(file: &std::path::Path) -> bool {
+    use std::process::Command;
+    let shown = if cfg!(target_vendor = "apple") {
+        Command::new("/usr/bin/open").arg("-R").arg(file).status().is_ok_and(|s| s.success())
+    } else if cfg!(windows) {
+        // Explorer exits with 1 even when it shows the file.
+        let mut select = std::ffi::OsString::from("/select,");
+        select.push(file);
+        Command::new("explorer.exe").arg(select).status().is_ok()
+    } else {
+        let uri = format!("array:string:file://{}", file.display());
+        let fm = "org.freedesktop.FileManager1";
+        let args = ["--session", "--type=method_call", &format!("--dest={fm}"), "/org/freedesktop/FileManager1"];
+        let call = [&format!("{fm}.ShowItems"), uri.as_str(), "string:"];
+        Command::new("dbus-send").args(args).args(call).status().is_ok_and(|s| s.success())
+    };
+    shown || file.parent().is_some_and(|dir| open_on_desktop(dir.display().to_string()))
+}
+
 /// With a server already on `listen`, as after `install`, opens it logged in, with the token it keeps
 /// in the state directory, and returns true.
 pub(crate) fn open_running(listen: &str) -> Result<bool> {

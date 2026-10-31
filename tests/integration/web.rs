@@ -718,6 +718,9 @@ fn the_profile_folder_opens_for_this_computer_only() {
     assert!(scripted.body.contains(&format!(r#"data-copy="{dir}""#)), "{}", scripted.body);
     // Asked anyway, it opens nothing.
     assert_eq!(server.post_form("/setup/folder", "").code, 404);
+    // Nor a repository's profile or a source.
+    assert_eq!(server.post_form("/collections/Here/folder", "repo=Here").code, 404);
+    assert_eq!(server.post_form("/collections/Here/folder", "source=0/0").code, 404);
 }
 
 #[test]

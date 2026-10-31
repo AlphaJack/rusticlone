@@ -17,6 +17,7 @@ use tokio::sync::{broadcast, watch};
 
 use super::{
     App, Base, Changes, Flash, Notice,
+    auth::Here,
     collections::{collection_main, index_main},
     render_str,
     repo::{RepoMain, repo_view},
@@ -49,11 +50,12 @@ fn render_main(
     view: &View,
     shown: Option<(i64, u64)>,
     base: &Base,
+    here: bool,
 ) -> Option<(String, Option<(i64, u64)>)> {
     match (&view.collection, &view.repo) {
         (None, _) => Some((render_str(&index_main(app), base), None)),
         (Some(collection), None) => {
-            collection_main(app, collection, view.run, shown).map(|m| (render_str(&m, base), m.log.shown()))
+            collection_main(app, collection, view.run, shown, here).map(|m| (render_str(&m, base), m.log.shown()))
         }
         (Some(collection), Some(repo)) => {
             repo_view(app, collection, repo).map(|repo| (render_str(&RepoMain { repo }, base), None))
@@ -62,8 +64,8 @@ fn render_main(
 }
 
 /// The page's `<main>`, the log it shows, and that log's lines added since `shown`, if any.
-fn render_update(app: &Arc<App>, view: &View, shown: Option<(i64, u64)>, base: &Base) -> Option<Update> {
-    let (html, log) = render_main(app, view, shown, base)?;
+fn render_update(app: &Arc<App>, view: &View, shown: Option<(i64, u64)>, base: &Base, here: bool) -> Option<Update> {
+    let (html, log) = render_main(app, view, shown, base, here)?;
     let (Some((run, at)), Some(collection)) = (log, &view.collection) else { return Some((html, log, None)) };
     let (lines, at) = log_tail(&app.engine(), collection, run, Some(at));
     Some((html, Some((run, at)), (!lines.0.is_empty()).then(|| render_str(&lines, base))))
@@ -77,6 +79,8 @@ struct Stream {
     app: Arc<App>,
     view: View,
     base: Base,
+    /// A browser on this computer: see [`Here`].
+    here: bool,
     changes: watch::Receiver<Changes>,
     /// The change count it was rendered at.
     seen: u64,
@@ -116,6 +120,7 @@ pub(super) async fn events(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
     base: Base,
+    Here(here): Here,
     Query(view): Query<View>,
 ) -> impl IntoResponse {
     // What a reconnecting page shows is unknown.
@@ -140,6 +145,7 @@ pub(super) async fn events(
         language: Language::current(),
         view,
         base,
+        here,
         changes,
         failures,
     };
@@ -176,7 +182,8 @@ pub(super) async fn events(
             s.seen = s.changes.borrow_and_update().count;
             let version = s.seen.to_string();
             let (app, view, shown, base, language) = (s.app.clone(), s.view.clone(), s.log, s.base.clone(), s.language);
-            let render = move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base)));
+            let here = s.here;
+            let render = move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base, here)));
             let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
             let (html, log, lines) = update?;
             s.changes_at = changes_at;

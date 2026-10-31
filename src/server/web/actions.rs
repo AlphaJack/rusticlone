@@ -293,3 +293,42 @@ pub(super) async fn dismiss(
     })
     .await
 }
+
+#[derive(Deserialize)]
+pub(super) struct OpenForm {
+    repo: Option<String>,
+    source: Option<String>,
+}
+
+/// Shows what the page names selected in its folder in the file manager, for a browser on this computer: a
+/// repository's profile (the file users edit) or a source. Its path comes from the profile. The file manager only
+/// shows it, so a page never opens a file or a program. Elsewhere the page copies the path instead.
+#[expect(clippy::disallowed_methods, reason = "shows only a source that exists")]
+pub(super) async fn open_collection_folder(
+    State(app): State<Arc<App>>,
+    Here(here): Here,
+    Path(collection): Path<String>,
+    Form(form): Form<OpenForm>,
+) -> Response {
+    let engine = app.engine();
+    let Some(j) = engine.collection(&collection).filter(|_| here) else {
+        return Error::NotFound(Missing::Page).into_response();
+    };
+    let shown = match (&form.repo, &form.source) {
+        (Some(repo), _) => {
+            j.repo(repo).and_then(|p| p.files().into_iter().next()).map(|f| crate::server::reveal_on_desktop(&f))
+        }
+        (None, Some(source)) => (|| {
+            let (entry, item) = source.split_once('/')?;
+            let entry = j.primary.sources.get(entry.parse::<usize>().ok()?).filter(|s| s.in_place())?;
+            let path = PathBuf::from(entry.sources.get(item.parse::<usize>().ok()?)?);
+            path.exists().then(|| crate::server::reveal_on_desktop(&path))
+        })(),
+        (None, None) => None,
+    };
+    match shown {
+        Some(true) => StatusCode::NO_CONTENT.into_response(),
+        Some(false) => Error::Refused(Notice::FolderNotOpened).into_response(),
+        None => Error::NotFound(Missing::Page).into_response(),
+    }
+}

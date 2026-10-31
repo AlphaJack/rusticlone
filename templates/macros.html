@@ -8,4 +8,6 @@
 {# an icon for what `text` is: a button that copies it, with the full text in its tooltip #}
 {% macro copyable(icon_name, text) %}<button type="button" class="icon-btn small plain" data-copy="{{ text }}" title="{{ text }}" aria-label="{{ Button::CopyThis { text: text } }}">{{ icon(icon_name) }}</button>{% endmacro %}
 {# a repository's location: on a network, or on a disk #}
+{# on this computer: an icon that shows what `what` names selected in the file manager, a repository's profile or the source `entry/source` #}
+{% macro reveal(base, collection, kind, what, icon_name, label) %}<button type="button" class="icon-btn small plain" hx-post="{{ base }}{{ Route::CollectionFolder(collection) }}" hx-vals='{"{{ kind }}": "{{ what }}"}' hx-swap="none" title="{{ label }}" aria-label="{{ label }}">{{ icon(icon_name) }}</button>{% endmacro %}
 {% macro place(remote, location) %}{% if remote %}{{ copyable("cloud", location) }}{% else %}{{ copyable("disk", location) }}{% endif %}{% endmacro %}

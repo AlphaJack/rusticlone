@@ -455,6 +455,11 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copy folder path
 button-see-how = See how
 button-cron-syntax = Cron syntax
+button-show-profile = { $os ->
+    [macos] Show the profile in Finder
+    [windows] Show the profile in File Explorer
+   *[other] Show the profile in the file manager
+}
 
 ## The web UI: words and states, in the tables and the breadcrumbs
 

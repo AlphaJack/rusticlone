@@ -7,7 +7,7 @@
     <tbody>
     {% for repo in collection.repos %}
     <tr>
-      <td class="name">{{ m::place(repo.remote, repo.location) }}{% if repo.exists %}<a class="strong" href="{{ base }}{{ Route::Repo(collection.name, repo.name) }}">{{ repo.name }}</a>{% else %}<span class="strong">{{ repo.name }}</span>{% endif %}</td>
+      <td class="name">{% if here %}{{ m::reveal(base, collection.name, "repo", repo.name, repo.place_icon(), Button::ShowProfile) }}{% else %}{{ m::place(repo.remote, repo.location) }}{% endif %}{% if repo.exists %}<a class="strong" href="{{ base }}{{ Route::Repo(collection.name, repo.name) }}">{{ repo.name }}</a>{% else %}<span class="strong">{{ repo.name }}</span>{% endif %}</td>
       <td class="nowrap">{% if let Some(doing) = repo.doing %}<span class="tag"><span class="spinner"></span>{{ doing }}</span>{% else %}<span class="tag">{{ m::dot(repo.class, repo.class) }}{{ repo.status }}</span>{% endif %}</td>
       <td class="right num">{% if repo.listing %}<span class="spinner"></span>{% else %}{{ repo.snapshots }}{% endif %}</td>
       <td class="right num nowrap wide">{% if repo.size_outdated %}<button class="icon-btn small stale" title="{{ Hint::SizeOutdated }}" hx-post="{{ base }}{{ Route::RepoRefresh(collection.name, repo.name) }}">{{ m::icon("refresh") }}</button> {% endif %}{{ repo.size }}</td>
