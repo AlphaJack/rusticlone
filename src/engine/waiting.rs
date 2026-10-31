@@ -14,11 +14,11 @@ pub(crate) enum Waiting {
 }
 
 impl Waiting {
-    /// Its name as runs show what they wait for.
-    pub(super) fn resource(self) -> String {
+    /// Its name as runs show what they wait for, untranslated like the other resources: `cpu`, `upload`.
+    pub(super) fn resource(self) -> &'static str {
         match self {
-            Self::Power => crate::i18n::t!("resource-power"),
-            Self::UnmeteredNetwork => crate::i18n::t!("resource-unmetered-network"),
+            Self::Power => "power",
+            Self::UnmeteredNetwork => "unmetered",
         }
     }
 }
@@ -48,7 +48,7 @@ fn waiting_for(battery: (bool, impl FnOnce() -> bool), metered: (bool, impl FnOn
     }
 }
 
-/// Holds a scheduled `run` back while it waits, shown as waiting for the power supply or an unmetered network as
+/// Holds a scheduled `run` back while it waits, shown as waiting for `power` or `unmetered` as
 /// for a lock. Returns whether it waited.
 pub(super) fn wait(run: &Run<'_>, remote: bool) -> bool {
     wait_while(run, WAIT_CHECK, || waiting(remote))
@@ -60,7 +60,7 @@ pub(super) fn wait_while(run: &Run<'_>, every: Duration, mut now: impl FnMut() -
     let (step, mut waited) = (run.cx.step(), None);
     while let Some(now) = now().filter(|_| !run.cx.stopping()) {
         if waited != Some(now) {
-            let resource = now.resource();
+            let resource = now.resource().to_owned();
             run.activity(Some(Doing::WaitingFor { lock: resource.clone(), by: Vec::new() }), false);
             live.set_holds(step, Holds { using: Vec::new(), waiting_for: Some(resource) });
             waited = Some(now);
