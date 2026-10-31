@@ -150,6 +150,10 @@ settings! {
     NOTIFY = "NOTIFY_URLS", None, Scope::Collection;
     PRUNE = "PRUNE_CRON", None, Scope::Repository;
     RUSTIC = "RUSTIC_BIN", None, Scope::Environment;
+    #[cfg(feature = "server")]
+    SKIP_ON_BATTERY = "SKIP_ON_BATTERY", Some("false"), Scope::Environment;
+    #[cfg(feature = "server")]
+    SKIP_ON_METERED = "SKIP_ON_METERED", Some("false"), Scope::Environment;
     STALL_TIMEOUT = "STALL_TIMEOUT", Some("1h"), Scope::Environment;
     STATE_DIR = "STATE_DIR", None, Scope::Environment;
 }
