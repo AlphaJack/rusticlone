@@ -298,11 +298,19 @@ impl Engine {
         let sources = p.sources.iter().flat_map(Sources::paths);
         issues
             .extend(sources.filter(|s| sys::needs_disk_access(s)).map(|source| Issue::NoDiskAccess { source }).take(1));
-        // Unknown, not "never", until the repository is first listed.
+        // Unknown, not "never", until the repository is first listed. A kit's collection is restored first.
         let listed = self.store.inventory(&p.name, &p.name).is_some();
-        if listed && backed_up.is_none() && snapshot.as_ref().is_none_or(|t| !failing(t)) {
+        let held = state.restore_first.get(&p.name);
+        if listed && held.is_none() && backed_up.is_none() && snapshot.as_ref().is_none_or(|t| !failing(t)) {
             issues.push(Issue::NeverBackedUp);
         }
+        issues.extend(held.map(|hold| match hold.failed {
+            None => Issue::RestorePending,
+            Some(_) => {
+                let files = collection.repos().filter_map(|r| Some(r.files().first()?.display().to_string()));
+                Issue::RestoreFailed { files: files.collect::<Vec<_>>().join(", ") }
+            }
+        }));
         for r in std::iter::once(&primary).chain(&targets) {
             issues.extend(r.issues(&p.name, last_backup, &failing));
         }
@@ -573,6 +581,12 @@ pub(crate) enum Issue {
         by: Option<RunStep>,
     },
     NeverBackedUp,
+    /// From an emergency kit: backups wait for its restore.
+    RestorePending,
+    /// From an emergency kit, and its restore failed: likely it describes another computer, where `files` are.
+    RestoreFailed {
+        files: String,
+    },
     /// macOS keeps rusticlone and rustic out of a source.
     #[fluent(exe = std::env::current_exe().map_or_else(|_| crate::NAME.into(), |e| e.display().to_string()))]
     NoDiskAccess {
@@ -674,12 +688,14 @@ impl Message for Issue {
             | Self::SameRepository { .. }
             | Self::Failed { .. }
             | Self::Missing { primary: true, .. }
+            | Self::RestoreFailed { .. }
             | Self::InvalidSchedule { .. } => Level::Failure,
             Self::PrunesOnForget { .. }
             | Self::SettingIgnored { .. }
             | Self::CopyFailed { .. }
             | Self::Warned { .. }
             | Self::NeverBackedUp
+            | Self::RestorePending
             | Self::NoDiskAccess { .. }
             | Self::Stale { .. }
             | Self::Undelivered { .. }

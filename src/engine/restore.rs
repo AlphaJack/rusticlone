@@ -13,7 +13,7 @@ use crate::request::{RestoreOptions, StepKey, Tested};
 use crate::result::Doing;
 use crate::{
     profile::RusticProfile,
-    result::StepResult,
+    result::{Status, StepResult},
     rustic::Snapshot,
     state::Event,
     sys::{self, Presence},
@@ -28,6 +28,18 @@ fn repo_named<'a>(run: &Run<'a>, name: Option<&str>) -> Result<&'a RusticProfile
 }
 
 impl Engine {
+    /// After its restore: whether the collection's profiles fit this computer, so that backups can go on with
+    /// them. The restore did not fail, its primary repository is where the profile says, and so are its folders,
+    /// with the user's files in them. Otherwise they likely describe another computer, as a disk mounted elsewhere.
+    #[expect(clippy::disallowed_methods, reason = "looks for the folders the restore just filled")]
+    pub(crate) fn fits(&self, collection: &super::Collection<'_>) -> bool {
+        let p = collection.primary;
+        let restored = self.store.runs(collection.name(), 1).first().is_none_or(|r| r.status != Status::Failed);
+        let folders = (p.sources.iter().filter(|s| s.in_place()).flat_map(|s| &s.sources))
+            .all(|s| !sys::foreign_path(s) && sys::presence(&p.dir.join(s)) == Presence::Present);
+        restored && p.exists() && folders
+    }
+
     /// Reads the tested snapshots of `from`, or of the repository a restore reads, as a restore would, and
     /// reports what restoring them in place would create and replace. Writes nothing. If reading the newest
     /// fails, it reads the next newest repository's, as a restore falls back to it.

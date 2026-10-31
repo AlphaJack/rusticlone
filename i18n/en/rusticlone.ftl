@@ -306,6 +306,8 @@ issue-prunes-on-forget = { $repo } prunes at every forget: slow and unscheduled.
 issue-setting-ignored = { $repo } { $setting }
 issue-no-password = { $repo } has no password, so rustic would ask for one with no one to type it. Set password, password-file or password-command in its [repository]
 issue-same-repository = { $target } is the same repository as { $primary }, so copying to it keeps no second copy, and its [forget] policy deletes the primary's snapshots. Give { $target } a repository of its own
+issue-restore-pending = from an emergency kit: backups wait for its restore
+issue-restore-failed = from an emergency kit, and its restore failed: backups wait for one that succeeds. If its sources or repositories have another place on this computer, write it in { $files }, then restore
 issue-never-backed-up = never backed up
 issue-no-disk-access = macOS does not let rustic read { $source }. In System Settings, give Full Disk Access to { $exe }, or to the terminal that runs it
 issue-missing = { $repo } is missing: { fix-missing-repo }
@@ -552,6 +554,7 @@ notice-kit-saved = { $saved ->
     [one] 1 profile saved in { $dir }
    *[other] { $saved } profiles saved in { $dir }
 }
+notice-kit-restoring = { notice-kit-saved }: restoring { $collections }
 notice-kit-not-saved = kit not saved: { $error }
 notice-folder-not-opened = the folder did not open: the server's log says why
 notice-run-failed = { $collection }: { $line }

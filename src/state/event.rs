@@ -178,10 +178,25 @@ pub struct Ledger {
     /// Snapshots each target's forget removed, by collection and target.
     #[serde(with = "entries")]
     pub dropped: BTreeMap<(String, String), Vec<(SnapshotId, Timestamp)>>,
-    /// [`Event::RestoreFirst`]'s collections, with when their restore was last asked for or failed. `None`: the
-    /// schedule asks for it.
+    /// [`Event::RestoreFirst`]'s collections.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub restore_first: BTreeMap<String, Option<Timestamp>>,
+    pub restore_first: BTreeMap<String, Hold>,
+}
+
+/// A collection from an emergency kit, waiting for its restore: see [`Event::RestoreFirst`].
+#[derive(Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Hold {
+    /// When the web UI asked for its restore. Unset: the schedule asks for it.
+    pub asked: Option<Timestamp>,
+    /// When its last restore failed. Nothing asks for another one then.
+    pub failed: Option<Timestamp>,
+}
+
+impl Hold {
+    /// Whether the schedule asks for its restore.
+    pub fn restore_due(&self) -> bool {
+        self.asked.is_none() && self.failed.is_none()
+    }
 }
 
 impl Versioned for Event {
@@ -312,13 +327,13 @@ impl Ledger {
                 }
             }
             Event::RestoreFirst { collections, asked } => {
-                self.restore_first.extend(collections.into_iter().map(|c| (c, asked)));
+                self.restore_first.extend(collections.into_iter().map(|c| (c, Hold { asked, failed: None })));
             }
             Event::Restored { collection, at, ok } => {
                 if ok {
                     self.restore_first.remove(&collection);
-                } else if let Some(failed) = self.restore_first.get_mut(&collection) {
-                    *failed = Some(at);
+                } else if let Some(hold) = self.restore_first.get_mut(&collection) {
+                    hold.failed = Some(at);
                 }
             }
             Event::Dropped { collection, target, removed, oldest_kept } => {
@@ -518,10 +533,11 @@ mod tests {
         state.apply(&Event::RestoreFirst { collections: vec!["Docs".into(), "Photos".into()], asked: None });
         let at = ts("2026-10-16T12:00:00Z");
         state.apply(&Event::Restored { collection: "Docs".into(), at, ok: false });
-        assert_eq!(state.restore_first.get("Docs"), Some(&Some(at)));
+        assert_eq!(state.restore_first["Docs"], Hold { asked: None, failed: Some(at) });
+        assert!(!state.restore_first["Docs"].restore_due() && state.restore_first["Photos"].restore_due());
         // The web UI could not ask for it: the schedule does.
         state.apply(&Event::RestoreFirst { collections: vec!["Docs".into()], asked: None });
-        assert_eq!(state.restore_first.get("Docs"), Some(&None));
+        assert!(state.restore_first["Docs"].restore_due());
         state.apply(&Event::Restored { collection: "Docs".into(), at, ok: true });
         let backup = StepKey::Snapshot("Photos".into());
         let done = StepResult::BackedUp { repo: "Photos".into(), snapshots: Vec::new(), new_repository: false };

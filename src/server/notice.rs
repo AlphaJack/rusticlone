@@ -37,6 +37,12 @@ pub(crate) enum Notice {
         saved: u64,
         dir: String,
     },
+    /// [`Self::KitSaved`], and the restores it started.
+    KitRestoring {
+        saved: u64,
+        dir: String,
+        collections: String,
+    },
     KitNotSaved {
         error: String,
     },
@@ -85,7 +91,8 @@ impl Notice {
             | Self::Dismissed { .. }
             | Self::Notified { .. }
             | Self::TestNotified
-            | Self::KitSaved { .. } => Level::Success,
+            | Self::KitSaved { .. }
+            | Self::KitRestoring { .. } => Level::Success,
             Self::Stopping { .. } => Level::Warning,
             Self::RunFailed { .. }
             | Self::DestinationNotAbsolute

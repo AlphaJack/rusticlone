@@ -264,17 +264,12 @@ enum Ask {
     Keep { files: String, dir: String },
 }
 
-/// After a restore: profiles whose folders are now all on this computer, where they were, fit it and backups can
-/// go on with them. Others describe another computer, as after a restore below `--to` on a new one: their
-/// sources and repositories need their places here first, which this says instead of offering to keep them.
-#[expect(clippy::disallowed_methods, reason = "looks for the restored folders")]
+/// After a restore: profiles that [fit](Engine::fits) this computer can go on backing up. Others describe another
+/// computer, as after a restore below `--to` on a new one, or one that failed: their sources and repositories need
+/// their places here first, which this says instead of offering to keep them.
 fn fitting_profiles(engine: &Engine) -> Result<()> {
     let collections = engine.collections();
-    let here = |p: &profile::RusticProfile| {
-        (p.sources.iter().filter(|s| s.in_place()).flat_map(|s| &s.sources))
-            .all(|s| !crate::sys::foreign_path(s) && p.dir.join(s).exists())
-    };
-    let elsewhere: Vec<String> = (collections.iter().filter(|j| !here(j.primary)))
+    let elsewhere: Vec<String> = (collections.iter().filter(|j| !engine.fits(j)))
         .flat_map(|j| j.repos().filter_map(|p| Some(p.files().first()?.display().to_string())))
         .collect();
     if elsewhere.is_empty() {

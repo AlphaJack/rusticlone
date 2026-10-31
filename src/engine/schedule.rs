@@ -56,8 +56,8 @@ pub(super) fn due(collection: &Collection<'_>, state: &Ledger, now: Timestamp, t
     // From an emergency kit: restored once, without overwriting anything, instead of backed up, unless the web UI
     // asked for that restore. Nothing backs it up or prunes it until a restore succeeds or someone backs it up.
     let held = state.restore_first.get(&p.name);
-    if let Some(asked) = held {
-        due.requests.push((Request::Restore(kit_restore()), asked.is_none().then_some(now)));
+    if let Some(hold) = held {
+        due.requests.push((Request::Restore(kit_restore()), hold.restore_due().then_some(now)));
     } else {
         let backup = due.at(&[p], RunKind::Backup, StepKey::Snapshot(p.name.clone()), state, now, tz);
         due.requests.push((Request::Backup, backup));
@@ -250,7 +250,7 @@ mod tests {
     use super::*;
     use crate::{
         profile,
-        state::{Lag, LastStep},
+        state::{Hold, Lag, LastStep},
     };
 
     fn ts(s: &str) -> Timestamp {
@@ -320,13 +320,14 @@ mod tests {
             (
                 "restore_first",
                 maintained,
-                Ledger { restore_first: [("Docs".into(), None)].into(), ..Ledger::default() },
+                Ledger { restore_first: [("Docs".into(), Hold::default())].into(), ..Ledger::default() },
             ),
             (
                 "restore_first_failed",
                 maintained,
                 Ledger {
-                    restore_first: [("Docs".into(), Some(ts("2026-10-16T11:00:00Z")))].into(),
+                    restore_first: [("Docs".into(), Hold { asked: None, failed: Some(ts("2026-10-16T11:00:00Z")) })]
+                        .into(),
                     ..Ledger::default()
                 },
             ),

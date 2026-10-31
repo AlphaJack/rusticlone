@@ -134,6 +134,9 @@ fn a_kit_says_where_it_looked_when_no_repository_is_there() {
     let (sb, kit, _) = backed_up();
     fs::rename(sb.path("local"), sb.path("elsewhere")).unwrap();
     sb.remove("remote/Docs");
+    // The new computer has the folder, so only the failed restore tells that the profile is another computer's.
+    fs::create_dir_all(sb.path("source/docs")).unwrap();
+    fs::write(sb.path("source/docs/.DS_Store"), "").unwrap();
     let run = restore(&sb, &kit);
     run.assert_exit(1);
     // The kit unpacks into the working folder, as a folder of profiles in a disaster recovery.
@@ -141,7 +144,8 @@ fn a_kit_says_where_it_looked_when_no_repository_is_there() {
     let said = run.stdout.replace("\\\\", "\\");
     assert!(said.contains("could be read") && said.contains(&docs) && said.contains(&file), "{}", run.stdout);
     // And that these profiles do not fit this computer yet.
-    run.assert_result("profiles-elsewhere", json!({}));
+    let elsewhere = run.stdout.lines().find(|l| l.contains("profiles-elsewhere")).unwrap_or_default();
+    assert!(elsewhere.contains("Docs.toml"), "{}", run.stdout);
 }
 
 /// A fresh install's home page takes the kit: its profiles go where the setup saves them, and its collections

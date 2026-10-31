@@ -306,6 +306,8 @@ issue-prunes-on-forget = { $repo } pulisce a ogni rimozione: lento e non pianifi
 issue-setting-ignored = { $repo } { $setting }
 issue-no-password = { $repo } non ha una password, quindi rustic la chiederebbe senza che nessuno possa digitarla. Imposta password, password-file o password-command nel suo [repository]
 issue-same-repository = { $target } è lo stesso archivio di { $primary }, quindi copiarvi non conserva una seconda copia, e la sua politica [forget] elimina gli snapshot del principale. Dai a { $target } un archivio suo
+issue-restore-pending = da un kit di emergenza: i backup aspettano il suo ripristino
+issue-restore-failed = da un kit di emergenza, e il suo ripristino non è riuscito: i backup aspettano uno che riesca. Se le sue sorgenti o i suoi archivi hanno un altro posto su questo computer, scrivilo in { $files }, poi ripristina
 issue-never-backed-up = nessun backup finora
 issue-no-disk-access = macOS non lascia che rustic legga { $source }. In Impostazioni di Sistema, concedi Accesso completo al disco a { $exe }, o al terminale che lo esegue
 issue-missing = { $repo } manca: { fix-missing-repo }
@@ -552,6 +554,7 @@ notice-kit-saved = { $saved ->
     [one] 1 profilo salvato in { $dir }
    *[other] { $saved } profili salvati in { $dir }
 }
+notice-kit-restoring = { notice-kit-saved }: ripristino di { $collections }
 notice-kit-not-saved = kit non salvato: { $error }
 notice-folder-not-opened = la cartella non si è aperta: il log del server dice perché
 notice-run-failed = { $collection }: { $line }
