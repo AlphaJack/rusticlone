@@ -294,6 +294,48 @@ mod tests {
         assert!(Cli::try_parse_from([NAME, "--unknown-flag"]).is_err());
     }
 
+    /// The book's commands page: each command's help, as `--help` shows it.
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn commands_page() -> String {
+        fn options(command: &clap::Command) -> String {
+            let line = |arg: &clap::Arg| {
+                let value = arg.get_action().takes_values().then(|| {
+                    let names = arg.get_value_names().map_or_else(|| arg.get_id().to_string(), |v| v.join(" "));
+                    format!(" <{}>", names.to_uppercase())
+                });
+                let short = arg.get_short().map(|s| format!("-{s}, ")).unwrap_or_default();
+                let long = arg.get_long().unwrap_or_default();
+                format!("- `{short}--{long}{}`: {}\n", value.unwrap_or_default(), arg.get_help().unwrap())
+            };
+            command.get_arguments().filter(|a| !a.is_hide_set()).map(line).collect()
+        }
+        fn section(command: &clap::Command, path: &str, out: &mut String) {
+            for sub in command.get_subcommands().filter(|c| !c.is_hide_set()) {
+                let path = format!("{path} {}", sub.get_name());
+                *out += &format!("\n## `{path}`\n\n{}\n\n{}", sub.get_about().unwrap(), options(sub));
+                section(sub, &path, out);
+            }
+        }
+        let t = |id| i18n::find(id, []).unwrap();
+        let root = command();
+        let mut out = format!(
+            "# {}\n\n{}\n\n## {}\n\n{}",
+            t("docs-commands-title"),
+            t("docs-commands-intro"),
+            t("docs-commands-global"),
+            options(&root)
+        );
+        section(&root, NAME, &mut out);
+        out
+    }
+
+    /// What the release ships, which is built with the default features.
+    #[test]
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn generated_commands_page() {
+        crate::tests::generated(file!(), &[("docs/src/reference/commands.md".into(), &commands_page)]);
+    }
+
     /// Every subcommand and argument has help, and every `help-` message is one's.
     #[test]
     #[cfg(feature = "self-update")]
