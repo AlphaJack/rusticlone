@@ -58,11 +58,16 @@ const urlsOf = (text) => text.split(/[\s,;]+(?=[a-z0-9]+:\/\/)/i).map((url) => u
 /** @param {string} url @param {string} schemes space-separated */
 const ofSchemes = (url, schemes) => url.includes("://") && schemes.split(" ").includes(url.split("://")[0].toLowerCase());
 
-// Shows the fields of the choice a radio button or select made.
-document.addEventListener("change", (event) => {
-  if (!event.target.form) return;
-  for (const fields of event.target.form.querySelectorAll(`[data-choice="${event.target.name}"]`)) fields.hidden = fields.dataset.value !== event.target.value;
-});
+/** Shows the fields of each choice made in `form`. @param {HTMLFormElement} form */
+const showChosen = (form) => {
+  for (const fields of form.querySelectorAll("[data-choice]")) {
+    const chosen = form.elements[fields.dataset.choice];
+    if (chosen) fields.hidden = fields.dataset.value !== chosen.value;
+  }
+};
+document.addEventListener("change", (event) => event.target.form && showChosen(event.target.form));
+// Firefox fills a reloaded form with the choices made before, without a change event.
+window.addEventListener("pageshow", () => [...document.forms].forEach(showChosen));
 
 // Folder rows: Add appends an empty one, Remove drops one but the first. Their fields are numbered again, as
 // the server reads them in order.
