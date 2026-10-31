@@ -25,6 +25,7 @@ server = [
     "dep:tokio",
     "dep:fluent-langneg",
     "dep:tokio-util",
+    "dep:block2",
 ]
 
 desktop = [
@@ -150,6 +151,8 @@ nix = { version = "0.31.3", features = ["time"], optional = true }
 tray-icon = { version = "0.26.1", optional = true }
 
 [target."cfg(target_vendor = \"apple\")".dependencies]
+# The Network framework's callback, which says whether the connection is metered.
+block2 = { version = "0.6.2", optional = true }
 objc2 = { version = "0.6.5", optional = true }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "std",
@@ -192,6 +195,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_JobObjects",
     "Win32_System_LibraryLoader",
     "Win32_System_Ioctl",
+    "Win32_System_Power",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",
