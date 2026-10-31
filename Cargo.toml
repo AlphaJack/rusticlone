@@ -281,6 +281,8 @@ unreachable_pub = "warn"
 unused_qualifications = "warn"
 trivial_casts = "warn"
 trivial_numeric_casts = "warn"
+missing_docs = "warn"
+missing_debug_implementations = "warn"
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"

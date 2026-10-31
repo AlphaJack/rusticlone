@@ -21,9 +21,13 @@ use crate::{i18n::t, request::Trigger};
 pub enum Status {
     /// A run waiting for an earlier run of the same request, or a step for the steps before it.
     Queued,
+    /// Started and not ended.
     Running,
+    /// Done without warnings.
     Succeeded,
+    /// Done, with warnings.
     SucceededWithWarnings,
+    /// Ended with an error.
     Failed,
     /// A step with nothing to do, or a step it needs did not do its job.
     Skipped,
@@ -69,6 +73,7 @@ impl Status {
         }
     }
 
+    /// Whether it may still change: queued or running.
     pub fn unfinished(self) -> bool {
         matches!(self, Self::Queued | Self::Running)
     }

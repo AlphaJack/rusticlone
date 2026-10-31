@@ -46,7 +46,14 @@ pub struct Ctx {
     step: Mutex<Option<usize>>,
 }
 
+impl std::fmt::Debug for Ctx {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Ctx").field("in_run", &self.run.is_some()).field("step", &self.step).finish_non_exhaustive()
+    }
+}
+
 impl Ctx {
+    /// The context of the run.
     pub fn new(run: Arc<dyn RunHandle>) -> Self {
         Self { run: Some(run), ..Self::default() }
     }
