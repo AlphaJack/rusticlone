@@ -59,6 +59,14 @@ pub(super) struct RepoRow {
     exists: bool,
     /// It exists, and was not listed without snapshots.
     pub(super) restorable: bool,
+    /// A copy would bring it up to date: a target that lacks snapshots, or a primary with such a target.
+    copy_helps: bool,
+}
+
+/// Whether a target lacks snapshots that a copy sends. A missing one is re-created instead, and one never
+/// measured is refreshed first.
+fn lacks(status: &RepoStatus) -> bool {
+    matches!(status, RepoStatus::Behind { .. } | RepoStatus::Stale { .. } | RepoStatus::CopyFailing)
 }
 
 /// A schedule's icon: lit when scheduled, red when invalid. Its tooltip shows the expression and
@@ -239,12 +247,14 @@ impl CollectionView {
             listed,
         } = input;
         let name = s.primary.name.clone();
+        let any_lacks = s.targets.iter().any(|t| lacks(&t.status));
         let row = |r: &RepoOverview, primary: bool| {
             let on = s.running.iter().flat_map(|run| run.activities.iter().filter_map(|a| a.on.as_ref()));
             let doing = on.clone().find(|(repo, _)| *repo == r.name).map(|(_, doing)| doing.clone());
             // A missing repository's old listing no longer applies.
             let listed = Listed::of(listings.get(&r.name).filter(|_| !r.missing), !r.missing);
             RepoRow {
+                copy_helps: if primary { any_lacks } else { lacks(&r.status) },
                 name: r.name.clone(),
                 primary,
                 location: r.repository.clone().unwrap_or_default(),

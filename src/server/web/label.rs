@@ -74,7 +74,6 @@ pub(super) enum Button<'a> {
     CheckAll,
     PruneAll,
     RefreshAll,
-    Refresh,
     Copy,
     CopyHere,
     CopyThis {
