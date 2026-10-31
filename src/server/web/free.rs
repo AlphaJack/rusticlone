@@ -50,7 +50,9 @@ struct FreeView {
 /// The free space where the folder of the field that asks is, whatever the field's name.
 pub(super) async fn free(base: Base, Query(field): Query<BTreeMap<String, String>>) -> Html<String> {
     let folder = field.into_values().next().unwrap_or_default();
-    let free = tokio::task::spawn_blocking(move || Free::of(first_run::pasted(&folder))).await.unwrap_or(Free::Missing);
+    let free = tokio::task::spawn_blocking(move || Free::of(&first_run::repository_folder(&folder)))
+        .await
+        .unwrap_or(Free::Missing);
     Html(render_str(&FreeView { free }, &base))
 }
 
