@@ -704,14 +704,14 @@ mod path_tests {
 }
 
 /// Keeps the computer from sleeping when idle until dropped so that a run is not cut short. The system lets go
-/// when this process ends however it does. Where it refuses, the computer may sleep as before.
+/// when this process ends however it does.
 #[cfg(all(feature = "server", target_vendor = "apple"))]
-pub(crate) struct Awake(Option<u32>);
+pub(crate) struct Awake(u32);
 
 /// A power assertion of `IOKit`, as `caffeinate` takes.
 #[cfg(all(feature = "server", target_vendor = "apple"))]
 #[expect(unsafe_code, reason = "IOKit's power assertions are C functions")]
-pub(crate) fn stay_awake() -> Awake {
+pub(crate) fn stay_awake() -> anyhow::Result<Awake> {
     use std::ffi::{CString, c_char, c_void};
     #[link(name = "IOKit", kind = "framework")]
     unsafe extern "C" {
@@ -732,14 +732,21 @@ pub(crate) fn stay_awake() -> Awake {
     let (kind, name) = (string("PreventUserIdleSystemSleep"), string(&crate::i18n::t!("awake-why")));
     let mut id = 0;
     // SAFETY: two strings that the call copies, released after, and where it writes the assertion's id.
-    let made = unsafe {
-        let made = !kind.is_null() && !name.is_null() && IOPMAssertionCreateWithName(kind, ON, name, &raw mut id) == 0;
+    let returned = unsafe {
+        let returned = if kind.is_null() || name.is_null() {
+            -1
+        } else {
+            IOPMAssertionCreateWithName(kind, ON, name, &raw mut id)
+        };
         for s in [kind, name].into_iter().filter(|s| !s.is_null()) {
             CFRelease(s);
         }
-        made
+        returned
     };
-    Awake(made.then_some(id))
+    match returned {
+        0 => Ok(Awake(id)),
+        code => Err(std::io::Error::other(format!("IOKit {code:#x}")).into()),
+    }
 }
 
 #[cfg(all(feature = "server", target_vendor = "apple"))]
@@ -750,19 +757,17 @@ impl Drop for Awake {
         unsafe extern "C" {
             fn IOPMAssertionRelease(id: u32) -> i32;
         }
-        if let Some(id) = self.0 {
-            // SAFETY: an assertion this took and releases once.
-            unsafe { IOPMAssertionRelease(id) };
-        }
+        // SAFETY: an assertion this took and releases once.
+        unsafe { IOPMAssertionRelease(self.0) };
     }
 }
 
 /// A logind inhibitor, held by the file it hands over: closing it lets go.
 #[cfg(all(feature = "server", target_os = "linux"))]
-pub(crate) struct Awake(#[expect(dead_code, reason = "held until dropped")] Option<std::os::fd::OwnedFd>);
+pub(crate) struct Awake(#[expect(dead_code, reason = "held until dropped")] std::os::fd::OwnedFd);
 
 #[cfg(all(feature = "server", target_os = "linux"))]
-pub(crate) fn stay_awake() -> Awake {
+pub(crate) fn stay_awake() -> anyhow::Result<Awake> {
     let inhibit = async {
         let bus = zbus::Connection::system().await?;
         let (login, why) = ("org.freedesktop.login1", crate::i18n::t!("awake-why"));
@@ -778,9 +783,9 @@ pub(crate) fn stay_awake() -> Awake {
             .await?;
         Ok::<_, zbus::Error>(std::os::fd::OwnedFd::from(reply.body().deserialize::<zbus::zvariant::OwnedFd>()?))
     };
-    // Called from a run's thread, outside the server's runtime.
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
-    Awake(runtime.ok().and_then(|r| r.block_on(inhibit).ok()))
+    // On a run's thread, outside the server's runtime.
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+    Ok(Awake(runtime.block_on(inhibit)?))
 }
 
 /// Windows keeps the computer awake while the thread that asked runs and until it asks no more.
@@ -789,11 +794,13 @@ pub(crate) struct Awake(());
 
 #[cfg(all(feature = "server", windows))]
 #[expect(unsafe_code, reason = "SetThreadExecutionState takes flags only")]
-pub(crate) fn stay_awake() -> Awake {
+pub(crate) fn stay_awake() -> anyhow::Result<Awake> {
     use windows_sys::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
-    // SAFETY: flags only.
-    unsafe { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED) };
-    Awake(())
+    // SAFETY: flags only. It returns the previous state, or 0 when refused.
+    match unsafe { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED) } {
+        0 => Err(std::io::Error::last_os_error().into()),
+        _ => Ok(Awake(())),
+    }
 }
 
 #[cfg(all(feature = "server", windows))]
@@ -810,8 +817,8 @@ impl Drop for Awake {
 pub(crate) struct Awake(());
 
 #[cfg(all(feature = "server", not(any(target_vendor = "apple", target_os = "linux", windows))))]
-pub(crate) fn stay_awake() -> Awake {
-    Awake(())
+pub(crate) fn stay_awake() -> anyhow::Result<Awake> {
+    Ok(Awake(()))
 }
 
 /// Each system says that something keeps it awake while held, and no longer once dropped.
@@ -841,8 +848,7 @@ mod awake_tests {
     #[cfg(target_vendor = "apple")]
     #[test]
     fn iokit_holds_an_idle_sleep_assertion_until_dropped() {
-        let awake = stay_awake();
-        assert!(awake.0.is_some(), "IOKit refused the assertion");
+        let awake = stay_awake().unwrap();
         let held = assertions();
         assert!(held.iter().any(|l| l.contains(&crate::i18n::t!("awake-why"))), "{held:?}");
         drop(awake);
@@ -859,7 +865,7 @@ mod awake_tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn logind_lists_the_inhibitor_until_dropped() {
-        let awake = stay_awake();
+        let awake = stay_awake().unwrap();
         // logind lists it before it answers the call.
         let held = inhibitors();
         assert!(!held.is_empty(), "logind lists no inhibitor: the system bus refused it");
@@ -875,7 +881,7 @@ mod awake_tests {
         use windows_sys::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
         // Each call returns the state before it: each sets the same state again but the last.
         let state = |flags| unsafe { SetThreadExecutionState(flags) };
-        let awake = stay_awake();
+        let awake = stay_awake().unwrap();
         assert_eq!(state(ES_CONTINUOUS | ES_SYSTEM_REQUIRED), ES_CONTINUOUS | ES_SYSTEM_REQUIRED);
         drop(awake);
         assert_eq!(state(ES_CONTINUOUS), ES_CONTINUOUS);

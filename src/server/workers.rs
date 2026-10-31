@@ -94,7 +94,11 @@ impl App {
             let (engine, batch) = (app.engine(), Batch::new(trigger));
             let request = queued.request.clone();
             if let Some(j) = engine.collection(&collection) {
-                let awake = crate::sys::stay_awake();
+                let awake = crate::sys::stay_awake().map_err(|e| {
+                    // Once: it would be refused again for each run.
+                    static TOLD: std::sync::Once = std::sync::Once::new();
+                    TOLD.call_once(|| log::event(None, &Logged::NotKeptAwake { error: format!("{e:#}") }));
+                });
                 let report = engine.execute(&j, queued, &batch);
                 drop(awake);
                 report.print();

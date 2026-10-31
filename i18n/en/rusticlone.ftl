@@ -670,6 +670,7 @@ server-not-watching-dir = cannot watch { $dir }: { $error }
 server-dir-not-created = cannot create { $dir }: { $error }
 server-web-ui-failed = web UI: { $error }
 server-no-wall-clock = no wall clock timer ({ $error }): schedules can be late after a suspend
+server-not-kept-awake = cannot keep the computer awake during runs: { $error }
 server-runs-unread = { $runs ->
     [one] 1 run
    *[other] { $runs } runs

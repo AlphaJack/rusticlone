@@ -670,6 +670,7 @@ server-not-watching-dir = impossibile osservare { $dir }: { $error }
 server-dir-not-created = impossibile creare { $dir }: { $error }
 server-web-ui-failed = interfaccia web: { $error }
 server-no-wall-clock = nessun timer legato all'orologio di sistema ({ $error }): le pianificazioni possono ritardare dopo una sospensione
+server-not-kept-awake = impossibile tenere sveglio il computer durante le esecuzioni: { $error }
 server-runs-unread = { $runs ->
     [one] 1 esecuzione non mostrata: scritta
    *[other] { $runs } esecuzioni non mostrate: scritte
