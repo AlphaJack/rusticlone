@@ -299,8 +299,8 @@ struct NotFound {
     what: String,
 }
 
-/// The time pages are rendered at. Open pages are rendered again at least every [`events::AGE_TICK`], so
-/// that their ages stay current.
+/// The time pages are rendered at. Open pages are rendered again when what they show changes with it, so that
+/// their ages stay current.
 #[expect(clippy::disallowed_methods, reason = "pages show ages as of now")]
 fn now() -> Timestamp {
     Timestamp::now()

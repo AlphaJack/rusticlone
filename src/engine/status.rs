@@ -209,6 +209,9 @@ impl Engine {
         let primary = r.name == p.name;
         let (backed_up, last_backup) = schedule::backups(p, state);
         let stale_at = self.stale_at(p, r, state, last_backup);
+        if let Some(at) = stale_at.filter(|at| *at > now) {
+            crate::clock::changes_at(at);
+        }
         let (prune, check) = (last(StepKey::Prune(r.name.clone())), last(StepKey::Check(r.name.clone())));
         let copy = if primary { None } else { last(StepKey::Copy(p.name.clone(), r.name.clone())) };
         let latest_snapshot = state.latest.get(&r.name).copied();
@@ -270,7 +273,13 @@ impl Engine {
         let snapshot = last(snapshot_key.clone());
         let (backed_up, last_backup) = schedule::backups(p, state);
         let running = self.running(&p.name);
-        let failing = |t: &LastStep| t.failing(now, !running.is_empty());
+        let failing = |t: &LastStep| {
+            // A failure awaiting its retry shows as failing once the retry is late.
+            if let Some(until) = t.pending_until().filter(|until| *until > now) {
+                crate::clock::changes_at(until);
+            }
+            t.failing(now, !running.is_empty())
+        };
         let repo = |r: &RusticProfile| self.repo_status(p, r, state, now, &failing);
         let primary = repo(p);
         let targets: Vec<RepoOverview> = collection.targets.iter().map(|t| repo(t)).collect();

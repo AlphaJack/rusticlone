@@ -22,12 +22,11 @@ use super::{
     repo::{RepoMain, repo_view},
     runs::log_tail,
 };
-use crate::sys;
+use crate::{clock, sys};
+use jiff::Timestamp;
 
 /// The shortest interval between two renders of a page while changes keep coming.
 const RENDER_EVERY: Duration = Duration::from_millis(500);
-/// How often a page is rendered again without a change, as its ages change once a minute.
-pub(super) const AGE_TICK: Duration = Duration::from_mins(1);
 
 #[derive(Clone, Deserialize)]
 pub(super) struct View {
@@ -87,6 +86,11 @@ struct Stream {
     /// The hash of its `<main>`.
     last: Option<u64>,
     rendered: tokio::time::Instant,
+    /// When what it shows changes without a change of state, as an age turns over: it is rendered again then.
+    /// `None`: never.
+    changes_at: Option<Timestamp>,
+    /// Rendered only to learn [`Stream::changes_at`], as it already shows the current state: nothing is sent.
+    learning: bool,
     /// The run whose log it shows, and the log offset its lines end at.
     log: Option<(i64, u64)>,
     /// New lines of that log, sent after `<main>`.
@@ -95,13 +99,19 @@ struct Stream {
     language: Language,
 }
 
+/// Waits until `at`, or forever.
+#[expect(clippy::disallowed_methods, reason = "what a page shows changes with time at `at`, which no event tells")]
+async fn until(at: Option<Timestamp>) {
+    match at {
+        Some(at) => tokio::time::sleep(Duration::try_from(at.duration_since(super::now())).unwrap_or_default()).await,
+        None => std::future::pending().await,
+    }
+}
+
 /// Sends the page's `<main>` again when what it shows changed, at most every [`RENDER_EVERY`], and
 /// only if it differs. A page's log grows through `log` events that carry only the new lines. Hidden
 /// pages disconnect (htmx) and get everything again when they reconnect.
-#[expect(
-    clippy::disallowed_methods,
-    reason = "ages shown on the page change with time, and a burst of changes renders once"
-)]
+#[expect(clippy::disallowed_methods, reason = "a burst of changes renders once")]
 pub(super) async fn events(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
@@ -112,16 +122,19 @@ pub(super) async fn events(
     let reconnected = headers.contains_key("last-event-id");
     let (mut changes, failures) = (app.pages.changes.subscribe(), app.pages.failures.subscribe());
     let seen = view.v.filter(|_| !reconnected);
+    let current = seen.is_some_and(|v| {
+        let changes = changes.borrow_and_update();
+        v <= changes.count && !changes.since(v, view.collection.as_deref())
+    });
     let stream = Stream {
         app,
         // Rendered with the current state: wait for the next change.
-        wait: seen.is_some_and(|v| {
-            let changes = changes.borrow_and_update();
-            v <= changes.count && !changes.since(v, view.collection.as_deref())
-        }),
+        wait: current,
+        learning: current,
         seen: seen.unwrap_or_default(),
         last: view.h,
         rendered: tokio::time::Instant::now(),
+        changes_at: None,
         log: view.log.zip(view.at).filter(|_| !reconnected),
         lines: None,
         language: Language::current(),
@@ -136,7 +149,8 @@ pub(super) async fn events(
         }
         let mut stopping = s.app.stopping.clone();
         loop {
-            if s.wait {
+            let learning = std::mem::take(&mut s.learning);
+            if s.wait && !learning {
                 tokio::select! {
                     changed = s.changes.changed() => {
                         changed.ok()?;
@@ -153,7 +167,7 @@ pub(super) async fn events(
                         Err(broadcast::error::RecvError::Closed) => return None,
                     },
                     _ = stopping.wait_for(|s| *s) => return None,
-                    () = tokio::time::sleep(AGE_TICK) => {}
+                    () = until(s.changes_at) => {}
                 }
                 // Render once for a burst of changes.
                 tokio::time::sleep_until(s.rendered + RENDER_EVERY).await;
@@ -162,8 +176,14 @@ pub(super) async fn events(
             s.seen = s.changes.borrow_and_update().count;
             let version = s.seen.to_string();
             let (app, view, shown, base, language) = (s.app.clone(), s.view.clone(), s.log, s.base.clone(), s.language);
-            let render = move || language.scope(|| render_update(&app, &view, shown, &base));
-            let (html, log, lines) = tokio::task::spawn_blocking(render).await.ok()??;
+            let render = move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base)));
+            let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
+            let (html, log, lines) = update?;
+            s.changes_at = changes_at;
+            if learning {
+                s.last = Some(sys::fnv1a(html.as_bytes()));
+                continue;
+            }
             s.log = log;
             s.lines = lines.map(|lines| sse::Event::default().event("log").id(&version).data(lines));
             // Unchanged: nothing to send.

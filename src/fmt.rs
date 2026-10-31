@@ -40,14 +40,34 @@ enum Age {
 /// so that ages shown live change at most once a minute.
 pub(crate) fn human_age(since: Timestamp, now: Timestamp) -> String {
     if now.duration_since(since) < SignedDuration::from_mins(1) {
+        crate::clock::changes_at(since + SignedDuration::from_mins(1));
         return Age::UnderAMinute.to_string();
     }
     let (since, now) = (since.to_zoned(TimeZone::system()), now.to_zoned(TimeZone::system()));
     let truncate = SpanRound::new().smallest(Unit::Minute).mode(RoundMode::Trunc).relative(&since);
     match since.until((Unit::Year, &now)).and_then(|span| span.round(truncate)) {
-        Ok(span) => largest(span),
+        Ok(span) => {
+            if let Some(next) = turns_over(&since, span) {
+                crate::clock::changes_at(next);
+            }
+            largest(span)
+        }
         Err(_) => Age::Long.to_string(),
     }
+}
+
+/// When an age of `span` since `since`, shown in its largest unit, shows one more of it.
+fn turns_over(since: &jiff::Zoned, span: Span) -> Option<Timestamp> {
+    let one_more = |n: i64| n.checked_add(1).unwrap_or(n);
+    let next = match (span.get_years(), span.get_months(), span.get_days(), span.get_hours()) {
+        (y, ..) if y != 0 => Span::new().try_years(one_more(y.into())),
+        (_, m, ..) if m != 0 => Span::new().try_months(one_more(m.into())),
+        (_, _, d, _) if d != 0 => Span::new().try_days(one_more(d.into())),
+        (.., h) if h != 0 => Span::new().try_hours(one_more(h.into())),
+        _ => Span::new().try_minutes(one_more(span.get_minutes())),
+    }
+    .ok()?;
+    Some(since.checked_add(next).ok()?.timestamp())
 }
 
 /// [`human_age`] ago: `3 hours ago`.
@@ -89,6 +109,22 @@ pub(crate) fn redact(repository: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A page showing an age is rendered again when the age shows one more of its unit, and not before.
+    #[test]
+    fn an_age_tells_when_it_turns_over() {
+        let now: Timestamp = "2026-10-14T12:00:00Z".parse().unwrap();
+        let next = |ago: &str| {
+            let since = now - ago.parse::<SignedDuration>().unwrap();
+            let (_, next) = crate::clock::next_change(|| human_age(since, now));
+            next.map(|at| at.duration_since(since))
+        };
+        let after = |d: &str| Some(d.parse::<SignedDuration>().unwrap());
+        assert_eq!(next("30s"), after("1m"));
+        assert_eq!(next("45m 10s"), after("46m"));
+        assert_eq!(next("2h 35m"), after("3h"));
+        assert_eq!(next("50h"), after("72h"));
+    }
 
     #[test]
     fn human_units() {
