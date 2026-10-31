@@ -1,4 +1,4 @@
-use std::fs;
+use std::{fs, path::PathBuf};
 
 use serde_json::json;
 
@@ -64,6 +64,46 @@ fn a_restore_says_where_it_looked_when_no_repository_is_there() {
         .assert_output("no repository of Docs could be read")
         .assert_output("Docs-remote at ")
         .assert_output("Docs.toml");
+}
+
+/// The primary's data is damaged, its listing is not: the restore goes on from the copy, which holds the files.
+#[test]
+fn a_restore_falls_back_to_the_copy_when_the_primary_is_damaged() {
+    let sb = docs_with_remote("");
+    sb.write("docs/a.txt", "a");
+    let original = sb.tree("source");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("source");
+    for pack in walk(&sb.path("local/Docs/data")) {
+        fs::write(pack, b"damaged").unwrap();
+    }
+    sb.run(&["restore", "--all"])
+        .assert_result("falling-back", json!({"repo": "Docs", "to": "Docs-remote"}))
+        .assert_result("restored", json!({"repo": "Docs-remote"}));
+    assert_eq!(sb.tree("source"), original);
+}
+
+/// A dry run reads the copy when the primary's data is damaged, as the restore would.
+#[test]
+fn a_dry_run_falls_back_to_the_copy_when_the_primary_is_damaged() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    for pack in walk(&sb.path("local/Docs/data")) {
+        fs::write(pack, b"damaged").unwrap();
+    }
+    sb.run(&["restore", "--dry-run", "--all"])
+        .assert_result("falling-back", json!({"repo": "Docs", "to": "Docs-remote"}))
+        .assert_result("test-restored", json!({"repo": "Docs-remote"}));
+}
+
+/// Every file below `dir`.
+fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.is_dir() { files.extend(walk(&path)) } else { files.push(path) }
+    }
+    files
 }
 
 #[test]

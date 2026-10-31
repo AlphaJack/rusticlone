@@ -259,6 +259,12 @@ pub enum StepResult {
         repo: String,
         error: String,
     },
+    /// A restore from `repo` failed, as when its data is damaged: it goes on from `to`, the next newest.
+    FallingBack {
+        repo: String,
+        to: String,
+        error: String,
+    },
     SomeSources {
         found: usize,
         of: usize,
@@ -335,6 +341,7 @@ impl Message for StepResult {
             | Self::Shrunk { .. }
             | Self::PrunePostponed { .. }
             | Self::Unavailable { .. }
+            | Self::FallingBack { .. }
             | Self::SomeSources { .. }
             | Self::Unmounted { .. }
             | Self::NoPlace { .. }
@@ -403,6 +410,7 @@ impl StepResult {
             | Self::PrunePostponed { repo: subject }
             | Self::KeepsEverything { repo: subject }
             | Self::Unavailable { repo: subject, .. }
+            | Self::FallingBack { repo: subject, .. }
             | Self::PrimaryUnavailable { repo: subject, .. }
             | Self::NotRecreated { repo: subject, .. }
             | Self::Copied { target: subject, .. }
@@ -559,6 +567,7 @@ impl std::fmt::Display for Detail<'_> {
             StepResult::Unavailable { error, .. } | StepResult::PrimaryUnavailable { error, .. } => {
                 t!("result-unavailable", error)
             }
+            StepResult::FallingBack { to, error, .. } => t!("result-falling-back", to, error),
             StepResult::SomeSources { found, of } => t!("result-some-sources", found = *found, of = *of),
             StepResult::Unmounted { .. } => t!("result-unmounted"),
             StepResult::NoPlace { .. } => t!("result-no-place"),

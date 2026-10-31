@@ -45,7 +45,7 @@ use crate::result::Doing;
 use crate::{
     clock,
     live::{Guard, Live, Runs},
-    log::{Level, Logged},
+    log::{Level, Logged, Message as _},
     profile::RusticProfile,
     request::Trigger,
     result::{self, RunResults, Status, StepResult},
@@ -158,6 +158,10 @@ pub(crate) enum Error {
         path: String,
         source: Source,
     },
+    /// Some of its paths failed, which the run reported.
+    PartlyRestored {
+        repo: String,
+    },
     NoTime {
         time: String,
         source: jiff::Error,
@@ -239,6 +243,11 @@ impl<'a> Run<'a> {
             self.cx.log(None, &result.to_string());
             results.push((self.cx.step(), result));
         }
+    }
+
+    /// How many failures the run reported so far.
+    fn failures(&self) -> usize {
+        self.shared.results.lock().iter().filter(|(_, r)| r.level() == Level::Failure).count()
     }
 
     /// Whether any step reported a result that `f` matches.
