@@ -505,6 +505,14 @@ pub(crate) enum Error {
     Exists {
         path: PathBuf,
     },
+    /// rustic would back up the repository into itself and grow it at every run.
+    #[cfg(feature = "server")]
+    Inside,
+    /// Neither empty nor a repository: rustic would mix its files in with others.
+    #[cfg(feature = "server")]
+    NotEmpty {
+        folder: String,
+    },
 }
 
 /// The form's questions, which also say in the profiles what each part answers.
@@ -771,6 +779,35 @@ impl Setup {
     }
 }
 
+#[cfg(feature = "server")]
+impl Setup {
+    /// Refuses a repository folder that a source holds or that holds a source. Refuses one with other files but no
+    /// repository's `config` too. The folder of an existing repository is kept to back up into it again.
+    fn check_folders(&self) -> Result<(), Error> {
+        use std::path::Path;
+        // As written and as the disk resolves it: `/tmp` is a link to `/private/tmp` on macOS.
+        let forms = |p: &str| [Some(Path::new(p).to_path_buf()), Path::new(p).canonicalize().ok()];
+        let sources = self.sources();
+        for folder in <Role as strum::IntoEnumIterator>::iter().filter_map(|role| self.folder(role)) {
+            for source in &sources {
+                let nested = forms(&folder)
+                    .iter()
+                    .flatten()
+                    .any(|f| forms(source).iter().flatten().any(|s| f.starts_with(s) || s.starts_with(f)));
+                if nested {
+                    return Err(Error::Inside);
+                }
+            }
+            let dir = Path::new(&folder);
+            let others = std::fs::read_dir(dir).is_ok_and(|mut entries| entries.next().is_some());
+            if others && !dir.join("config").is_file() {
+                return Err(Error::NotEmpty { folder });
+            }
+        }
+        Ok(())
+    }
+}
+
 /// The folder the form saves to, if this process may write in it.
 #[cfg(feature = "server")]
 pub(crate) fn dir() -> Option<PathBuf> {
@@ -782,6 +819,7 @@ pub(crate) fn dir() -> Option<PathBuf> {
 pub(crate) fn save(setup: &Setup) -> anyhow::Result<PathBuf> {
     use std::{fs, io::Write};
     setup.check()?;
+    setup.check_folders()?;
     let dir = dir().ok_or(Error::NoDir)?;
     fs::create_dir_all(&dir)?;
     let profiles = setup.profiles();
@@ -839,6 +877,31 @@ mod tests {
         assert!(matches!(with("source.1", "Documents"), Err(Error::Relative { path }) if path == "Documents"));
         assert!(matches!(with("source.1", "~me/x"), Err(Error::Relative { .. })));
         assert!(matches!(with("target.local.repository", "backup"), Err(Error::Relative { .. })));
+    }
+
+    /// rustic backs up a repository inside its sources into itself. It mixes a new one in with other files.
+    #[cfg(feature = "server")]
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "lays out folders to back up into")]
+    fn a_backup_folder_is_neither_nested_nor_shared() {
+        let dir = crate::sys::test_dir("folders");
+        let path = |parts: &[&str]| parts.iter().fold(dir.clone(), |p, part| p.join(part)).display().to_string();
+        std::fs::create_dir_all(dir.join("docs")).unwrap();
+        std::fs::create_dir_all(dir.join("full")).unwrap();
+        std::fs::write(dir.join("full").join("notes.txt"), "mine").unwrap();
+        std::fs::create_dir_all(dir.join("repo")).unwrap();
+        std::fs::write(dir.join("repo").join("config"), "").unwrap();
+        let into = |folder: &str| {
+            let mut setup = target(Kind::None, &[]);
+            setup.values.insert("source.0".into(), path(&["docs"]));
+            setup.values.insert("primary.local.repository".into(), folder.to_owned());
+            setup.check_folders()
+        };
+        assert!(matches!(into(&path(&["docs", "backup"])), Err(Error::Inside)));
+        assert!(matches!(into(&dir.display().to_string()), Err(Error::Inside)), "it would hold the source");
+        assert!(matches!(into(&path(&["full"])), Err(Error::NotEmpty { .. })));
+        assert!(into(&path(&["repo"])).is_ok(), "an existing repository");
+        assert!(into(&path(&["new", "backup"])).is_ok());
     }
 
     #[test]
