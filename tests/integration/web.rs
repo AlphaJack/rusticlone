@@ -15,11 +15,6 @@ use crate::{
     server::card,
 };
 
-/// Whether `html` has a disabled button with this icon.
-fn disabled(html: &str, icon: &str) -> bool {
-    html.contains(&format!(r##"disabled><svg class="i" aria-hidden="true"><use href="#{icon}"/>"##))
-}
-
 /// Whether a flash message of this level is in `html`: `success` or `failure`.
 fn flash(html: &str, level: &str) -> bool {
     html.contains(&format!(r#"class="flash {level}""#))
@@ -306,7 +301,8 @@ fn lost_repositories_are_neither_maintained_nor_restored_from() {
     let status = server.collection("Docs").to_string();
     assert_eq!(status.matches(r#""status":{"kind":"missing","#).count(), 2, "{status}");
     assert!(!card(&page, "repos").contains(r#"<td class="right num">1</td>"#), "{page}");
-    assert!(disabled(&card(&page, "sources"), "restore"));
+    // Nothing to restore from: no Restore button.
+    assert!(!card(&page, "sources").contains(r##"<use href="#restore"/>"##), "{page}");
 }
 
 #[test]
@@ -435,9 +431,9 @@ fn lost_repositories_are_re_created_by_copying() {
 
     // The primary is lost too, and comes back from the target.
     sb.remove("local/Docs");
-    wait_for(10, "the status", || disabled(&repos(), "copy"));
-    // Copy is disabled, and Re-create is offered.
-    assert!(disabled(&repos(), "copy") && repos().contains(r##"<use href="#recreate"/>"##));
+    wait_for(10, "the status", || repos().contains(r##"<use href="#recreate"/>"##));
+    // Re-create is offered, and there is no Copy from a primary that is gone.
+    assert!(!repos().contains(r##"<use href="#copy"/>"##));
     assert_eq!(server.post_form("/collections/Docs/repos/Docs/runs", "kind=copy").code, 422);
     // The form offers the target with the newest snapshots, or another one.
     let form = server.get("/collections/Docs/runs/new?kind=re-create&repo=Docs").body;
@@ -589,8 +585,8 @@ fn a_backup_unknown_until_one_is_made() {
     sb.run(&["backup", "--all"]).assert_exit(0).assert_result("backed-up", json!({"snapshots": []}));
     let repos = card(&server.get("/collections/Docs").body, "repos");
     assert!(repos.contains("ago</time></span></span></td>"), "{repos}");
-    // And there is nowhere to copy to.
-    assert!(disabled(&card(&server.get("/collections/Docs").body, "repos"), "copy"));
+    // And there is nowhere to copy to: no Copy button.
+    assert!(!card(&server.get("/collections/Docs").body, "repos").contains(r##"<use href="#copy"/>"##));
     assert_eq!(server.post_form("/collections/Docs/runs", "kind=copy").code, 422);
     assert_eq!(server.post_form("/collections/Docs/repos/Docs/runs", "kind=copy").code, 422);
 }

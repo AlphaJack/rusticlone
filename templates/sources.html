@@ -18,8 +18,7 @@
       <td class="wide"></td><td class="wide"></td>
       <td class="right nowrap tools">
         <span class="btn-group">
-          {% if let Some(why) = collection.restore_blocked %}<span title="{{ why }}"><button class="icon-btn" aria-label="{{ Button::Restore }}" disabled>{{ m::icon("restore") }}</button></span>{% else %}
-          <button class="icon-btn" title="{{ Button::Restore }}" hx-get="{{ base }}{{ Route::NewRun(collection.name) }}?kind=restore&amp;source={{ loop.index0 }}" hx-target="#dialog">{{ m::icon("restore") }}</button>{% endif %}
+          {% if collection.restore_blocked.is_none() %}<button class="icon-btn" title="{{ Button::Restore }}" hx-get="{{ base }}{{ Route::NewRun(collection.name) }}?kind=restore&amp;source={{ loop.index0 }}" hx-target="#dialog">{{ m::icon("restore") }}</button>{% endif %}
         </span>
       </td>
     </tr>
