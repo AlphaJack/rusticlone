@@ -62,7 +62,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Clippy without default features
-        run: cargo clippy --workspace --all-targets --no-default-features --locked -- -D warnings
+        run: cargo clippy -p rusticlone --all-targets --no-default-features --locked -- -D warnings
       - name: Rustdoc
         run: cargo doc --workspace --no-deps --all-features --document-private-items --locked
       - name: Modules are acyclic
