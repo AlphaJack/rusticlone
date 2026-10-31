@@ -144,6 +144,12 @@ pub(crate) enum Error {
     NoSnapshotOfThem {
         repo: String,
     },
+    /// No repository could be listed, which says why each failed and which profiles name their places.
+    Unreadable {
+        collection: String,
+        repos: String,
+        files: String,
+    },
     NoMatchingSnapshot {
         repo: String,
     },

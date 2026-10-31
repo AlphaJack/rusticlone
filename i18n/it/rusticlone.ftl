@@ -806,6 +806,7 @@ engine-error-unavailable = { $repo } non è disponibile o è stato eliminato ({ 
 engine-error-unreachable = non raggiungibile
 engine-error-not-copied = { $failed } snapshot su { $of } non copiati: { $error }
 engine-error-no-snapshot-of-them = { $repo } non ha snapshot di queste sorgenti: esegui prima il backup, o ripristina da un altro archivio con --repo
+engine-error-unreadable = nessun repository di { $collection } è leggibile: { $repos }. Se il suo disco è montato altrove su questo computer, scrivi la nuova posizione come `repository` in { $files }
 engine-error-no-matching-snapshot = nessuno snapshot corrispondente in { $repo } o nelle sue destinazioni: usa un --at-time successivo, o esegui prima il backup
 engine-error-no-time = impossibile interpretare l'orario { $time }: usa 2026-10-01, "2026-10-01 12:00" o RFC 3339
 rustic-error-dry-run-creates = una simulazione non crea archivi
