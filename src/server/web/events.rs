@@ -100,6 +100,7 @@ struct Stream {
 }
 
 /// Waits until `at`, or forever.
+#[expect(clippy::disallowed_methods, reason = "what a page shows changes with time at `at`, which no event tells")]
 async fn until(at: Option<Timestamp>) {
     match at {
         Some(at) => tokio::time::sleep(Duration::try_from(at.duration_since(super::now())).unwrap_or_default()).await,
@@ -110,10 +111,7 @@ async fn until(at: Option<Timestamp>) {
 /// Sends the page's `<main>` again when what it shows changed, at most every [`RENDER_EVERY`], and
 /// only if it differs. A page's log grows through `log` events that carry only the new lines. Hidden
 /// pages disconnect (htmx) and get everything again when they reconnect.
-#[expect(
-    clippy::disallowed_methods,
-    reason = "ages shown on the page change with time, and a burst of changes renders once"
-)]
+#[expect(clippy::disallowed_methods, reason = "a burst of changes renders once")]
 pub(super) async fn events(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
