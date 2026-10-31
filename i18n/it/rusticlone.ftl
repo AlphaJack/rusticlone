@@ -707,6 +707,7 @@ app-description = Backup 3-2-1-1-0 pianificati per computer e server, basati su 
 tray-quit = Esci (sospende i backup automatici)
 switch-at-boot = Avvia all'accensione
 switch-at-login = Avvia all'accesso
+awake-why = È in corso un backup
 switch-auto-update = Aggiorna automaticamente
 update-current = { -name } { $current } è aggiornato
 update-available = { -name } { $to } è disponibile, questo è { $from }

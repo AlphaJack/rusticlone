@@ -702,3 +702,78 @@ mod path_tests {
         assert!(!foreign_path("C:relative") && !foreign_path(""));
     }
 }
+
+/// Keeps the computer from sleeping when idle until dropped so that a run is not cut short. It uses `caffeinate`
+/// on macOS and a systemd inhibitor on Linux: both end with it. Where neither is found the
+/// computer may sleep as before.
+#[cfg(all(feature = "server", unix))]
+pub(crate) struct Awake(Option<std::process::Child>);
+
+#[cfg(all(feature = "server", unix))]
+#[expect(clippy::disallowed_methods, reason = "starts the system's sleep inhibitor, not rustic")]
+pub(crate) fn stay_awake() -> Awake {
+    use std::process::{Command, Stdio};
+    let mut command = if cfg!(target_vendor = "apple") {
+        let mut c = Command::new("/usr/bin/caffeinate");
+        c.arg("-i");
+        c
+    } else {
+        let mut c = Command::new("systemd-inhibit");
+        let why = crate::i18n::t!("awake-why");
+        c.args(["--what=idle:sleep", "--mode=block", &format!("--who={}", crate::APP_NAME), &format!("--why={why}")]);
+        c.args(["sleep", "infinity"]);
+        c
+    };
+    command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+    Awake(command.spawn().ok())
+}
+
+#[cfg(all(feature = "server", unix))]
+impl Drop for Awake {
+    fn drop(&mut self) {
+        if let Some(child) = &mut self.0 {
+            _ = child.kill();
+            _ = child.wait();
+        }
+    }
+}
+
+/// Windows keeps the computer awake while the thread that asked runs and until it asks no more.
+#[cfg(all(feature = "server", windows))]
+pub(crate) struct Awake(());
+
+#[cfg(all(feature = "server", windows))]
+#[expect(unsafe_code, reason = "SetThreadExecutionState takes flags only")]
+pub(crate) fn stay_awake() -> Awake {
+    use windows_sys::Win32::System::Power::{ES_CONTINUOUS, ES_SYSTEM_REQUIRED, SetThreadExecutionState};
+    // SAFETY: flags only.
+    unsafe { SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED) };
+    Awake(())
+}
+
+#[cfg(all(feature = "server", windows))]
+#[expect(unsafe_code, reason = "SetThreadExecutionState takes flags only")]
+impl Drop for Awake {
+    fn drop(&mut self) {
+        use windows_sys::Win32::System::Power::{ES_CONTINUOUS, SetThreadExecutionState};
+        // SAFETY: flags only.
+        unsafe { SetThreadExecutionState(ES_CONTINUOUS) };
+    }
+}
+
+#[cfg(all(feature = "server", not(any(unix, windows))))]
+pub(crate) struct Awake(());
+
+#[cfg(all(feature = "server", not(any(unix, windows))))]
+pub(crate) fn stay_awake() -> Awake {
+    Awake(())
+}
+
+#[cfg(all(test, feature = "server"))]
+mod awake_tests {
+    /// Asks the system to stay awake and then lets it sleep again.
+    #[test]
+    fn stays_awake_then_lets_go() {
+        drop(super::stay_awake());
+    }
+}

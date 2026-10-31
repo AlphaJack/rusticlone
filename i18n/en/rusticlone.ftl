@@ -707,6 +707,7 @@ app-description = { -description }
 tray-quit = Quit (pause automatic backups)
 switch-at-boot = Start at boot
 switch-at-login = Start at login
+awake-why = A backup is running
 switch-auto-update = Update automatically
 update-current = { -name } { $current } is up to date
 update-available = { -name } { $to } is available, this is { $from }

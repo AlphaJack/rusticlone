@@ -94,7 +94,9 @@ impl App {
             let (engine, batch) = (app.engine(), Batch::new(trigger));
             let request = queued.request.clone();
             if let Some(j) = engine.collection(&collection) {
+                let awake = crate::sys::stay_awake();
                 let report = engine.execute(&j, queued, &batch);
+                drop(awake);
                 report.print();
                 // Shown on whichever page is open now.
                 if let Some(why) =
