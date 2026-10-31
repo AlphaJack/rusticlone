@@ -466,3 +466,36 @@ fn a_request_joins_the_same_one_queued() {
     let checks = [ask(Request::Check(vec![("Docs".into(), None)])), ask(Request::Check(vec![("Docs".into(), None)]))];
     assert!(checks.iter().all(|c| matches!(c, Asked::Queued(_))));
 }
+
+/// A scheduled run shows what it waits for as it does a lock, each in turn, then goes on. A run started by hand never
+/// waits.
+#[cfg(feature = "server")]
+#[test]
+fn a_scheduled_run_waits_for_power_then_an_unmetered_network() {
+    use super::waiting::{Waiting, wait_while};
+    use crate::{live::Guard, request::Trigger, state::RunLog};
+    let engine = engine("waiting", &Replay::new());
+    let collections = engine.collections();
+    let start = |trigger| {
+        let log = RunLog::new(&engine.store, collections[0].name(), Request::Backup, trigger);
+        Guard::start(&engine.runs, log)
+    };
+    let scheduled = start(Trigger::Schedule);
+    let run = super::Run::new(&collections[0], Some(scheduled.live.clone()));
+    let (mut answers, mut shown) =
+        (vec![None, Some(Waiting::UnmeteredNetwork), Some(Waiting::PowerSupply)], Vec::new());
+    let waited = wait_while(&run, || {
+        // As the system would tell each change.
+        crate::clock::wake();
+        shown.push(scheduled.live.activities().into_iter().find_map(|a| a.doing).map(|d| d.to_string()));
+        answers.pop().flatten()
+    });
+    let doing = |w: Waiting| {
+        Some(crate::result::Doing::WaitingFor { lock: w.resource().to_owned(), by: Vec::new() }.to_string())
+    };
+    assert!(waited);
+    assert_eq!(shown, [None, doing(Waiting::PowerSupply), doing(Waiting::UnmeteredNetwork)]);
+    let by_hand = start(Trigger::Web);
+    let run = super::Run::new(&collections[0], Some(by_hand.live.clone()));
+    assert!(!wait_while(&run, || Some(Waiting::PowerSupply)));
+}

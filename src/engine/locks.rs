@@ -38,6 +38,8 @@ impl Engine {
     /// - this computer's link to it, one run at a time: the disk of a local repository that may be on a
     ///   spinning disk, or the upload or download link of a remote one (or of a network mount);
     /// - the CPU, for runs that compress or repack.
+    ///
+    /// A scheduled run first waits for the power supply or an unmetered network if settings ask.
     pub(super) fn lock<'r>(&self, run: &'r Run<'_>, cpu: bool, uses: &[(&RusticProfile, Use)]) -> Result<Held<'r>> {
         let mut keys: Vec<(String, Mode, String)> = Vec::new();
         if cpu {
@@ -66,6 +68,12 @@ impl Engine {
         let held: Vec<(&str, Mode)> = keys.iter().map(|(k, m, ..)| (k.as_str(), *m)).collect();
         let (last, since) = (RefCell::new(None), self.store.now());
         let (live, step) = (run.live.as_deref(), run.cx.step());
+        #[cfg(feature = "server")]
+        let remote = keys.iter().any(|(k, ..)| k == "upload" || k == "download");
+        #[cfg(feature = "server")]
+        let held_back = super::waiting::wait_while(run, || super::waiting::waiting(self.conditions, remote));
+        #[cfg(not(feature = "server"))]
+        let held_back = false;
         let locks = self.store.lock(
             &run.cx,
             &held,
@@ -89,7 +97,7 @@ impl Engine {
             let using = if locks.is_ok() { keys.into_iter().map(|(.., name)| name).collect() } else { Vec::new() };
             l.set_holds(step, Holds { using, waiting_for: None });
         }
-        if last.borrow().is_some()
+        if (held_back || last.borrow().is_some())
             && let Some(l) = &run.live
         {
             l.waited(step, u64::try_from(self.store.now().duration_since(since).as_secs()).unwrap_or_default());

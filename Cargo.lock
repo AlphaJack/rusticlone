@@ -1961,6 +1961,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -2580,6 +2581,7 @@ dependencies = [
  "anyhow",
  "askama",
  "axum",
+ "block2",
  "bytesize",
  "clap",
  "clap_complete",

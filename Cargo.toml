@@ -25,6 +25,8 @@ server = [
     "dep:tokio",
     "dep:fluent-langneg",
     "dep:tokio-util",
+    "dep:block2",
+    "dep:zbus",
 ]
 
 desktop = [
@@ -39,7 +41,6 @@ desktop = [
     "dep:dispatch2",
     "dep:objc2-service-management",
     "dep:ksni",
-    "dep:zbus",
     "dep:winresource",
 ]
 
@@ -143,13 +144,15 @@ sd-notify = { version = "0.5.0", optional = true }
 ksni = { version = "0.3.7", optional = true }
 # Whether the panel is light or dark, from the desktop portal: the bus that ksni uses.
 zbus = { version = "5.19.0", default-features = false, features = ["tokio"], optional = true }
-nix = { version = "0.31.3", features = ["time"], optional = true }
+nix = { version = "0.31.3", features = ["time", "socket"], optional = true }
 
 # The tray icon in macOS's menu bar and Windows's taskbar.
 [target."cfg(any(target_vendor = \"apple\", windows))".dependencies]
 tray-icon = { version = "0.26.1", optional = true }
 
 [target."cfg(target_vendor = \"apple\")".dependencies]
+# The Network framework's callback, which says whether the connection is metered.
+block2 = { version = "0.6.2", optional = true }
 objc2 = { version = "0.6.5", optional = true }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "std",
@@ -185,6 +188,9 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
     "Win32_Security",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+    "Win32_System_SystemServices",
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
     "Win32_System_EventLog",
@@ -192,6 +198,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_JobObjects",
     "Win32_System_LibraryLoader",
     "Win32_System_Ioctl",
+    "Win32_System_Power",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",
