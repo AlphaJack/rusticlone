@@ -55,7 +55,7 @@ curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rust
 Homebrew:
 
 ```sh
-brew install AlphaJack/tap/rusticlone && rusticlone install
+brew install AlphaJack/tap/rusticlone
 ```
 
 nix-darwin and Home Manager: see [Nix](#nix)
@@ -77,7 +77,7 @@ yay -S rusticlone-bin
 Homebrew:
 
 ```sh
-brew install AlphaJack/tap/rusticlone && rusticlone install
+brew install AlphaJack/tap/rusticlone
 ```
 
 NixOS and Home Manager: see [Nix](#nix)
