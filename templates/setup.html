@@ -14,7 +14,7 @@
   <select name="{{ role }}.{{ value }}.{{ f.key }}" id="setup-{{ role }}-{{ value }}-{{ f.key }}">{% for choice in f.choices %}<option value="{{ choice }}"{% if *choice == chosen %} selected{% endif %}>{{ crate::first_run::Field::meaning(choice) }}</option>{% endfor %}</select>
   {% elif *kind == Kind::Local %}
   <div class="field-row">
-    <input type="text" name="{{ role }}.{{ value }}.{{ f.key }}" id="setup-{{ role }}-{{ value }}-{{ f.key }}" value="{{ setup.shown(*role, **kind, f) }}" placeholder="{{ f.example }}" autocomplete="off" hx-get="{{ base }}{{ Route::SetupFree }}" hx-trigger="load, input delay:600ms" hx-target="next .free" hx-swap="innerHTML">
+    <input type="text" name="{{ role }}.{{ value }}.{{ f.key }}" id="setup-{{ role }}-{{ value }}-{{ f.key }}" value="{{ setup.shown(*role, **kind, f) }}" placeholder="{{ f.example }}" autocomplete="off" hx-get="{{ base }}{{ Route::SetupFree }}" hx-trigger="load, input delay:600ms, change from:.sources" hx-include="[name^='source.']" hx-target="next .free" hx-swap="innerHTML">
     <span class="muted free nowrap"></span>
   </div>
   {% else %}
