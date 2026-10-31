@@ -708,16 +708,28 @@ mod path_tests {
 #[expect(clippy::disallowed_methods, reason = "asks the power manager, not rustic")]
 pub(crate) fn on_battery() -> bool {
     let out = std::process::Command::new("/usr/bin/pmset").args(["-g", "ps"]).output();
-    out.is_ok_and(|o| String::from_utf8_lossy(&o.stdout).contains("'Battery Power'"))
+    out.is_ok_and(|o| pmset_on_battery(&String::from_utf8_lossy(&o.stdout)))
+}
+
+/// Whether `pmset -g ps` says the power comes from the battery.
+#[cfg(all(feature = "server", any(test, target_vendor = "apple")))]
+fn pmset_on_battery(out: &str) -> bool {
+    out.contains("'Battery Power'")
 }
 
 /// A battery discharging as the kernel reports power supplies.
 #[cfg(all(feature = "server", target_os = "linux"))]
-#[expect(clippy::disallowed_methods, reason = "reads the kernel's power supplies")]
 pub(crate) fn on_battery() -> bool {
+    supplies_on_battery(std::path::Path::new("/sys/class/power_supply"))
+}
+
+/// Whether the power supplies in `dir`, laid out as the kernel's, have a battery discharging and no mains plugged
+/// in.
+#[cfg(all(feature = "server", any(test, target_os = "linux")))]
+#[expect(clippy::disallowed_methods, reason = "reads the kernel's power supplies")]
+fn supplies_on_battery(dir: &std::path::Path) -> bool {
     let read = |p: &std::path::Path, f: &str| std::fs::read_to_string(p.join(f)).unwrap_or_default().trim().to_owned();
-    let supplies: Vec<PathBuf> =
-        std::fs::read_dir("/sys/class/power_supply").into_iter().flatten().flatten().map(|e| e.path()).collect();
+    let supplies: Vec<PathBuf> = std::fs::read_dir(dir).into_iter().flatten().flatten().map(|e| e.path()).collect();
     let plugged = supplies.iter().any(|s| read(s, "type") == "Mains" && read(s, "online") == "1");
     !plugged && supplies.iter().any(|s| read(s, "type") == "Battery" && read(s, "status") == "Discharging")
 }
@@ -746,8 +758,14 @@ pub(crate) fn metered() -> bool {
     let out = std::process::Command::new("busctl")
         .args(["get-property", nm, "/org/freedesktop/NetworkManager", nm, "Metered"])
         .output();
-    // `u 1` is metered and `u 3` guessed so. 2 and 4 are not metered. 0 is unknown.
-    out.is_ok_and(|o| matches!(String::from_utf8_lossy(&o.stdout).trim(), "u 1" | "u 3"))
+    out.is_ok_and(|o| busctl_metered(&String::from_utf8_lossy(&o.stdout)))
+}
+
+/// Whether `NetworkManager`'s `Metered` property, as `busctl` prints it, is metered: `u 1` is metered and `u 3`
+/// guessed so. 2 and 4 are not metered. 0 is unknown.
+#[cfg(all(feature = "server", any(test, target_os = "linux")))]
+fn busctl_metered(out: &str) -> bool {
+    matches!(out.trim(), "u 1" | "u 3")
 }
 
 /// Whether macOS says the connection costs. It is "expensive" on an iPhone's hotspot or a cellular link. It is
@@ -810,8 +828,14 @@ pub(crate) fn metered() -> bool {
         .args(["-NoProfile", "-NonInteractive", "-Command", COST])
         .creation_flags(CREATE_NO_WINDOW)
         .output();
-    // `Unrestricted` is not metered. `Unknown` means there is no connection.
-    out.is_ok_and(|o| matches!(String::from_utf8_lossy(&o.stdout).trim(), "Fixed" | "Variable"))
+    out.is_ok_and(|o| cost_metered(&String::from_utf8_lossy(&o.stdout)))
+}
+
+/// Whether a `NetworkCostType` costs: `Fixed` and `Variable` do. `Unrestricted` is not metered. `Unknown` means
+/// there is no connection.
+#[cfg(all(feature = "server", any(test, windows)))]
+fn cost_metered(out: &str) -> bool {
+    matches!(out.trim(), "Fixed" | "Variable")
 }
 
 #[cfg(all(feature = "server", not(any(target_os = "linux", target_vendor = "apple", windows))))]
@@ -821,10 +845,47 @@ pub(crate) fn metered() -> bool {
 
 #[cfg(all(test, feature = "server"))]
 mod power_tests {
-    /// The system answers here and now. The test cannot know the computer's state.
+    use super::{busctl_metered, cost_metered, pmset_on_battery, supplies_on_battery};
+
     #[test]
-    fn power_and_network_are_read() {
-        println!("on battery: {}, metered: {}", super::on_battery(), super::metered());
-        assert_eq!(super::metered(), super::metered(), "the same answer twice in a row");
+    fn pmset_says_where_power_comes_from() {
+        let battery = "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=4653155)\t87%; discharging;";
+        let plugged = "Now drawing from 'AC Power'\n -InternalBattery-0 (id=4653155)\t87%; charging;";
+        assert!(pmset_on_battery(battery) && !pmset_on_battery(plugged) && !pmset_on_battery(""));
+    }
+
+    /// A laptop unplugged, then plugged in. A desktop has no battery. A missing folder is not on battery.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes power supplies as the kernel lays them out")]
+    fn the_kernels_supplies_say_whether_on_battery() {
+        let dir = super::test_dir("power-supplies");
+        let supply = |name: &str, files: &[(&str, &str)]| {
+            let path = dir.join(name);
+            std::fs::create_dir_all(&path).unwrap();
+            for (file, value) in files {
+                std::fs::write(path.join(file), format!("{value}\n")).unwrap();
+            }
+        };
+        supply("BAT0", &[("type", "Battery"), ("status", "Discharging")]);
+        supply("AC", &[("type", "Mains"), ("online", "0")]);
+        assert!(supplies_on_battery(&dir));
+        supply("AC", &[("type", "Mains"), ("online", "1")]);
+        assert!(!supplies_on_battery(&dir));
+        std::fs::remove_dir_all(dir.join("BAT0")).unwrap();
+        supply("AC", &[("type", "Mains"), ("online", "0")]);
+        assert!(!supplies_on_battery(&dir));
+        assert!(!supplies_on_battery(&dir.join("none")));
+    }
+
+    #[test]
+    fn networkmanager_says_whether_metered() {
+        assert!(busctl_metered("u 1\n") && busctl_metered("u 3"));
+        assert!(["u 0", "u 2", "u 4", ""].iter().all(|o| !busctl_metered(o)));
+    }
+
+    #[test]
+    fn windows_says_whether_the_connection_costs() {
+        assert!(cost_metered("Fixed\r\n") && cost_metered("Variable"));
+        assert!(["Unrestricted", "Unknown", ""].iter().all(|o| !cost_metered(o)));
     }
 }

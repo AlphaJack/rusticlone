@@ -6,7 +6,6 @@ mod service;
 mod timer;
 #[cfg(tray)]
 mod tray;
-mod waiting;
 mod watcher;
 mod web;
 mod workers;
