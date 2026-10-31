@@ -562,8 +562,7 @@ missing-snapshot = snapshot non trovato
 free-missing = cartella o disco non trovato
 free-bytes = { $size } liberi
 measured-missing = { free-missing }
-measured-bytes = { $size } in { $files } file{ $largest }
-measured-at-least = più di { $size } in { $files } file, conteggio in corso{ $largest }
+measured-bytes = { $size } in { $files } file
 
 ## L'aiuto delle metriche
 
@@ -617,6 +616,7 @@ keep-year = Un anno
 keep-month = Un mese
 keep-all = Per sempre
 first-run-key-repository = archivio
+first-run-key-immutable = immutable
 field-repository-password = Password dell'archivio
 field-server-key = Chiave del server
 field-choice-accept = Qualsiasi chiave
@@ -638,6 +638,8 @@ field-secret-key = Chiave segreta
 field-password = Password
 field-email = Email
 field-url = URL
+field-object-lock = Questo bucket ha Object Lock
+field-append-only = Questo server accetta solo aggiunte
 first-run-guide = guida completa alla configurazione: { $url }
 first-run-no-choice = nessuna scelta { $choice }
 first-run-error-name = il nome deve iniziare con una lettera o una cifra; gli altri caratteri possono essere lettere, cifre, `-`, `_` o `.`

@@ -180,6 +180,8 @@ pub(crate) enum Key {
     /// A variable in `[global.env]`.
     #[fluent(transparent)]
     Env(&'static str),
+    /// A repository that refuses deletes, ticked: it gets no `[forget]`, so it is never forgotten or pruned.
+    Immutable,
 }
 
 impl Key {
@@ -289,6 +291,11 @@ pub(crate) fn password() -> String {
     crate::i18n::t!("field-repository-password")
 }
 
+/// A repository that refuses deletes, under its name for this kind.
+const fn immutable(label: &'static str) -> Field {
+    Field { required: false, ..field(Key::Immutable, label, "") }
+}
+
 /// `root`: where in the service the repository is.
 const ROOT: Field = Field { required: false, ..field(Key::Option("root"), "path", "/backup") };
 
@@ -361,6 +368,7 @@ impl Kind {
                         ROOT,
                         field(Key::Option("access_key_id"), "access-key", ""),
                         secret(Key::Option("secret_access_key"), "secret-key"),
+                        immutable("object-lock"),
                     ]
                 }
             }
@@ -387,7 +395,14 @@ impl Kind {
                     ]
                 }
             }
-            Self::Rest => const { &[field(Key::Repository, "url", "https://me:password@backup.example.com:8000/me")] },
+            Self::Rest => {
+                const {
+                    &[
+                        field(Key::Repository, "url", "https://me:password@backup.example.com:8000/me"),
+                        immutable("append-only"),
+                    ]
+                }
+            }
             Self::Gdrive => const { &rclone("gdrive:backup") },
             Self::Onedrive => const { &rclone("onedrive:backup") },
             Self::Dropbox => const { &rclone("dropbox:backup") },
@@ -671,6 +686,11 @@ impl Setup {
         pasted(self.shown(role, self.kind(role), field))
     }
 
+    /// Whether `role`'s repository refuses deletes.
+    fn immutable(&self, role: Role) -> bool {
+        (self.kind(role).fields().iter()).any(|f| f.key == Key::Immutable && !self.value(role, f).is_empty())
+    }
+
     #[cfg(any(feature = "server", test))]
     fn check(&self) -> Result<(), Error> {
         let name = self.name.trim();
@@ -781,6 +801,13 @@ impl Setup {
         backup["snapshots"] = Item::ArrayOfTables(snapshots.collect());
         primary["backup"] = Item::Table(backup);
         primary["repository"] = self.repository(Role::Primary, section(Question::WhereSaved));
+        let forget = (!self.keep.rules().is_empty()).then(|| {
+            let mut forget = section(Question::HowLongKeep);
+            for (keep, n) in self.keep.rules() {
+                forget[keep] = value(*n);
+            }
+            Item::Table(forget)
+        });
         let target = (self.target != Kind::None).then(|| {
             let name = self.profile_name(Role::Target);
             let mut copy = section(Question::WhereCopied);
@@ -788,18 +815,18 @@ impl Setup {
             primary["copy"] = Item::Table(copy);
             let mut target = DocumentMut::new();
             target["repository"] = self.repository(Role::Target, section(Question::WhereCopied));
+            // Kept as long as the backups, and checked and pruned on their schedules, which it inherits.
+            if let Some(forget) = forget.clone().filter(|_| !self.immutable(Role::Target)) {
+                target["forget"] = forget;
+            }
             let env: Table = self.env(Role::Target).collect();
             if !env.is_empty() {
                 target["global"] = implicit([("env", Item::Table(env))]);
             }
             (format!("{name}.toml"), target.to_string())
         });
-        if !self.keep.rules().is_empty() {
-            let mut forget = section(Question::HowLongKeep);
-            for (keep, n) in self.keep.rules() {
-                forget[keep] = value(*n);
-            }
-            primary["forget"] = Item::Table(forget);
+        if let Some(forget) = forget.filter(|_| !self.immutable(Role::Primary)) {
+            primary["forget"] = forget;
         }
         let mut vars = Table::new();
         vars.decor_mut().set_prefix("\n");
@@ -989,6 +1016,23 @@ mod tests {
         let local = target(Kind::Local, &[("repository", r#""D:\backup""#)]);
         let (_, text) = &local.profiles()[1];
         assert!(text.contains(r"'D:\backup'"), "{text}");
+    }
+
+    #[test]
+    fn a_repository_keeps_as_long_as_the_backups_unless_it_refuses_deletes() {
+        let keeps = |setup: &Setup| profile::parse("Documents-rest", &setup.profiles()[1].1).has_keep;
+        let rest = target(Kind::Rest, &[("repository", "http://h/r")]);
+        assert!(rest.profiles()[1].1.contains("keep-last = 10"), "{:?}", rest.profiles());
+        assert!(!keeps(&Setup { keep: Keep::All, ..rest }));
+        assert!(!keeps(&target(Kind::Rest, &[("repository", "http://h/r"), ("immutable", "on")])));
+        let object_lock = target(Kind::S3, &[("endpoint", "https://s3"), ("immutable", "on")]);
+        let text = &object_lock.profiles()[1].1;
+        assert!(!text.contains("forget") && !text.contains("immutable"), "{text}");
+        let mut locked = target(Kind::Rest, &[("repository", "http://h/r")]);
+        locked.primary = Kind::S3;
+        locked.values.insert("primary.s3.immutable".into(), "on".into());
+        let profiles = locked.profiles();
+        assert!(!profiles[0].1.contains("keep-") && profiles[1].1.contains("keep-last"), "{profiles:?}");
     }
 
     #[test]

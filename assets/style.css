@@ -209,7 +209,10 @@
   dialog::backdrop { background: rgba(0, 0, 0, .35); }
   .form-grid { display: grid; grid-template-columns: 90px 1fr; gap: 10px 16px; align-items: center; }
   .form-grid label { color: var(--muted-foreground); }
-  .form-grid .hint { grid-column: 1 / -1; }
+  .form-grid .hint, .form-grid .wide { grid-column: 1 / -1; }
+  .form-grid .wide { display: flex; align-items: center; gap: 8px; }
+  .measured.htmx-request > * { display: none; }
+  .measured.htmx-request::after { content: "\2026"; }
   /* a repository's password, apart from its service's fields, and only if there is a repository */
   .location .password { margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--border); }
   .location:has(input[value=none]:checked) .password { display: none; }
