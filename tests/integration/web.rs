@@ -11,7 +11,7 @@ use rusticlone::APP_NAME;
 use serde_json::json;
 
 use crate::{
-    common::{Sandbox, docs_with_remote, global_env, json_has, wait_for},
+    common::{Sandbox, as_root, docs_with_remote, global_env, json_has, wait_for},
     server::card,
 };
 
@@ -692,6 +692,9 @@ fn every_job_is_backed_up_at_once() {
 /// script or a reverse proxy, it would open on the server's desktop.
 #[test]
 fn the_profile_folder_opens_for_this_computer_only() {
+    if as_root() {
+        return;
+    }
     let sb = Sandbox::new();
     let server = sb.server(&[]);
     let form = "Content-Type: application/x-www-form-urlencoded";
@@ -723,6 +726,9 @@ fn the_profile_folder_opens_for_this_computer_only() {
 
 #[test]
 fn a_first_user_is_shown_where_to_start() {
+    if as_root() {
+        return;
+    }
     let sb = Sandbox::new();
     let server = sb.server(&[]);
     let page = server.get("/").body;
