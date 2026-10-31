@@ -86,6 +86,9 @@ pub(super) struct RunForm {
     /// The repository a re-create copies from.
     #[serde(default)]
     from: String,
+    /// What the restore dialog's choice restores: `all`, a backup entry by index, or `custom` for `path`.
+    #[serde(default)]
+    pick: String,
 }
 
 /// Starts the runs and reports them. If it started one run, the page opens it.
@@ -131,15 +134,14 @@ impl RunForm {
             .map_err(|e: NotASnapshotId| Notice::InvalidSnapshot(e.to_string()))?;
         let at = opt(self.at).map(|at| crate::request::parse_at(&at)).transpose();
         let at = at.map_err(|e| Notice::InvalidTime(format!("{e:#}")))?;
-        let options = RestoreOptions {
-            snapshot,
-            path: opt(self.path),
-            source: self.source,
-            at,
-            to,
-            from: opt(self.from),
-            ..RestoreOptions::default()
+        // The dialog's choice, if it offered one, says what `path` and `source` mean.
+        let (path, source) = match self.pick.as_str() {
+            "" => (opt(self.path), self.source),
+            "custom" => (opt(self.path), None),
+            pick => (None, pick.parse().ok()),
         };
+        let options =
+            RestoreOptions { snapshot, path, source, at, to, from: opt(self.from), ..RestoreOptions::default() };
         // As on the command line: without choices, a dry run reads the snapshots as a restore would; with them, it
         // says what would be restored where.
         let choices = options.at.is_some() || options.to.is_some() || options.path.is_some();
