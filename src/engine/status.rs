@@ -304,15 +304,7 @@ impl Engine {
         if listed && held.is_none() && backed_up.is_none() && snapshot.as_ref().is_none_or(|t| !failing(t)) {
             issues.push(Issue::NeverBackedUp);
         }
-        issues.extend(held.map(|hold| match hold.failed {
-            None => Issue::RestorePending,
-            Some(_) => {
-                // Its name alone if its file cannot be found, as for a profile of `use-profiles` only.
-                let file = |r: &RusticProfile| r.files().first().map(|f| f.display().to_string());
-                let files = collection.repos().map(|r| file(r).unwrap_or_else(|| format!("{}.toml", r.name)));
-                Issue::RestoreFailed { files: files.collect::<Vec<_>>().join(", ") }
-            }
-        }));
+        issues.extend(held.map(|hold| Issue::held(collection, hold.failed.is_some())));
         for r in std::iter::once(&primary).chain(&targets) {
             issues.extend(r.issues(&p.name, last_backup, &failing));
         }
@@ -631,6 +623,17 @@ impl Since {
 }
 
 impl Issue {
+    /// A kit's collection waiting for its restore, which may have `failed`.
+    fn held(collection: &Collection<'_>, failed: bool) -> Self {
+        if !failed {
+            return Self::RestorePending;
+        }
+        // Its name alone if its file cannot be found, as for a profile of `use-profiles` only.
+        let file = |r: &RusticProfile| r.files().first().map(|f| f.display().to_string());
+        let files = collection.repos().map(|r| file(r).unwrap_or_else(|| format!("{}.toml", r.name)));
+        Self::RestoreFailed { files: files.collect::<Vec<_>>().join(", ") }
+    }
+
     /// A step's failed last attempt, which can be dismissed. A cancelled attempt is not an issue: whoever
     /// cancelled it knows, it waits for its next scheduled time, and what it left undone becomes stale
     /// meanwhile.
