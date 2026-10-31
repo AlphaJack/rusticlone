@@ -79,7 +79,9 @@ pub enum StepKey {
     Copy(String, String),
     /// A collection's snapshots in one of its repositories.
     Forget(String, String),
+    /// Removing unused data from a repository.
     Prune(String),
+    /// Checking a repository.
     Check(String),
 }
 

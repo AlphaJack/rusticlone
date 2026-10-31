@@ -23,12 +23,15 @@ pub(super) fn run_lock(collection: &str, id: i64) -> String {
 /// Shared with runs that read from or add to the repository, or exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
+    /// Held along with other shared locks.
     Shared,
+    /// Held alone.
     Exclusive,
 }
 
 /// Released on drop. The run's rustic processes inherit them (see [`crate::rustic::Ctx::held`]), so that a killed
 /// process cannot leave rustic running without its locks.
+#[derive(Debug)]
 pub struct RepoLocks<'a> {
     files: Vec<File>,
     cx: &'a Ctx,
