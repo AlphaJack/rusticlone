@@ -5,7 +5,7 @@
   <img alt="Web UI collections" src="https://raw.githubusercontent.com/AlphaJack/rusticlone/HEAD/screenshots/web-light-collections.png">
 </picture>
 
-Rusticlone backs up your computers and servers on a schedule, keeps copies in more than one place and warns you when something needs your attention.
+Rusticlone backs up your desktops and servers on a schedule, keeps copies in more than one place and warns you when something needs your attention.
 
 ## Philosophy
 
@@ -406,7 +406,7 @@ Some can be accessed via a separate `RUSTICLONE_METRICS_TOKEN`:
 
 ### Smartphone backup
 
-Rusticlone doesn't have a mobile app, but it can back up their files once they reach a computer or server:
+Rusticlone doesn't have a mobile app, but it can back up their files once they reach a desktop or server:
 
 - Android: sync the folders you care about with [Syncthing](https://syncthing.net/)
 - iPhone: sync folders with [Möbius Sync](https://www.mobiussync.com/), or turn on "Download Originals" for iCloud Photos on a Mac or Windows computer
