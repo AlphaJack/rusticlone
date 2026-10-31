@@ -89,14 +89,23 @@ impl FromRequestParts<Arc<App>> for Here {
     async fn from_request_parts(parts: &mut Parts, app: &Arc<App>) -> Result<Self, Infallible> {
         let session = Access::from_request_parts(parts, app).await? == Access::Session;
         let peer = parts.extensions.get::<ConnectInfo<std::net::SocketAddr>>();
-        let forwarded = [header::FORWARDED, HeaderName::from_static(FORWARDED_FOR)];
-        let forwarded = forwarded.iter().any(|h| parts.headers.contains_key(h));
-        Ok(Self(cfg!(feature = "desktop") && session && peer.is_some_and(|p| p.0.ip().is_loopback()) && !forwarded))
+        // Cloudflare Tunnel, ngrok, Tailscale Serve and Funnel, Caddy and Traefik all send it.
+        let forwarded = parts.headers.contains_key("x-forwarded-for");
+        let host = parts.headers.get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or_default();
+        let local = peer.is_some_and(|p| p.0.ip().is_loopback()) && addressed_locally(host);
+        Ok(Self(cfg!(feature = "desktop") && session && local && !forwarded))
     }
 }
 
-/// What reverse proxies add, besides the standard `Forwarded`.
-const FORWARDED_FOR: &str = "x-forwarded-for";
+/// Whether the browser asked for this server by a name that only this computer reaches: `localhost` or a
+/// loopback address, as the tray and `serve --open` do. A tunnel or Tailscale Funnel passes on the name the
+/// visitor used instead, whatever headers it adds.
+fn addressed_locally(host: &str) -> bool {
+    let name =
+        host.rsplit_once(':').filter(|(_, port)| port.chars().all(|c| c.is_ascii_digit())).map_or(host, |(n, _)| n);
+    let name = name.trim_start_matches('[').trim_end_matches(']');
+    name.eq_ignore_ascii_case("localhost") || name.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
+}
 
 /// Computed once per request.
 impl FromRequestParts<Arc<App>> for Access {
@@ -310,6 +319,18 @@ fn saved_token(path: &Path) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only names that lead to this computer from this computer count, with or without a port.
+    #[test]
+    fn only_a_local_name_is_this_computer() {
+        for host in ["localhost", "127.0.0.1:32110", "LOCALHOST:80", "[::1]:32110", "[::1]", "127.0.0.2"] {
+            assert!(addressed_locally(host), "{host}");
+        }
+        let elsewhere = ["backup.example.com", "laptop.tailnet.ts.net", "192.168.1.10:32110", "[2001:db8::1]:80", ""];
+        for host in elsewhere {
+            assert!(!addressed_locally(host), "{host}");
+        }
+    }
 
     #[test]
     fn tokens_and_cross_site_requests() {
