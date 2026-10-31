@@ -108,6 +108,18 @@ struct Stream {
     language: Language,
 }
 
+impl Stream {
+    /// Its page's `<main>` as of now, and when that changes with time. `None` if what it shows no longer exists.
+    async fn render(&self) -> Option<(Update, Option<Timestamp>)> {
+        let (app, view, shown, base) = (self.app.clone(), self.view.clone(), self.log, self.base.clone());
+        let (language, local_browser) = (self.language, self.local_browser);
+        let render =
+            move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base, local_browser)));
+        let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
+        Some((update?, changes_at))
+    }
+}
+
 /// Waits until `at`, or forever.
 #[expect(clippy::disallowed_methods, reason = "what a page shows changes with time at `at`, which no event tells")]
 async fn until(at: Option<Timestamp>) {
@@ -186,11 +198,7 @@ pub(super) async fn events(
             (s.wait, s.rendered) = (true, tokio::time::Instant::now());
             s.seen = s.changes.borrow_and_update().count;
             let version = s.seen.to_string();
-            let (app, view, shown, base, language) = (s.app.clone(), s.view.clone(), s.log, s.base.clone(), s.language);
-            let local_browser = s.local_browser;
-            let render = move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base, local_browser)));
-            let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
-            let (html, log, lines) = update?;
+            let ((html, log, lines), changes_at) = s.render().await?;
             s.changes_at = changes_at;
             if learning {
                 s.last = Some(sys::fnv1a(html.as_bytes()));
