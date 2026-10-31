@@ -987,7 +987,7 @@ fn metered() -> bool {
     let mut hint: NL_NETWORK_CONNECTIVITY_HINT = unsafe { std::mem::zeroed() };
     // SAFETY: a structure to fill.
     let read = unsafe { GetNetworkConnectivityHint(&raw mut hint) } == 0;
-    read && matches!(hint.ConnectivityCost, NetworkConnectivityCostHintFixed | NetworkConnectivityCostHintVariable)
+    read && [NetworkConnectivityCostHintFixed, NetworkConnectivityCostHintVariable].contains(&hint.ConnectivityCost)
 }
 
 #[cfg(all(feature = "server", not(any(target_vendor = "apple", target_os = "linux", windows))))]
