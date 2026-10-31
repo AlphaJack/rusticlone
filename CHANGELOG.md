@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.0.4](https://github.com/AlphaJack/rusticlone/compare/v2.0.3...v2.0.4) - 2026-10-31
+
+### Fixed
+
+- Use dark and rounded look for the Windows tray menu ([#79](https://github.com/AlphaJack/rusticlone/pull/79))
+
+#### Backup
+
+- Fall back to the next repository when a restore fails ([#82](https://github.com/AlphaJack/rusticlone/pull/82))
+- Say where a restore looked when no repository could be read ([#77](https://github.com/AlphaJack/rusticlone/pull/77))
+- Find another computer's snapshots when restoring ([#73](https://github.com/AlphaJack/rusticlone/pull/73))
+- Restore another system's folders only into a folder ([#72](https://github.com/AlphaJack/rusticlone/pull/72))
+- Restore snapshots made on Windows on macOS and Linux ([#71](https://github.com/AlphaJack/rusticlone/pull/71))
+
+#### Web
+
+- Show the fields of the choices Firefox restores in the setup form ([#95](https://github.com/AlphaJack/rusticlone/pull/95))
+- Read the backup folder in the setup form as rustic does ([#94](https://github.com/AlphaJack/rusticlone/pull/94))
+- Save each setup folder as its own backup entry ([#81](https://github.com/AlphaJack/rusticlone/pull/81))
+- Hide Copy and Restore when they have nothing to do ([#80](https://github.com/AlphaJack/rusticlone/pull/80))
+- Refuse a backup folder inside a source or holding other files ([#75](https://github.com/AlphaJack/rusticlone/pull/75))
+- Treat browsers behind a proxy or tunnel as remote ([#74](https://github.com/AlphaJack/rusticlone/pull/74))
+
+### Performance
+
+#### Web
+
+- Render open pages again when what they show changes with time ([#97](https://github.com/AlphaJack/rusticlone/pull/97))
+
 ## [2.0.3](https://github.com/AlphaJack/rusticlone/compare/v2.0.2...v2.0.3) - 2026-10-29
 
 ### Fixed
