@@ -358,7 +358,7 @@ pub(super) fn index_main(app: &App) -> IndexMain {
     #[cfg(not(feature = "desktop"))]
     let blocked = None;
     let built = IndexMain::build(inputs).with(empty, engine.rustic.untested(), blocked, engine.unconfigured());
-    IndexMain { waiting: crate::engine::waiting::waiting(true), ..built }
+    IndexMain { waiting: crate::engine::waiting::waiting(engine.conditions, true), ..built }
 }
 
 impl IndexMain {

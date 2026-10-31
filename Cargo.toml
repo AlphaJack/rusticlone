@@ -146,7 +146,7 @@ zbus = { version = "6.0.0", default-features = false, features = ["tokio", "serv
 libc = "0.2.191"
 sd-notify = { version = "0.5.0", optional = true }
 # Whether a folder can take new files, and Linux's wall clock timer.
-nix = { version = "0.31.3", features = ["fs", "time"], optional = true }
+nix = { version = "0.31.3", features = ["fs", "socket", "time"], optional = true }
 
 [target."cfg(target_os = \"linux\")".dependencies]
 # The tray icon, over D-Bus.
@@ -196,8 +196,10 @@ windows-sys = { version = "0.61.2", features = [
     "Wdk_System_SystemServices",
     "Win32_Foundation",
     "Win32_Security",
-    "Win32_System_Com",
     "Win32_System_Diagnostics_ToolHelp",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Networking_WinSock",
+    "Win32_System_SystemServices",
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
     "Win32_System_EventLog",
