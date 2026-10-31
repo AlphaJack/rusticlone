@@ -51,6 +51,21 @@ fn restores_from_the_target_while_the_primary_disk_is_away() {
     assert!(!sb.path("local").exists());
 }
 
+/// Its disks are elsewhere, as on another computer: the error names each place tried and the profile to edit.
+#[test]
+fn a_restore_says_where_it_looked_when_no_repository_is_there() {
+    let sb = docs_with_remote("");
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("local");
+    sb.remove("remote");
+    sb.run(&["restore", "--all"])
+        .assert_exit(1)
+        .assert_output("no repository of Docs could be read")
+        .assert_output("Docs-remote at ")
+        .assert_output("Docs.toml");
+}
+
 #[test]
 fn restores_into_another_directory_after_a_hostname_change() {
     let sb = Sandbox::new();

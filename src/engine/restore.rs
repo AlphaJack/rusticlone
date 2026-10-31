@@ -167,18 +167,32 @@ impl Engine {
             None => collection.repos().collect(),
         };
         let mut best: Option<(&RusticProfile, Vec<Snapshot>)> = None;
-        for p in candidates {
+        let mut unreadable = Vec::new();
+        for p in &candidates {
             match self.list(run, p) {
                 Ok(snapshots) => {
                     let picks = pick(&snapshots, groups, at);
                     if !picks.is_empty() && best.as_ref().is_none_or(|(_, b)| newest(&picks) > newest(b)) {
-                        best = Some((p, picks));
+                        best = Some((*p, picks));
                     }
                 }
-                // Lost in a disaster: the next backup re-creates it from a target.
-                Err(_) if p.name == collection.name() => {}
-                Err(e) => run.push(StepResult::Unavailable { repo: p.name.clone(), error: format!("{e:#}") }),
+                Err(e) => {
+                    // Lost in a disaster: the next backup re-creates it from a target.
+                    if p.name != collection.name() {
+                        run.push(StepResult::Unavailable { repo: p.name.clone(), error: format!("{e:#}") });
+                    }
+                    unreadable.push((*p, format!("{e:#}")));
+                }
             }
+        }
+        // None could be read: its place is likely another computer's, as a disk mounted elsewhere here.
+        if unreadable.len() == candidates.len() {
+            let repos = unreadable.iter().map(|(p, e)| {
+                format!("{} at {}: {}", p.name, p.repository.as_deref().unwrap_or_default(), e.trim_end_matches('.'))
+            });
+            let files = unreadable.iter().filter_map(|(p, _)| Some(p.files().first()?.display().to_string()));
+            let (repos, files) = (repos.collect::<Vec<_>>().join("; "), files.collect::<Vec<_>>().join(", "));
+            return Err(Error::Unreadable { collection: collection.title.to_owned(), repos, files }.into());
         }
         let Some((src, picks)) = best else {
             return Err(Error::NoMatchingSnapshot { repo: collection.title.to_owned() }.into());
