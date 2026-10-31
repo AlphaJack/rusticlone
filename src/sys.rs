@@ -827,16 +827,6 @@ mod awake_tests {
         out.map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default()
     }
 
-    /// What `held` finds within 5 seconds: logind takes a moment to list it.
-    #[cfg(target_os = "linux")]
-    #[expect(clippy::disallowed_methods, reason = "waits for another process, which wakes no clock")]
-    fn held_soon(held: impl Fn() -> Option<Vec<String>>) -> Option<Vec<String>> {
-        (0..50).find_map(|_| {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            held()
-        })
-    }
-
     /// The idle sleep assertions that this process holds, as `pmset` lists them.
     #[cfg(target_vendor = "apple")]
     fn assertions() -> Vec<String> {
@@ -870,8 +860,9 @@ mod awake_tests {
     #[test]
     fn logind_lists_the_inhibitor_until_dropped() {
         let awake = stay_awake();
-        let held = held_soon(|| Some(inhibitors()).filter(|i| !i.is_empty()));
-        let held = held.expect("logind lists no inhibitor: systemd-inhibit is missing or was refused");
+        // logind lists it before it answers the call.
+        let held = inhibitors();
+        assert!(!held.is_empty(), "logind lists no inhibitor: the system bus refused it");
         assert!(held.iter().all(|l| l.contains("idle:sleep") && l.contains("block")), "{held:?}");
         drop(awake);
         assert!(inhibitors().is_empty(), "the inhibitor outlived the run");
