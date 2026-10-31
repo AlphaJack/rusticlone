@@ -86,6 +86,7 @@ pub(super) fn runs() -> Arc<Runs> {
 const SPIN: Duration = Duration::from_millis(250);
 
 /// Turns the spinners of running steps while the runs exist.
+#[expect(clippy::disallowed_methods, reason = "a spinner turns with time, which no event tells")]
 fn spin(runs: &Weak<Runs>) {
     while runs.strong_count() > 0 && !clock::interrupted() {
         clock::sleep(SPIN, &clock::interrupted);

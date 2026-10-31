@@ -173,6 +173,7 @@ impl Switch {
 impl Tray {
     /// Shows the health whenever pages are told it may have changed. `url`: the web UI; `login`: the
     /// same, logged in.
+    #[expect(clippy::disallowed_methods, reason = "a burst of changes settles before the icon is drawn again")]
     pub(super) async fn follow(mut self, app: Arc<App>, url: String, login: String) {
         let base = url.trim_end_matches('/').to_owned();
         let mut changes = app.pages.changes.subscribe();
