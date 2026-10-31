@@ -470,6 +470,7 @@ fn resume(app: &Arc<App>) -> Result<()> {
 }
 
 /// Gives runs a moment to stop their rustic calls and record that. A second signal ends the wait.
+#[expect(clippy::disallowed_methods, reason = "runs get a bounded time to stop")]
 async fn drain(app: &App) {
     let mut changes = app.pages.changes.subscribe();
     let drained = async {
@@ -488,6 +489,7 @@ async fn drain(app: &App) {
 
 /// Reads the collections again. Reading runs rustic and the collections' hooks, so this happens only when
 /// they change.
+#[expect(clippy::disallowed_methods, reason = "an editor saves in several steps, which no event groups")]
 async fn reload_profiles(app: &Arc<App>, build: &Build, reload: &Reload) {
     report(Phase::Reloading);
     // An editor saves in several steps: reload once for all of them.
