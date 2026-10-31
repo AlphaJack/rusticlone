@@ -487,7 +487,9 @@ fn a_scheduled_run_waits_for_power_then_an_unmetered_network() {
         shown.push(scheduled.live.activities().into_iter().find_map(|a| a.doing).map(|d| d.to_string()));
         answers.pop().flatten()
     });
-    let doing = |w: Waiting| Some(crate::result::Doing::WaitingFor { lock: w.resource(), by: Vec::new() }.to_string());
+    let doing = |w: Waiting| {
+        Some(crate::result::Doing::WaitingFor { lock: w.resource().to_owned(), by: Vec::new() }.to_string())
+    };
     assert!(waited);
     assert_eq!(shown, [None, doing(Waiting::Power), doing(Waiting::UnmeteredNetwork)]);
     let by_hand = start(Trigger::Web);
