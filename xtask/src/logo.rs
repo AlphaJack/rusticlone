@@ -1,11 +1,10 @@
 //! `cargo xtask logo`: renders `assets/images/logo.svg` into the images beside it that need pixels, so that
 //! builds do not render them: the tray's opacity, a PNG for notifications, the Windows and macOS icons, and the
 //! web UI's icons for a phone's home screen, in the sizes and color of `assets/manifest.webmanifest`. It keeps the images that already match, so that it changes no bytes.
-//! `cargo xtask logo --check`: verifies that they match the logo, within the rounding of another machine.
 
 use std::{fs, path::Path};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use resvg::{
     tiny_skia::{Pixmap, Transform},
     usvg::{Options, Tree},
@@ -41,7 +40,7 @@ fn web_icon(background: &str) -> [String; 2] {
     ]
 }
 
-pub(crate) fn render(check: bool) -> Result<()> {
+pub(crate) fn render() -> Result<()> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/images");
     let logo = fs::read_to_string(dir.join("logo.svg"))?;
     let options = Options::default();
@@ -69,9 +68,6 @@ pub(crate) fn render(check: bool) -> Result<()> {
         let (new, old) = (pixels(name, &rendered)?, fs::read(&path).ok().map(|old| pixels(name, &old)).transpose()?);
         if old.is_some_and(|old| alike(&new, &old)) {
             continue;
-        }
-        if check {
-            bail!("{} does not match logo.svg: cargo xtask logo", path.display());
         }
         fs::write(&path, rendered)?;
     }

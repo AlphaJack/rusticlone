@@ -4,7 +4,7 @@
 //! `cargo xtask vendor --check`: verifies that the files match the locked version.
 //! `cargo xtask fixtures`: see [`fixtures`].
 //! `cargo xtask acyclic [--mermaid]`: see [`acyclic`].
-//! `cargo xtask logo [--check]`: see [`logo`].
+//! `cargo xtask logo`: see [`logo`].
 //! `cargo xtask translations`: see [`translations`].
 //! `cargo xtask generate`: writes anew every generated file: the logo's renderings, and the files of the
 //! `generated_*` tests, such as the env file and the Linux packages.
@@ -43,19 +43,18 @@ fn main() -> Result<()> {
         ["fixtures"] => fixtures::record(),
         ["acyclic"] => acyclic::check(false),
         ["acyclic", "--mermaid"] => acyclic::check(true),
-        ["logo"] => logo::render(false),
-        ["logo", "--check"] => logo::render(true),
+        ["logo"] => logo::render(),
         ["translations"] => translations::report(),
         ["generate"] => generate(),
         ["screenshots", ref options @ ..] => screenshots(options),
         _ => bail!(
-            "usage: cargo xtask vendor [VERSION | --check] | cargo xtask fixtures | cargo xtask acyclic [--mermaid] | cargo xtask logo [--check] | cargo xtask translations | cargo xtask generate | cargo xtask screenshots [--setup | --only NAME... | --teardown]"
+            "usage: cargo xtask vendor [VERSION | --check] | cargo xtask fixtures | cargo xtask acyclic [--mermaid] | cargo xtask logo | cargo xtask translations | cargo xtask generate | cargo xtask screenshots [--setup | --only NAME... | --teardown]"
         ),
     }
 }
 
 fn generate() -> Result<()> {
-    logo::render(false)?;
+    logo::render()?;
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let tests = || {
         let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
