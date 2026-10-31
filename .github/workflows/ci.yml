@@ -180,6 +180,20 @@ jobs:
       - name: Evaluate the Nix package
         run: nix eval --raw .#packages.x86_64-linux.default.drvPath
 
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install mdbook
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: mdbook
+      - name: Build docs
+        run: mdbook build docs
+
   deny:
     runs-on: ubuntu-latest
     env:
