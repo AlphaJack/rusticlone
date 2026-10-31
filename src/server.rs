@@ -366,26 +366,69 @@ fn open_on_desktop(target: String) -> bool {
     open::that_detached(target).map_err(|e| log::event(None, &Logged::NotOpened { error: e.to_string() })).is_ok()
 }
 
-/// Whether the file manager showed `file` selected in its folder. Where no file manager selects files, as on a
-/// Linux desktop without the `FileManager1` service, it opens the folder.
-#[expect(clippy::disallowed_methods, reason = "asks the file manager to show a file, not rustic")]
-fn reveal_on_desktop(file: &std::path::Path) -> bool {
-    use std::process::Command;
-    let shown = if cfg!(target_vendor = "apple") {
-        Command::new("/usr/bin/open").arg("-R").arg(file).status().is_ok_and(|s| s.success())
-    } else if cfg!(windows) {
-        // Explorer exits with 1 even when it shows the file.
-        let mut select = std::ffi::OsString::from("/select,");
-        select.push(file);
-        Command::new("explorer.exe").arg(select).status().is_ok()
-    } else {
-        let uri = format!("array:string:file://{}", file.display());
-        let fm = "org.freedesktop.FileManager1";
-        let args = ["--session", "--type=method_call", &format!("--dest={fm}"), "/org/freedesktop/FileManager1"];
-        let call = [&format!("{fm}.ShowItems"), uri.as_str(), "string:"];
-        Command::new("dbus-send").args(args).args(call).status().is_ok_and(|s| s.success())
+/// Whether the file manager showed `file` selected in its folder. Where it does not, as on a Linux desktop without
+/// the `FileManager1` service, it opens the folder.
+pub(crate) async fn reveal_on_desktop(file: &std::path::Path) -> bool {
+    select_in_file_manager(file).await || file.parent().is_some_and(|dir| open_on_desktop(dir.display().to_string()))
+}
+
+/// Finder's window of the folder, with `file` selected.
+#[cfg(all(feature = "desktop", target_vendor = "apple"))]
+#[expect(clippy::unused_async, reason = "as Linux's, which asks over D-Bus")]
+async fn select_in_file_manager(file: &std::path::Path) -> bool {
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::{NSArray, NSString, NSURL};
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&file.display().to_string()));
+    NSWorkspace::sharedWorkspace().activateFileViewerSelectingURLs(&NSArray::from_retained_slice(&[url]));
+    true
+}
+
+/// File Explorer's window of the folder, with `file` selected.
+#[cfg(all(feature = "desktop", windows))]
+#[expect(clippy::unused_async, reason = "as Linux's, which asks over D-Bus")]
+#[expect(unsafe_code, reason = "the shell's item lists are C structures")]
+async fn select_in_file_manager(file: &std::path::Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
+    use windows_sys::Win32::{
+        System::Com::{COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize},
+        UI::Shell::{ILCreateFromPathW, ILFree, SHOpenFolderAndSelectItems},
     };
-    shown || file.parent().is_some_and(|dir| open_on_desktop(dir.display().to_string()))
+    let wide: Vec<u16> = file.as_os_str().encode_wide().chain([0]).collect();
+    // SAFETY: COM set up for this call on this thread, a path that lives through it, and an item list freed once.
+    unsafe {
+        let set_up = CoInitializeEx(std::ptr::null(), u32::try_from(COINIT_APARTMENTTHREADED).unwrap_or_default()) >= 0;
+        let item = ILCreateFromPathW(wide.as_ptr());
+        let shown = !item.is_null() && SHOpenFolderAndSelectItems(item, 0, std::ptr::null(), 0) >= 0;
+        if !item.is_null() {
+            ILFree(item);
+        }
+        if set_up {
+            CoUninitialize();
+        }
+        shown
+    }
+}
+
+/// The desktop's file manager through the `FileManager1` service on the session's bus: Nautilus, Dolphin, Nemo,
+/// Thunar and Caja provide it.
+#[cfg(all(feature = "desktop", target_os = "linux"))]
+async fn select_in_file_manager(file: &std::path::Path) -> bool {
+    let Ok(path) = askama::filters::urlencode(file.display()) else { return false };
+    let show = async {
+        let bus = zbus::Connection::session().await?;
+        let fm = "org.freedesktop.FileManager1";
+        let items = vec![format!("file://{path}")];
+        bus.call_method(Some(fm), "/org/freedesktop/FileManager1", Some(fm), "ShowItems", &(items, "")).await
+    };
+    show.await.is_ok()
+}
+
+/// Without a desktop, nothing selects files: only a browser on this computer asks, which needs one.
+#[cfg(not(all(feature = "desktop", any(target_vendor = "apple", windows, target_os = "linux"))))]
+#[expect(clippy::unused_async, reason = "as Linux's, which asks over D-Bus")]
+async fn select_in_file_manager(_: &std::path::Path) -> bool {
+    false
 }
 
 /// With a server already on `listen`, as after `install`, opens it logged in, with the token it keeps
