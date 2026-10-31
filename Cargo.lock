@@ -2545,6 +2545,7 @@ dependencies = [
  "anyhow",
  "askama",
  "axum",
+ "block2",
  "bytesize",
  "clap",
  "clap_complete",
