@@ -420,7 +420,6 @@ button-back-up-all = Back up all
 button-check-all = Check all
 button-prune-all = Prune all
 button-refresh-all = Refresh all
-button-refresh = Refresh
 button-copy = Copy
 button-copy-here = Copy here
 button-copy-this = Copy { $text }

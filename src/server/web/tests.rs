@@ -131,6 +131,9 @@ fn collection_pages() {
     let tag = |status: RepoStatus| format!("success {status}");
     let behind = RepoStatus::Behind { since: ts("2026-10-16T03:00:00Z") };
     assert_eq!(page.texts("td .tag"), [tag(RepoStatus::InSync), tag(RepoStatus::InSync), tag(behind)]);
+    // Copy shows where it helps: on the primary and the target behind, not on the one in sync.
+    let copies = page.0.select(&scraper::Selector::parse(".tools use[href='#copy']").unwrap()).count();
+    assert_eq!(copies, 2);
     // Each source and repository shows whether it is on a disk or reached over a network.
     assert_eq!(page.texts("td [data-copy] use").len(), 4);
     assert_eq!(page.0.select(&scraper::Selector::parse("use[href='#cloud']").unwrap()).count(), 1);
