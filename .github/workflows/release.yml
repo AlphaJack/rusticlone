@@ -404,6 +404,15 @@ jobs:
     permissions:
       "contents": "read"
 
+  custom-nixpkgs:
+    needs:
+      - plan
+      - announce
+    uses: ./.github/workflows/nixpkgs.yml
+    with:
+      plan: ${{ needs.plan.outputs.val }}
+    secrets: inherit
+
   custom-scoop:
     needs:
       - plan

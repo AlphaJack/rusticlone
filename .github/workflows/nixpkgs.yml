@@ -1,0 +1,125 @@
+name: nixpkgs
+
+# Pushes a branch that bumps rusticlone in nixpkgs to the fork, and links the pull request to open by hand in the
+# job summary: nixpkgs wants a person to review and submit each pull request.
+# requirements:
+# - secret NIXPKGS_TOKEN, a fine-grained token with contents write on AlphaJack/nixpkgs
+# - a fork of NixOS/nixpkgs under AlphaJack, which already has pkgs/by-name/ru/rusticlone
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to publish (e.g. v3.0.0)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+
+  nixpkgs:
+    name: Prepare nixpkgs update
+    runs-on: ubuntu-latest
+    permissions: {}
+    env:
+      PLAN: ${{ inputs.plan }}
+      DISPATCH_TAG: ${{ inputs.tag }}
+      FORK: AlphaJack/nixpkgs
+    steps:
+
+      - name: Resolve tag and version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_TAG}" ]; then
+            tag="${DISPATCH_TAG}"
+          else
+            tag="$(jq -r '.announcement_tag' <<<"${PLAN}")"
+            prerelease="$(jq -r '.announcement_is_prerelease' <<<"${PLAN}")"
+          fi
+          {
+            echo "tag=${tag}"
+            echo "version=${tag#v}"
+            echo "prerelease=${prerelease:-false}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sync the fork
+        if: steps.v.outputs.prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.NIXPKGS_TOKEN }}
+        run: gh repo sync "${FORK}" --branch master
+
+      - name: Check out the fork
+        if: steps.v.outputs.prerelease != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.FORK }}
+          ref: master
+          token: ${{ secrets.NIXPKGS_TOKEN }}
+
+      - name: Install Nix
+        if: steps.v.outputs.prerelease != 'true'
+        uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
+
+      - name: Update the package
+        id: update
+        if: steps.v.outputs.prerelease != 'true'
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          current="$(nix eval --raw -f . rusticlone.version)"
+          if [ "${current}" = "${VERSION}" ]; then
+            echo "nixpkgs already has rusticlone ${VERSION}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name AlphaJack
+          git config user.email 19962243+AlphaJack@users.noreply.github.com
+          git switch -c "rusticlone-${VERSION}"
+          nix run nixpkgs#nix-update -- rusticlone --version "${VERSION}" --commit
+          git push --force origin "rusticlone-${VERSION}"
+          echo "from=${current}" >> "$GITHUB_OUTPUT"
+
+      - name: Link the pull request
+        if: steps.update.outputs.from != ''
+        env:
+          FROM: ${{ steps.update.outputs.from }}
+          VERSION: ${{ steps.v.outputs.version }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          title="rusticlone: ${FROM} -> ${VERSION}"
+          body="$(cat <<EOF
+          Changelog: https://github.com/AlphaJack/rusticlone/releases/tag/${TAG}
+
+          Updated with \`nix-update\` by the upstream release workflow. I am the upstream author and maintainer.
+
+          ## Things done
+
+          - [x] Fits [CONTRIBUTING.md], [pkgs/README.md], [maintainers/README.md] and other READMEs.
+          - [x] Follows the [automation/AI policy].
+          - Built on platform:
+            - [ ] x86_64-linux
+            - [ ] aarch64-linux
+            - [ ] aarch64-darwin
+          - Tested, as applicable:
+            - [ ] Basic functionality of all binary files, usually in \`./result/bin/\`.
+            - [ ] Ran \`nixpkgs-review\` on this PR. See [nixpkgs-review usage].
+
+          [nixpkgs-review usage]: https://github.com/Mic92/nixpkgs-review#usage
+          [CONTRIBUTING.md]: https://github.com/NixOS/nixpkgs/blob/master/CONTRIBUTING.md
+          [automation/AI policy]: https://github.com/NixOS/nixpkgs/blob/master/CONTRIBUTING.md#automationai-policy
+          [maintainers/README.md]: https://github.com/NixOS/nixpkgs/blob/master/maintainers/README.md
+          [pkgs/README.md]: https://github.com/NixOS/nixpkgs/blob/master/pkgs/README.md
+          EOF
+          )"
+          query="$(jq -rn --arg t "${title}" --arg b "${body}" '"expand=1&title=\($t|@uri)&body=\($b|@uri)"')"
+          url="https://github.com/NixOS/nixpkgs/compare/master...${FORK/\//:}:rusticlone-${VERSION}?${query}"
+          echo "Review and open the nixpkgs pull request, unless r-ryantm already did: [${title}](${url})" >> "$GITHUB_STEP_SUMMARY"
