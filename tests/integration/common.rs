@@ -12,6 +12,13 @@ use serde_json::{Value, json};
 
 use rusticlone::{ENV_PREFIX, Event, StepKey, Store};
 
+/// Whether the tests run as root on Unix. Root's web UI saves profiles in the system's folder `/etc/rustic` where
+/// rustic reads them too. No sandbox redirects it: tests of saving them would write there.
+#[cfg(feature = "server")]
+pub(crate) fn as_root() -> bool {
+    cfg!(unix) && Command::new("id").arg("-u").output().is_ok_and(|o| o.stdout.trim_ascii() == b"0")
+}
+
 pub(crate) const NAME: &str = env!("CARGO_PKG_NAME");
 const BIN: &str = env!("CARGO_BIN_EXE_rusticlone");
 
@@ -351,6 +358,8 @@ impl Sandbox {
             .env("XDG_CONFIG_HOME", self.path("config"))
             .env("XDG_STATE_HOME", self.path("state"))
             .env(var("STATE_DIR"), self.path("store"))
+            // Where rustic writes the report of a panic among others.
+            .env("TMPDIR", self.path("tmp"))
             .env("TZ", "UTC")
             .current_dir(self.path("cwd"));
         // Windows's own, without which processes cannot start or reach the network, and the sandbox's
