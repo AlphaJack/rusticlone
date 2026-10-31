@@ -2,12 +2,20 @@
 //! manifest. Rebuilds the catalogs on a new language. Hands the code the keywords of Cargo.toml, and where GitHub serves the logo.
 
 /// From Windows 11 24H2 on, no console for the executable unless it starts in one, so that it starts at login
-/// without a window, and still prints into the terminal that runs it.
+/// without a window, and still prints into the terminal that runs it. Common Controls 6 and the monitor's
+/// DPI, so that the tray's menu has the system's look, rather than the classic one scaled up.
 #[cfg(feature = "desktop")]
 const MANIFEST: &str = r#"<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <application>
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0" processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
+    </dependentAssembly>
+  </dependency>
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <consoleAllocationPolicy xmlns="http://schemas.microsoft.com/SMI/2024/WindowsSettings">detached</consoleAllocationPolicy>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
     </windowsSettings>
   </application>
 </assembly>"#;
