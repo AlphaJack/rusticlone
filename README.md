@@ -370,7 +370,7 @@ From there you can start and stop runs, browse and download snapshots, compare t
 If `RUSTICLONE_LISTEN` is not set, the server will listen on localhost on port 32110.
 If `RUSTICLONE_ADMIN_TOKEN` is not set, the server generates a random token in the state folder (see location below).
 
-#### Personal computer
+#### Desktop
 
 To access the web UI, open the desktop app, use the tray icon or run `rusticlone serve --open`.
 This way, the token will be automatically passed to the login page and you won't need to enter it manually.
