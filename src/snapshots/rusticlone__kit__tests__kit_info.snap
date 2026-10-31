@@ -2,8 +2,6 @@
 source: src/kit.rs
 expression: "info(&profiles, &made)"
 ---
-restore-kit v1
-
 Emergency kit of laptop, made on 2026-10-30 12:00 by me
 
 The .toml files next to this one are the rustic profiles and passwords that open your backups: without them, the backups cannot be read. Keep this zip away from this computer, for example in a password manager or a cloud drive. Anyone with it can access your backup files.

@@ -204,10 +204,13 @@ pub(super) async fn save_setup(base: Base, Here(here): Here, Form(setup): Form<f
 }
 
 /// Opens the profiles' folder in the file manager, for a browser on this computer, so that its user copies
-/// them somewhere safe. Elsewhere, there is no such page.
+/// them somewhere safe, or a fresh install's user puts them there. Elsewhere, there is no such page.
+#[expect(clippy::disallowed_methods, reason = "creates the folder on a fresh install")]
 pub(super) async fn open_profile_folder(Here(here): Here) -> Response {
     match crate::profile::own_dir().filter(|_| here) {
-        Some(dir) if crate::server::open_on_desktop(dir.display().to_string()) => {
+        Some(dir)
+            if std::fs::create_dir_all(&dir).is_ok() && crate::server::open_on_desktop(dir.display().to_string()) =>
+        {
             StatusCode::NO_CONTENT.into_response()
         }
         Some(_) => Error::Refused(Notice::FolderNotOpened).into_response(),

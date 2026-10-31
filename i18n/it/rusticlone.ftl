@@ -456,6 +456,7 @@ button-copy-folder-path = Copia il percorso della cartella
 button-see-how = Vedi come
 button-cron-syntax = Sintassi cron
 button-emergency-kit = Kit di emergenza
+button-restore-from-kit = Ripristina da un kit
 
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 
@@ -515,6 +516,8 @@ hint-more-holding = { $more ->
 hint-no-snapshot-here = Nessuno snapshot di { $collection } qui
 hint-create-profiles-in = Rispondi a qualche domanda, o scrivi i tuoi profili rustic in { $dir }
 hint-write-profiles-in = Scrivi i tuoi profili rustic in { $dir }: l'interfaccia web non può salvarli lì
+hint-upload-kit = Stai reinstallando? Carica il tuo kit di emergenza, { $file }: i suoi profili vanno in questa cartella, e ogni raccolta viene ripristinata prima di un nuovo backup. Niente di ciò che è su questo computer viene sovrascritto.
+hint-not-sent = non inviato: il server non ha risposto
 hint-keep-a-copy = Conserva una copia di questi profili lontano da questo computer, per esempio in un gestore di password: ti servono per ripristinare dopo un disastro
 hint-now-visible = La tua raccolta ora è in { $app }. Metti i profili delle altre raccolte nella stessa cartella
 hint-profiles-step = Metti i tuoi profili in { $dir } o in un'altra cartella
@@ -544,6 +547,12 @@ notice-notified = { $collection }: notifica inviata
 notice-not-notified = { $collection }: { notification-undelivered }
 notice-test-notified = notifica di prova inviata
 notice-test-not-notified = notifica di prova fallita: { $error }
+notice-kit-saved = { $saved ->
+    [0] i profili del kit sono già in { $dir }
+    [one] 1 profilo salvato in { $dir }
+   *[other] { $saved } profili salvati in { $dir }
+}
+notice-kit-not-saved = kit non salvato: { $error }
 notice-folder-not-opened = la cartella non si è aperta: il log del server dice perché
 notice-run-failed = { $collection }: { $line }
 notice-destination-not-absolute = la destinazione deve essere un percorso assoluto
@@ -577,11 +586,10 @@ kit-falls-back-again = Se manca anche { $missing }, i file verranno copiati da {
 kit-list = { $rest } e { $last }
 kit-error-name = { $name } non è il nome di un profilo
 kit-error-empty = nessun profilo in questo kit
-kit-error-not-a-kit = non è un kit di emergenza: uno zip con un info.txt
-kit-error-no-layout = non è un kit di emergenza: il suo info.txt non inizia con la versione del formato
+kit-error-not-a-kit = non è un kit di emergenza: né uno zip né una cartella di profili rustic
+kit-error-twice = { $name } è due volte in questo kit, in cartelle diverse
 kit-error-too-many-files = non è un kit di emergenza: contiene troppi file
 kit-error-too-large = non è un kit di emergenza: { $name } è troppo grande
-kit-error-newer = questo kit è nel formato { $version }, di un { -name } più recente: aggiorna { -name } per leggerlo
 kit-error-differs = { $path } esiste già, con un contenuto diverso: spostalo per usare quello del kit
 free-bytes = { $size } liberi
 

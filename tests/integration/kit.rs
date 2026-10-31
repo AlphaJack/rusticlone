@@ -122,6 +122,43 @@ fn a_kit_says_where_it_looked_when_no_repository_is_there() {
     run.assert_result("profiles-elsewhere", json!({}));
 }
 
+/// A fresh install's home page takes the kit: its profiles go where the setup saves them, and its collections
+/// show up. They are restored first, never backed up while their folders are empty. The setup stays the main
+/// way to start.
+#[test]
+fn a_fresh_install_takes_a_kit_upload() {
+    if as_root() {
+        return;
+    }
+    let (sb, kit, original) = backed_up();
+    // Read from the repository: the profiles are gone.
+    let snapshots = || walk(&sb.path("local/Docs/snapshots")).len();
+    let before = snapshots();
+    assert!(before > 0);
+    // A new computer has the folder, empty: a backup now would save nothing over what the kit restores.
+    fs::create_dir_all(sb.path("source/docs")).unwrap();
+    let server = sb.server(&[]);
+    let page = server.get("/").body;
+    let setup = page.find(r#"class="btn primary" href="/setup""#);
+    let upload = page.find(r#"data-upload="/kit""#);
+    assert!(setup.is_some() && upload.is_some(), "{page}");
+    let dir = sb.profile_dir().display().to_string();
+    assert!(page.contains(&format!(r#"data-copy="{dir}""#)), "{page}");
+    let auth = format!("Authorization: Bearer {}", server.token);
+    let post = |body: &[u8]| server.request_bytes("POST", "/kit", &[&auth, "Content-Type: application/zip"], body);
+    // The page opens the restore of its one collection.
+    let saved = post(&fs::read(&kit).unwrap());
+    assert!(saved.code == 201 && saved.head.contains("hx-location: /collections/Docs/runs/"), "{}", saved.head);
+    assert!(sb.profile_path("Docs").is_file() && sb.profile_path("Docs-remote").is_file());
+    crate::common::wait_for(15, "the kit's collection", || server.get("/").body.contains("/collections/Docs"));
+    crate::common::wait_for(60, "the restore", || sb.tree("source") == original);
+    assert_eq!(snapshots(), before, "backed up before the restore");
+    // The same kit again saves nothing; anything else is refused.
+    assert!(post(&fs::read(&kit).unwrap()).body.contains("already"));
+    let refused = post(b"not a zip");
+    assert!(refused.code == 422 && refused.body.contains("not an emergency kit"), "{}", refused.body);
+}
+
 /// Every file below `dir`.
 fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
     let mut files = Vec::new();

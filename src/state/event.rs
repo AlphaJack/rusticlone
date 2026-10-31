@@ -116,6 +116,24 @@ pub enum Event {
         /// When the oldest snapshot the forget kept was taken. `None` if unknown.
         oldest_kept: Option<Timestamp>,
     },
+    /// Collections from an emergency kit, on a computer that lacks their sources: restored before anything backs
+    /// them up, so that a backup of empty folders never replaces what the repositories hold.
+    RestoreFirst {
+        /// The collections, by their primary.
+        collections: Vec<String>,
+        /// When their restore was asked for, by the web UI that saved them. `None`: the schedule asks for it, as
+        /// when the web UI could not.
+        asked: Option<Timestamp>,
+    },
+    /// A restore of every source of the collection ended. Once one succeeds, the collection is backed up again.
+    Restored {
+        /// The collection.
+        collection: String,
+        /// When it ended.
+        at: Timestamp,
+        /// Whether it restored everything.
+        ok: bool,
+    },
 }
 
 /// How a check read a data subset.
@@ -160,6 +178,10 @@ pub struct Ledger {
     /// Snapshots each target's forget removed, by collection and target.
     #[serde(with = "entries")]
     pub dropped: BTreeMap<(String, String), Vec<(SnapshotId, Timestamp)>>,
+    /// [`Event::RestoreFirst`]'s collections, with when their restore was last asked for or failed. `None`: the
+    /// schedule asks for it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub restore_first: BTreeMap<String, Option<Timestamp>>,
 }
 
 impl Versioned for Event {
@@ -209,25 +231,32 @@ impl Ledger {
         self.lag.get(&(collection.to_owned(), target.to_owned()))
     }
 
+    /// [`Event::Attempted`].
+    fn attempted(&mut self, key: StepKey, started: Timestamp, at: Timestamp, result: Outcome, by: Option<RunStep>) {
+        // Reading another subset does not clear the failure of a failed one.
+        let failing =
+            matches!(&key, StepKey::Check(repo) if self.checks.get(repo).is_some_and(|c| !c.failed.is_empty()));
+        let succeeded = result.status.done();
+        // Backed up by hand: whoever did it has the sources.
+        if let (StepKey::Snapshot(collection), true) = (&key, succeeded) {
+            self.restore_first.remove(collection);
+        }
+        let record = self.last_steps.entry(key).or_default();
+        record.by = by;
+        if succeeded && failing {
+            (record.last_attempt, record.note) = (Some(at), Some(result.record));
+        } else {
+            if succeeded {
+                record.ok_started = Some(started);
+            }
+            record.record(at, &result);
+        }
+    }
+
     /// Records the event.
     pub fn apply(&mut self, event: &Event) {
         match event.clone() {
-            Event::Attempted { key, started, at, result, by } => {
-                // Reading another subset does not clear the failure of a failed one.
-                let failing =
-                    matches!(&key, StepKey::Check(repo) if self.checks.get(repo).is_some_and(|c| !c.failed.is_empty()));
-                let record = self.last_steps.entry(key).or_default();
-                record.by = by;
-                let succeeded = result.status.done();
-                if succeeded && failing {
-                    (record.last_attempt, record.note) = (Some(at), Some(result.record));
-                } else {
-                    if succeeded {
-                        record.ok_started = Some(started);
-                    }
-                    record.record(at, &result);
-                }
-            }
+            Event::Attempted { key, started, at, result, by } => self.attempted(key, started, at, result, by),
             Event::Warned { key, warnings } => {
                 self.last_steps.entry(key).or_default().warnings = warnings;
             }
@@ -280,6 +309,16 @@ impl Ledger {
                     Read::Through => _ = (c.owed.remove(&n), c.failed.remove(&n)),
                     Read::Failed => _ = (c.owed.insert(n), c.failed.insert(n)),
                     Read::Not => _ = c.owed.insert(n),
+                }
+            }
+            Event::RestoreFirst { collections, asked } => {
+                self.restore_first.extend(collections.into_iter().map(|c| (c, asked)));
+            }
+            Event::Restored { collection, at, ok } => {
+                if ok {
+                    self.restore_first.remove(&collection);
+                } else if let Some(failed) = self.restore_first.get_mut(&collection) {
+                    *failed = Some(at);
                 }
             }
             Event::Dropped { collection, target, removed, oldest_kept } => {
@@ -469,5 +508,24 @@ mod tests {
         for event in stored {
             assert!(shape::read::<Event>(event.clone()).is_some(), "cannot read {event}");
         }
+    }
+
+    /// A kit's collection waits for its restore: a failed one keeps it waiting, a successful one or a backup by
+    /// hand ends the wait.
+    #[test]
+    fn a_kits_collection_waits_for_its_restore() {
+        let mut state = Ledger::default();
+        state.apply(&Event::RestoreFirst { collections: vec!["Docs".into(), "Photos".into()], asked: None });
+        let at = ts("2026-10-16T12:00:00Z");
+        state.apply(&Event::Restored { collection: "Docs".into(), at, ok: false });
+        assert_eq!(state.restore_first.get("Docs"), Some(&Some(at)));
+        // The web UI could not ask for it: the schedule does.
+        state.apply(&Event::RestoreFirst { collections: vec!["Docs".into()], asked: None });
+        assert_eq!(state.restore_first.get("Docs"), Some(&None));
+        state.apply(&Event::Restored { collection: "Docs".into(), at, ok: true });
+        let backup = StepKey::Snapshot("Photos".into());
+        let done = StepResult::BackedUp { repo: "Photos".into(), snapshots: Vec::new(), new_repository: false };
+        state.apply(&Event::Attempted { key: backup, started: at, at, result: (&done).into(), by: None });
+        assert!(state.restore_first.is_empty(), "{state:?}");
     }
 }

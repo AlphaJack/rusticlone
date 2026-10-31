@@ -456,6 +456,7 @@ button-copy-folder-path = Copy folder path
 button-see-how = See how
 button-cron-syntax = Cron syntax
 button-emergency-kit = Emergency kit
+button-restore-from-kit = Restore from a kit
 
 ## The web UI: words and states, in the tables and the breadcrumbs
 
@@ -515,6 +516,8 @@ hint-more-holding = { $more ->
 hint-no-snapshot-here = No snapshot of { $collection } here
 hint-create-profiles-in = Answer a few questions, or write your rustic profiles in { $dir }
 hint-write-profiles-in = Write your rustic profiles in { $dir }: the web UI cannot save them there
+hint-upload-kit = Installing again? Upload your emergency kit, { $file }: its profiles go in this folder, and each collection is restored before it is backed up again. Nothing that is on this computer is overwritten.
+hint-not-sent = not sent: the server did not answer
 hint-keep-a-copy = Keep a copy of these profiles away from this computer, for example in a password manager: you need them to restore after a disaster
 hint-now-visible = Your collection is now in { $app }. Put the profiles of other collections in the same folder
 hint-profiles-step = Put your profiles in { $dir } or another folder
@@ -544,6 +547,12 @@ notice-notified = { $collection }: notification sent
 notice-not-notified = { $collection }: { notification-undelivered }
 notice-test-notified = test notification sent
 notice-test-not-notified = test notification failed: { $error }
+notice-kit-saved = { $saved ->
+    [0] the kit's profiles are in { $dir } already
+    [one] 1 profile saved in { $dir }
+   *[other] { $saved } profiles saved in { $dir }
+}
+notice-kit-not-saved = kit not saved: { $error }
 notice-folder-not-opened = the folder did not open: the server's log says why
 notice-run-failed = { $collection }: { $line }
 notice-destination-not-absolute = the destination must be an absolute path
@@ -577,11 +586,10 @@ kit-falls-back-again = If { $missing } is missing too, files will be copied from
 kit-list = { $rest } and { $last }
 kit-error-name = { $name } is not the name of a profile
 kit-error-empty = no profile in this kit
-kit-error-not-a-kit = not an emergency kit: a zip with an info.txt
-kit-error-no-layout = not an emergency kit: its info.txt does not start with the layout
+kit-error-not-a-kit = not an emergency kit: neither a zip nor a folder of rustic profiles
+kit-error-twice = { $name } is twice in this kit, in different folders
 kit-error-too-many-files = not an emergency kit: it holds too many files
 kit-error-too-large = not an emergency kit: { $name } is too large
-kit-error-newer = this kit is in layout { $version }, from a newer rusticlone: update rusticlone to read it
 kit-error-differs = { $path } exists already, with other contents: move it away to use the kit's
 free-bytes = { $size } free
 

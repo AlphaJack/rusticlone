@@ -17,6 +17,7 @@ use tokio::sync::{broadcast, watch};
 
 use super::{
     App, Base, Changes, Flash, Notice,
+    auth::Here,
     collections::{collection_main, index_main},
     render_str,
     repo::{RepoMain, repo_view},
@@ -41,6 +42,9 @@ pub(super) struct View {
     /// The run whose log the page shows, and the log offset its lines end at.
     log: Option<i64>,
     at: Option<u64>,
+    /// [`super::auth::Here`], from the stream's request rather than its query.
+    #[serde(skip)]
+    here: bool,
 }
 
 /// The `<main>` of a live page, and the run whose log it shows with the log offset. `None` if what it
@@ -52,7 +56,7 @@ fn render_main(
     base: &Base,
 ) -> Option<(String, Option<(i64, u64)>)> {
     match (&view.collection, &view.repo) {
-        (None, _) => Some((render_str(&index_main(app), base), None)),
+        (None, _) => Some((render_str(&index_main(app, view.here), base), None)),
         (Some(collection), None) => {
             collection_main(app, collection, view.run, shown).map(|m| (render_str(&m, base), m.log.shown()))
         }
@@ -102,8 +106,10 @@ pub(super) async fn events(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
     base: Base,
+    Here(here): Here,
     Query(view): Query<View>,
 ) -> impl IntoResponse {
+    let view = View { here, ..view };
     // What a reconnecting page shows is unknown.
     let reconnected = headers.contains_key("last-event-id");
     let (mut changes, failures) = (app.pages.changes.subscribe(), app.pages.failures.subscribe());

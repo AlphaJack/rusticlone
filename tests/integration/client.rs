@@ -88,16 +88,21 @@ impl Sandbox {
 impl Server {
     /// A raw HTTP/1.1 request with these extra header lines.
     pub(crate) fn request(&self, method: &str, path: &str, headers: &[&str], body: &str) -> Response {
+        self.request_bytes(method, path, headers, body.as_bytes())
+    }
+
+    /// [`Self::request`] with a body that may be binary, as an uploaded file.
+    pub(crate) fn request_bytes(&self, method: &str, path: &str, headers: &[&str], body: &[u8]) -> Response {
         let mut stream = TcpStream::connect(&self.addr).unwrap();
         let headers: String = headers.iter().map(|h| format!("{h}\r\n")).collect();
         // In one write: a server that rejects the headers closes before reading a body sent apart, and the
         // unread body makes the system reset the connection, losing the response.
-        let request = format!(
-            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nContent-Length: {}\r\n{headers}\r\n{body}",
+        let head = format!(
+            "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nContent-Length: {}\r\n{headers}\r\n",
             self.addr,
             body.len()
         );
-        stream.write_all(request.as_bytes()).unwrap();
+        stream.write_all(&[head.as_bytes(), body].concat()).unwrap();
         let mut bytes = Vec::new();
         stream.read_to_end(&mut bytes).unwrap();
         // Downloads may be binary: the body is kept as sent too.

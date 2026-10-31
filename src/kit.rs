@@ -1,7 +1,6 @@
 //! The emergency kit: a zip of every profile to keep away from this computer. Its `info.txt` says what it is and
-//! how to restore from it in the reader's language. The first line is never translated: it names the kit's
-//! layout so that a later release still reads the kits of this one. `--kit` puts its profiles where rustic
-//! finds them.
+//! how to restore from it in the reader's language, for people only. Any zip or folder of profiles is a kit:
+//! `--kit` puts its `.toml` files where rustic finds them.
 
 use std::io::{Read, Seek};
 
@@ -11,13 +10,9 @@ use toml_edit::DocumentMut;
 /// The kit's name. Every download has the same one.
 #[cfg(feature = "server")]
 pub(crate) const FILE: &str = "restore-kit.zip";
-/// What the kit says about itself.
-const INFO: &str = "info.txt";
-/// The start of `info.txt`'s first line before the layout's number: `restore-kit v1`.
-const VERSION_MARK: &str = "restore-kit";
-/// The layout this release writes: `info.txt` and each profile as `<name>.toml` at the top of the zip.
+/// What the kit says about itself, for whoever opens it.
 #[cfg(feature = "server")]
-const VERSION: u32 = 1;
+const INFO: &str = "info.txt";
 /// Far more files and far larger ones than a kit holds. A zip made to fill the memory as it is read (a zip bomb)
 /// is refused before that.
 const MOST_FILES: usize = 256;
@@ -31,13 +26,11 @@ pub(crate) enum Error {
         name: String,
     },
     Empty,
-    /// Not a zip or one without `info.txt`.
+    /// Neither a zip nor a folder.
     NotAKit(#[source] zip::result::ZipError),
-    /// An `info.txt` that names no layout.
-    NoLayout,
-    /// Written by a later release in a layout this one cannot read.
-    Newer {
-        version: u32,
+    /// Two profiles of that name, in different folders of the zip.
+    Twice {
+        name: String,
     },
     /// More files than [`MOST_FILES`].
     TooManyFiles,
@@ -80,6 +73,13 @@ impl Profile {
             targets: strings(doc.get("copy").and_then(|c| c.get("targets"))),
         }
     }
+}
+
+/// The collections of `profiles` by file name: the profiles that back something up.
+#[cfg(feature = "server")]
+pub(crate) fn primaries(profiles: &[(String, String)]) -> Vec<String> {
+    let backs_up = |(_, text): &&(String, String)| !Profile::of(text).sources.is_empty();
+    profiles.iter().filter(backs_up).map(|(file, _)| file.trim_end_matches(".toml").to_owned()).collect()
 }
 
 /// `items` as a sentence lists them: `a`, `a and b`, `a, b and c`, in the reader's language.
@@ -136,7 +136,7 @@ fn info(profiles: &[(String, String)], made: &Made<'_>) -> String {
     let sudo = if made.root && cfg!(unix) { "sudo " } else { "" };
     let restore = format!("{sudo}{} --kit {FILE}", command_line("restore", &[("all", None)]));
     let resume = format!("{sudo}{}", command_line("install", &[("auto_update", None)]));
-    let mut info = format!("{VERSION_MARK} v{VERSION}\n\n");
+    let mut info = String::new();
     let url = concat!(env!("CARGO_PKG_REPOSITORY"), "#restore");
     let (host, time, user) = (made.host, made.time, made.user);
     info.push_str(&crate::i18n::t!(
@@ -170,54 +170,84 @@ pub(crate) fn render(profiles: &[(String, String)], made: &Made<'_>) -> Result<V
     Ok(zip.finish()?.into_inner())
 }
 
-/// A file of the zip as text. Refused if it decompresses to more than [`LARGEST_FILE`] whatever size it claims.
-fn text(file: zip::read::ZipFile<'_, impl Read>) -> Result<String> {
-    let name = file.name()?.into_owned();
-    if file.size() > LARGEST_FILE {
-        return Err(Error::TooLarge { name }.into());
+/// A file as text. Refused if it holds more than [`LARGEST_FILE`] whatever size it claims.
+fn text(name: &str, claimed: u64, file: impl Read) -> Result<String> {
+    let too_large = || Error::TooLarge { name: name.to_owned() };
+    if claimed > LARGEST_FILE {
+        return Err(too_large().into());
     }
     let mut text = String::new();
     file.take(LARGEST_FILE + 1).read_to_string(&mut text)?;
     if text.len() as u64 > LARGEST_FILE {
-        return Err(Error::TooLarge { name }.into());
+        return Err(too_large().into());
     }
     Ok(text)
 }
 
-/// The profiles of a kit by file name in the layout its `info.txt` names.
+/// Whether the zip's entry at `path` is a profile: a `.toml` file, in any folder but the hidden ones that
+/// archivers add, as macOS's `__MACOSX/._Docs.toml`.
+fn is_profile(path: &std::path::Path) -> bool {
+    let hidden = path.iter().any(|part| part.to_string_lossy().starts_with('.') || part == "__MACOSX");
+    !hidden && path.extension().is_some_and(|e| e == "toml")
+}
+
+/// The profiles of a zip by file name: every `.toml` file, at the top or in a folder. The rest, as `info.txt`,
+/// is for people.
 pub(crate) fn parse(kit: impl Read + Seek) -> Result<Vec<(String, String)>> {
     let mut zip = zip::ZipArchive::new(kit).map_err(Error::NotAKit)?;
     if zip.len() > MOST_FILES {
         return Err(Error::TooManyFiles.into());
     }
-    let info = text(zip.by_name(INFO).map_err(Error::NotAKit)?)?;
-    let version =
-        info.lines().next().and_then(|l| l.trim().strip_prefix(VERSION_MARK)?.trim().strip_prefix('v')?.parse().ok());
-    match version.ok_or(Error::NoLayout)? {
-        1 => parse_v1(&mut zip),
-        version => Err(Error::Newer { version }.into()),
-    }
-}
-
-/// Each `.toml` file of the zip.
-fn parse_v1(zip: &mut zip::ZipArchive<impl Read + Seek>) -> Result<Vec<(String, String)>> {
-    let mut profiles = Vec::new();
+    let mut profiles: Vec<(String, String)> = Vec::new();
     for i in 0..zip.len() {
         let file = zip.by_index(i)?;
-        let name = file.name()?.into_owned();
-        if std::path::Path::new(&name).extension().is_none_or(|e| e != "toml") {
+        let raw = file.name()?.into_owned();
+        // A path that leaves the zip's folder, as `../x.toml`.
+        let Some(path) = file.enclosed_name() else { return Err(Error::Name { name: raw }.into()) };
+        if file.is_dir() || !is_profile(&path) {
             continue;
         }
-        profiles.push((name, text(file)?));
+        let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        if profiles.iter().any(|(n, _)| *n == name) {
+            return Err(Error::Twice { name }.into());
+        }
+        let text = text(&raw, file.size(), file)?;
+        profiles.push((name, text));
     }
     Ok(profiles)
+}
+
+/// The profiles of a folder by file name: its `.toml` files, not those of its subfolders.
+#[expect(clippy::disallowed_methods, reason = "reads the folder that `--kit` names")]
+fn read_folder(dir: &std::path::Path) -> Result<Vec<(String, String)>> {
+    let mut profiles = Vec::new();
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if !path.is_file() || !is_profile(std::path::Path::new(path.file_name().unwrap_or_default())) {
+            continue;
+        }
+        if profiles.len() == MOST_FILES {
+            return Err(Error::TooManyFiles.into());
+        }
+        let name = path.file_name().unwrap_or_default().to_string_lossy().into_owned();
+        let claimed = std::fs::metadata(&path)?.len();
+        profiles.push((name.clone(), text(&name, claimed, std::fs::File::open(&path)?)?));
+    }
+    profiles.sort();
+    Ok(profiles)
+}
+
+/// [`unpack`] of the kit at `kit`: a zip, or a folder of profiles.
+#[expect(clippy::disallowed_methods, reason = "reads the kit that `--kit` names")]
+pub(crate) fn unpack_path(kit: &std::path::Path, dir: &std::path::Path) -> Result<usize> {
+    let profiles = if kit.is_dir() { read_folder(kit)? } else { parse(std::fs::File::open(kit)?)? };
+    unpack(profiles, dir)
 }
 
 /// Saves the kit's profiles that are not in `dir` yet and returns how many. Never overwrites a profile that
 /// differs: rustic would read the one in `dir`.
 #[expect(clippy::disallowed_methods, reason = "saves the kit's profiles")]
-pub(crate) fn unpack(kit: &std::path::Path, dir: &std::path::Path) -> Result<usize> {
-    let profiles = parse(std::fs::File::open(kit)?)?;
+pub(crate) fn unpack(profiles: Vec<(String, String)>, dir: &std::path::Path) -> Result<usize> {
     if profiles.is_empty() {
         return Err(Error::Empty.into());
     }
@@ -295,28 +325,47 @@ mod tests {
         assert_eq!(parse(std::io::Cursor::new(kit)).unwrap(), profiles);
     }
 
-    /// The first line of `info.txt` picks the layout whatever language the rest is in.
+    /// Any zip of profiles is a kit, as one zipped by hand from a folder: `info.txt` is for people.
     #[test]
-    fn the_layout_is_read_from_info() {
-        let kit = |info| std::io::Cursor::new(zip_of(&[("info.txt", info), ("Docs.toml", DOCS)]));
-        assert_eq!(parse(kit("restore-kit v1\n\nKit di emergenza")).unwrap().len(), 1);
-        let newer = parse(kit("restore-kit v2\n")).unwrap_err();
-        assert!(matches!(newer.downcast_ref(), Some(Error::Newer { version: 2 })), "{newer}");
-        let other = parse(kit("a zip of something else")).unwrap_err();
-        assert!(matches!(other.downcast_ref(), Some(Error::NoLayout)), "{other}");
+    fn any_zip_of_profiles_is_a_kit() {
+        let parse = |files: &[(&str, &str)]| parse(std::io::Cursor::new(zip_of(files)));
+        let names = |files| parse(files).unwrap().into_iter().map(|(n, _)| n).collect::<Vec<_>>();
+        assert_eq!(names(&[("Docs.toml", DOCS)]), ["Docs.toml"]);
+        assert_eq!(
+            names(&[("rustic/Docs.toml", DOCS), ("info.txt", "notes"), ("__MACOSX/rustic/._Docs.toml", "\0")]),
+            ["Docs.toml"]
+        );
+        let twice = parse(&[("a/Docs.toml", DOCS), ("b/Docs.toml", DOCS)]).unwrap_err();
+        assert!(matches!(twice.downcast_ref(), Some(Error::Twice { .. })), "{twice}");
+        let other = parse(&[("notes.txt", "")]).unwrap();
+        assert!(other.is_empty());
+    }
+
+    /// A folder of profiles is a kit too: its `.toml` files, not its subfolders'.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "lays out a folder kit")]
+    fn a_folder_of_profiles_is_a_kit() {
+        let dir = crate::sys::test_dir("kit-folder");
+        let kit = dir.join("kit");
+        std::fs::create_dir_all(kit.join("old")).unwrap();
+        std::fs::write(kit.join("Docs.toml"), DOCS).unwrap();
+        std::fs::write(kit.join("old/Docs-usb.toml"), DOCS).unwrap();
+        std::fs::write(kit.join("info.txt"), "notes").unwrap();
+        let profiles = dir.join("profiles");
+        assert_eq!(unpack_path(&kit, &profiles).unwrap(), 1);
+        assert!(profiles.join("Docs.toml").is_file() && !profiles.join("Docs-usb.toml").exists());
     }
 
     /// A small zip that decompresses to more than any profile is refused. So is one with too many files.
     #[test]
     fn a_zip_bomb_is_refused() {
         let huge = " ".repeat(usize::try_from(LARGEST_FILE).unwrap() + 1);
-        let bomb = zip_of(&[("info.txt", "restore-kit v1\n"), ("Docs.toml", &huge)]);
+        let bomb = zip_of(&[("Docs.toml", &huge)]);
         assert!(bomb.len() < 100_000, "deflate shrinks it: {}", bomb.len());
         let refused = parse(std::io::Cursor::new(bomb)).unwrap_err();
         assert!(matches!(refused.downcast_ref(), Some(Error::TooLarge { .. })), "{refused}");
         let names: Vec<String> = (0..=MOST_FILES).map(|i| format!("{i}.toml")).collect();
-        let files: Vec<(&str, &str)> =
-            std::iter::once(("info.txt", "restore-kit v1\n")).chain(names.iter().map(|n| (n.as_str(), DOCS))).collect();
+        let files: Vec<(&str, &str)> = names.iter().map(|n| (n.as_str(), DOCS)).collect();
         let refused = parse(std::io::Cursor::new(zip_of(&files))).unwrap_err();
         assert!(matches!(refused.downcast_ref(), Some(Error::TooManyFiles)), "{refused}");
     }
@@ -325,14 +374,13 @@ mod tests {
     #[expect(clippy::disallowed_methods, reason = "lays out a kit and a profile folder")]
     fn unpacking_never_overwrites_a_different_profile() {
         let dir = crate::sys::test_dir("kit");
-        let kit = dir.join("kit.zip");
-        std::fs::write(&kit, zip_of(&[("info.txt", "restore-kit v1\n"), ("Docs.toml", DOCS)])).unwrap();
+        let kit = || parse(std::io::Cursor::new(zip_of(&[("Docs.toml", DOCS)]))).unwrap();
         let profiles = dir.join("profiles");
-        assert_eq!(unpack(&kit, &profiles).unwrap(), 1);
-        assert_eq!(unpack(&kit, &profiles).unwrap(), 0, "the same profile is there already");
+        assert_eq!(unpack(kit(), &profiles).unwrap(), 1);
+        assert_eq!(unpack(kit(), &profiles).unwrap(), 0, "the same profile is there already");
         std::fs::write(profiles.join("Docs.toml"), "[repository]\n").unwrap();
-        assert!(unpack(&kit, &profiles).is_err());
-        std::fs::write(&kit, zip_of(&[("info.txt", "restore-kit v1\n"), ("../x.toml", DOCS)])).unwrap();
-        assert!(unpack(&kit, &profiles).is_err());
+        assert!(unpack(kit(), &profiles).is_err());
+        let escaping = parse(std::io::Cursor::new(zip_of(&[("../x.toml", DOCS)]))).unwrap_err();
+        assert!(matches!(escaping.downcast_ref(), Some(Error::Name { .. })), "{escaping}");
     }
 }

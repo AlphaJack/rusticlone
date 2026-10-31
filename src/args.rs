@@ -22,8 +22,9 @@ pub(crate) struct Cli {
     pub json: bool,
     #[arg(short, long, global = true)]
     pub verbose: bool,
-    /// First save the profiles of this emergency kit where rustic finds them unless they are there already.
-    #[arg(long, global = true, value_name = "FILE")]
+    /// First save the profiles of this emergency kit, a zip or a folder of profiles, where rustic finds them
+    /// unless they are there already.
+    #[arg(long, global = true, value_name = "PATH")]
     pub kit: Option<PathBuf>,
     #[command(subcommand)]
     pub command: Option<Command>,

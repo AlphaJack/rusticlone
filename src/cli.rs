@@ -178,7 +178,7 @@ fn real_main(cli: Cli) -> Result<Level> {
     // them only if they fit this computer, which the restore offers to do.
     if let Some(kit) = &cli.kit {
         let dir = std::env::current_dir()?;
-        let saved = crate::kit::unpack(kit, &dir)? as u64;
+        let saved = crate::kit::unpack_path(kit, &dir)? as u64;
         log::event(None, &Logged::KitUnpacked { saved, dir: dir.display().to_string() });
     }
     let dry_run = command.dry_run();
