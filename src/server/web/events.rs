@@ -89,6 +89,8 @@ struct Stream {
     /// When what it shows changes without a change of state, as an age turns over: it is rendered again then.
     /// `None`: never.
     changes_at: Option<Timestamp>,
+    /// Rendered only to learn [`Stream::changes_at`], as it already shows the current state: nothing is sent.
+    learning: bool,
     /// The run whose log it shows, and the log offset its lines end at.
     log: Option<(i64, u64)>,
     /// New lines of that log, sent after `<main>`.
@@ -122,18 +124,19 @@ pub(super) async fn events(
     let reconnected = headers.contains_key("last-event-id");
     let (mut changes, failures) = (app.pages.changes.subscribe(), app.pages.failures.subscribe());
     let seen = view.v.filter(|_| !reconnected);
+    let current = seen.is_some_and(|v| {
+        let changes = changes.borrow_and_update();
+        v <= changes.count && !changes.since(v, view.collection.as_deref())
+    });
     let stream = Stream {
         app,
         // Rendered with the current state: wait for the next change.
-        wait: seen.is_some_and(|v| {
-            let changes = changes.borrow_and_update();
-            v <= changes.count && !changes.since(v, view.collection.as_deref())
-        }),
+        wait: current,
+        learning: current,
         seen: seen.unwrap_or_default(),
         last: view.h,
         rendered: tokio::time::Instant::now(),
-        // Unknown until it is rendered here: at once.
-        changes_at: Some(super::now()),
+        changes_at: None,
         log: view.log.zip(view.at).filter(|_| !reconnected),
         lines: None,
         language: Language::current(),
@@ -148,7 +151,8 @@ pub(super) async fn events(
         }
         let mut stopping = s.app.stopping.clone();
         loop {
-            if s.wait {
+            let learning = std::mem::take(&mut s.learning);
+            if s.wait && !learning {
                 tokio::select! {
                     changed = s.changes.changed() => {
                         changed.ok()?;
@@ -178,6 +182,10 @@ pub(super) async fn events(
             let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
             let (html, log, lines) = update?;
             s.changes_at = changes_at;
+            if learning {
+                s.last = Some(sys::fnv1a(html.as_bytes()));
+                continue;
+            }
             s.log = log;
             s.lines = lines.map(|lines| sse::Event::default().event("log").id(&version).data(lines));
             // Unchanged: nothing to send.
