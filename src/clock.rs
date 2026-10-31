@@ -41,6 +41,25 @@ pub(crate) fn interrupted() -> bool {
     INTERRUPTED.load(Ordering::Relaxed)
 }
 
+thread_local! {
+    /// The earliest time at which what was read as of now changes, which [`next_change`] collects.
+    static NEXT_CHANGE: std::cell::Cell<Option<Timestamp>> = const { std::cell::Cell::new(None) };
+}
+
+/// What was read as of now changes at `at`: an age turns over, a threshold passes, a schedule fires.
+pub(crate) fn changes_at(at: Timestamp) {
+    NEXT_CHANGE.with(|next| next.set(Some(next.get().map_or(at, |earliest| earliest.min(at)))));
+}
+
+/// Runs `f`, and returns with what it returns the earliest time at which what it read as of now changes: `None`
+/// if nothing does.
+#[cfg(any(test, feature = "server"))]
+pub(crate) fn next_change<T>(f: impl FnOnce() -> T) -> (T, Option<Timestamp>) {
+    let outer = NEXT_CHANGE.take();
+    let done = f();
+    (done, NEXT_CHANGE.replace(outer))
+}
+
 static WAKES: Mutex<u64> = Mutex::new(0);
 static WOKEN: Condvar = Condvar::new();
 

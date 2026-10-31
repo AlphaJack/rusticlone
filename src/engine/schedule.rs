@@ -132,7 +132,14 @@ pub(super) fn of(chain: &[&RusticProfile], key: RunKind, now: Timestamp, tz: &Ti
     let setting = setting(chain, key)?;
     let (next, error) = match setting.schedule(chain) {
         Ok(None) => return None,
-        Ok(Some(cron)) => (cron.next_after(now, tz), None),
+        Ok(Some(cron)) => {
+            let next = cron.next_after(now, tz);
+            // Shown until it fires: then the next one is.
+            if let Some(next) = next {
+                crate::clock::changes_at(next);
+            }
+            (next, None)
+        }
         Err(e) => (None, Some(format!("{e:#}"))),
     };
     Some(Schedule { cron: setting.get(chain)?, next, error })
