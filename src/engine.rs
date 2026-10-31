@@ -17,6 +17,8 @@ mod snapshots;
 mod status;
 #[cfg(test)]
 mod tests;
+#[cfg(feature = "server")]
+pub(crate) mod waiting;
 
 pub(crate) use collection::{Blocked, Collection};
 use holds::Use;

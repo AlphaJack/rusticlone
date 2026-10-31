@@ -339,7 +339,7 @@ pub(super) struct IndexMain {
     /// [`crate::install::autostart::Blocked`].
     blocked: Option<String>,
     unconfigured: Option<Unconfigured>,
-    waiting: Option<super::super::waiting::Waiting>,
+    waiting: Option<crate::engine::waiting::Waiting>,
 }
 
 pub(super) fn index_main(app: &App) -> IndexMain {
@@ -358,7 +358,7 @@ pub(super) fn index_main(app: &App) -> IndexMain {
     #[cfg(not(feature = "desktop"))]
     let blocked = None;
     let built = IndexMain::build(inputs).with(empty, engine.rustic.untested(), blocked, engine.unconfigured());
-    IndexMain { waiting: super::super::waiting::waiting(), ..built }
+    IndexMain { waiting: crate::engine::waiting::waiting(true), ..built }
 }
 
 impl IndexMain {

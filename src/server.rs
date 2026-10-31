@@ -19,7 +19,6 @@ use unix as os;
 mod windows;
 #[cfg(windows)]
 use windows as os;
-mod waiting;
 mod watcher;
 mod web;
 mod workers;
