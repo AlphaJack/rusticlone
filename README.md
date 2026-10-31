@@ -17,28 +17,12 @@ Rusticlone backs up your computers and servers on a schedule, keeps copies in mo
 
 ## Install
 
-One-line installer for Windows PowerShell:
+### Windows
+
+One-line installer for PowerShell:
 
 ```powershell
 irm https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.ps1 | iex; & "$HOME\.cargo\bin\rusticlone.exe" install --auto-update
-```
-
-One-line installer for Linux and macOS:
-
-```sh
-curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.sh | sh && $HOME/.cargo/bin/rusticlone install --auto-update
-```
-
-Homebrew:
-
-```sh
-brew install AlphaJack/tap/rusticlone
-```
-
-Arch Linux (AUR):
-
-```sh
-yay -S rusticlone-bin
 ```
 
 WinGet:
@@ -60,6 +44,48 @@ Chocolatey:
 choco install rusticlone
 ```
 
+### macOS
+
+One-line installer:
+
+```sh
+curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.sh | sh && $HOME/.cargo/bin/rusticlone install --auto-update
+```
+
+Homebrew:
+
+```sh
+brew install AlphaJack/tap/rusticlone
+```
+
+nix-darwin and Home Manager: see [Nix](#nix)
+
+### Linux
+
+One-line installer:
+
+```sh
+curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.sh | sh && $HOME/.cargo/bin/rusticlone install --auto-update
+```
+
+Arch Linux (AUR):
+
+```sh
+yay -S rusticlone-bin
+```
+
+Homebrew:
+
+```sh
+brew install AlphaJack/tap/rusticlone
+```
+
+NixOS and Home Manager: see [Nix](#nix)
+
+Docker and Podman: see [Container image](#container-image)
+
+### Any OS
+
 Cargo:
 
 ```sh
@@ -67,10 +93,6 @@ cargo binstall rusticlone
 ```
 
 Manual installation: [GitHub release binaries](https://github.com/AlphaJack/rusticlone/releases)
-
-Docker and Podman: see [Container image](#container-image)
-
-NixOS and Home Manager: see [Nix](#nix)
 
 ## Getting started
 
