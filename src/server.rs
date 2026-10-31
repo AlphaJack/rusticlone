@@ -414,7 +414,7 @@ async fn select_in_file_manager(file: &std::path::Path) -> bool {
 /// Thunar and Caja provide it.
 #[cfg(all(feature = "desktop", target_os = "linux"))]
 async fn select_in_file_manager(file: &std::path::Path) -> bool {
-    let Ok(path) = askama::filters::urlencode(file.display()) else { return false };
+    let Ok(path) = askama::filters::urlencode(file.display());
     let show = async {
         let bus = zbus::Connection::session().await?;
         let fm = "org.freedesktop.FileManager1";
