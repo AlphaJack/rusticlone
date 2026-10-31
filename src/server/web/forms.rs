@@ -107,10 +107,21 @@ struct RestoreFormView {
     from: String,
     snapshot: String,
     short: String,
-    /// The paths it restores, as rustic recorded them.
+    /// The paths it restores as rustic recorded them, when the page that opened it chose them: one path, or
+    /// those of one snapshot. Empty to choose in the dialog.
     what: Vec<String>,
     path: String,
     source: Option<usize>,
+    /// Each backup entry's folders to choose from, by entry.
+    entries: Vec<String>,
+}
+
+impl RestoreFormView {
+    /// Whether the page that opened it chose backup entry `entry`, as a source's row does.
+    #[expect(clippy::trivially_copy_pass_by_ref, reason = "the template passes its loop's index by reference")]
+    fn picked(&self, entry: &usize) -> bool {
+        self.source == Some(*entry)
+    }
 }
 
 /// The re-create dialog: which repository to copy from.
@@ -193,12 +204,12 @@ fn restore_form(app: &App, collection: String, q: RunForm) -> Result<RestoreForm
         let listed = engine.store.snapshots(&collection, &q.repo);
         Some(listed.into_iter().find(|sn| sn.id.as_str() == q.snapshot)?.paths)
     };
-    let what = match (q.path.is_empty(), q.source, q.snapshot.is_empty()) {
-        (false, ..) => vec![q.path.clone()],
-        (true, Some(i), _) => j.primary.sources.get(i).map(crate::profile::Sources::paths).unwrap_or_default(),
-        (true, None, false) => snapshot_paths().unwrap_or_default(),
-        (true, None, true) => j.primary.groups().flatten().collect(),
+    let what = match (q.path.is_empty(), q.snapshot.is_empty()) {
+        (false, _) => vec![q.path.clone()],
+        (true, false) => snapshot_paths().unwrap_or_default(),
+        (true, true) => Vec::new(),
     };
+    let entries = j.primary.groups().map(|paths| paths.join(", ")).collect();
     Ok(RestoreFormView {
         dry_run,
         from: q.repo,
@@ -209,6 +220,7 @@ fn restore_form(app: &App, collection: String, q: RunForm) -> Result<RestoreForm
         what,
         path: q.path,
         source: q.source,
+        entries,
     })
 }
 

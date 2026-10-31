@@ -117,6 +117,8 @@ pub(super) enum Button<'a> {
 pub(super) enum Label<'a> {
     EveryCollection,
     Unknown,
+    AllFolders,
+    ASubfolder,
     Error,
     /// What `app.js` shows: the live dot's states.
     Live,
@@ -233,5 +235,6 @@ pub(super) enum Hint<'a> {
     NameOrPath,
     WhereItWas,
     Now,
+    SubfolderExample,
     Notify,
 }

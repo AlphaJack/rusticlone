@@ -215,7 +215,7 @@
   .location:has(input[value=none]:checked) .password { display: none; }
   .checks { display: flex; flex-direction: column; gap: 6px; }
   .checks label { display: inline-flex; align-items: center; gap: 8px; }
-  input[type=text], input[type=password], select, textarea { font: inherit; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--foreground); width: 100%; max-width: 520px; }
+  input[type=text], input[type=password], input[type=datetime-local], select, textarea { font: inherit; height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--foreground); width: 100%; max-width: 520px; }
   textarea { height: auto; padding: 8px 12px; resize: vertical; }
   select option { background: var(--card); }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--border); outline-offset: 1px; }
@@ -238,6 +238,10 @@
   .form-grid label:has(+ .sources) { align-self: start; margin-top: 9px; }
   .sources .source { width: 100%; }
   .field-row { display: flex; gap: 8px; align-items: center; }
+  /* as wide as the other fields: the time picker counts its padding inside, and the choice shares its row */
+  input[type=datetime-local] { box-sizing: border-box; }
+  .restore-what { max-width: 520px; }
+  .restore-what select, .restore-what input { flex: 1; min-width: 0; }
   .setup-saved { gap: 24px; }
   .setup-saved ol { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
   dialog p:empty { display: none; }

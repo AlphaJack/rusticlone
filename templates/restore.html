@@ -13,11 +13,23 @@
     {% else %}
     <span><b>{{ from }}</b>, {{ Label::SnapshotWord }} <code>{{ short }}</code><input type="hidden" name="repo" value="{{ from }}"><input type="hidden" name="snapshot" value="{{ snapshot }}"></span>
     {% endif %}
+    {% if what.is_empty() %}
+    <label for="restore-what">{{ Heading::SnapshotPath }}</label>
+    <div class="field-row restore-what">
+      <select name="pick" id="restore-what">
+        <option value="all">{{ Label::AllFolders }}</option>
+        {% for entry in entries %}<option value="{{ loop.index0 }}"{% if self.picked(loop.index0) %} selected{% endif %}>{{ entry }}</option>{% endfor %}
+        <option value="custom">{{ Label::ASubfolder }}</option>
+      </select>
+      <input type="text" name="path" data-choice="pick" data-value="custom" hidden placeholder="{{ Hint::SubfolderExample }}" aria-label="{{ Label::ASubfolder }}">
+    </div>
+    {% else %}
     <label>{{ Heading::SnapshotPath }}</label>
-    <span>{% for w in what %}<code>{{ w }}</code> {% endfor %}<input type="hidden" name="path" value="{{ path }}">{% if let Some(source) = source %}<input type="hidden" name="source" value="{{ source }}">{% endif %}</span>
+    <div>{% for w in what %}<div><code>{{ w }}</code></div>{% endfor %}<input type="hidden" name="path" value="{{ path }}"></div>
+    {% endif %}
     {% if snapshot.is_empty() %}
     <label for="restore-at">{{ Heading::AtTime }}</label>
-    <input type="text" name="at" id="restore-at" placeholder="{{ Hint::Now }}">
+    <input type="datetime-local" name="at" id="restore-at" title="{{ Hint::Now }}">
     {% endif %}
     <label for="restore-to">{{ Heading::To }}</label>
     <input type="text" name="to" id="restore-to" placeholder="{{ Hint::WhereItWas }}">

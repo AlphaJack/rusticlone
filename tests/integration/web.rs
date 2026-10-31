@@ -201,7 +201,13 @@ fn a_path_is_restored_from_a_copy_target() {
     assert!(path.contains(&format!("<code>{docs}/sub</code>")) && path.contains("<b>Docs-remote</b>"), "{path}");
     let whole = new(&format!("kind=restore&repo=Docs-remote&snapshot={id}")).body;
     assert!(whole.contains(&format!("<code>{docs}</code>")), "{whole}");
-    assert!(new("kind=restore").body.contains(&format!("<code>{docs}</code>")));
+    // Without a choice, the dialog offers every folder, each backup entry, or a subfolder.
+    let choose = new("kind=restore").body;
+    assert!(
+        choose.contains(r#"<option value="all">"#) && choose.contains(&format!(r#"<option value="0">{docs}</option>"#)),
+        "{choose}"
+    );
+    assert!(choose.contains(r#"<option value="custom">"#) && choose.contains(r#"type="datetime-local""#), "{choose}");
     assert_eq!(new("kind=backup").code, 404);
     // In the page's dialog, only the form is returned.
     let dialog = server.get_with("/collections/Docs/runs/new?kind=restore", &["HX-Request: true"]).body;
