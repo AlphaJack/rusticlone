@@ -22,12 +22,11 @@ use super::{
     repo::{RepoMain, repo_view},
     runs::log_tail,
 };
-use crate::sys;
+use crate::{clock, sys};
+use jiff::Timestamp;
 
 /// The shortest interval between two renders of a page while changes keep coming.
 const RENDER_EVERY: Duration = Duration::from_millis(500);
-/// How often a page is rendered again without a change, as its ages change once a minute.
-pub(super) const AGE_TICK: Duration = Duration::from_mins(1);
 
 #[derive(Clone, Deserialize)]
 pub(super) struct View {
@@ -87,12 +86,23 @@ struct Stream {
     /// The hash of its `<main>`.
     last: Option<u64>,
     rendered: tokio::time::Instant,
+    /// When what it shows changes without a change of state, as an age turns over: it is rendered again then.
+    /// `None`: never.
+    changes_at: Option<Timestamp>,
     /// The run whose log it shows, and the log offset its lines end at.
     log: Option<(i64, u64)>,
     /// New lines of that log, sent after `<main>`.
     lines: Option<sse::Event>,
     /// The page's, which renders outlive the request that opened the stream.
     language: Language,
+}
+
+/// Waits until `at`, or forever.
+async fn until(at: Option<Timestamp>) {
+    match at {
+        Some(at) => tokio::time::sleep(Duration::try_from(at.duration_since(super::now())).unwrap_or_default()).await,
+        None => std::future::pending().await,
+    }
 }
 
 /// Sends the page's `<main>` again when what it shows changed, at most every [`RENDER_EVERY`], and
@@ -122,6 +132,8 @@ pub(super) async fn events(
         seen: seen.unwrap_or_default(),
         last: view.h,
         rendered: tokio::time::Instant::now(),
+        // Unknown until it is rendered here: at once.
+        changes_at: Some(super::now()),
         log: view.log.zip(view.at).filter(|_| !reconnected),
         lines: None,
         language: Language::current(),
@@ -153,7 +165,7 @@ pub(super) async fn events(
                         Err(broadcast::error::RecvError::Closed) => return None,
                     },
                     _ = stopping.wait_for(|s| *s) => return None,
-                    () = tokio::time::sleep(AGE_TICK) => {}
+                    () = until(s.changes_at) => {}
                 }
                 // Render once for a burst of changes.
                 tokio::time::sleep_until(s.rendered + RENDER_EVERY).await;
@@ -162,8 +174,10 @@ pub(super) async fn events(
             s.seen = s.changes.borrow_and_update().count;
             let version = s.seen.to_string();
             let (app, view, shown, base, language) = (s.app.clone(), s.view.clone(), s.log, s.base.clone(), s.language);
-            let render = move || language.scope(|| render_update(&app, &view, shown, &base));
-            let (html, log, lines) = tokio::task::spawn_blocking(render).await.ok()??;
+            let render = move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base)));
+            let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
+            let (html, log, lines) = update?;
+            s.changes_at = changes_at;
             s.log = log;
             s.lines = lines.map(|lines| sse::Event::default().event("log").id(&version).data(lines));
             // Unchanged: nothing to send.
