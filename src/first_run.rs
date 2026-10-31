@@ -893,7 +893,8 @@ mod tests {
         assert!(setup.profiles()[1].1.contains(&format!("{home}/usb")), "{}", setup.profiles()[1].1);
         assert!(setup.check().is_ok());
         let prefixed = target(Kind::Local, &[("repository", "local:~/usb")]);
-        assert!(prefixed.profiles()[1].1.contains(&format!("\"{home}/usb\"")), "{}", prefixed.profiles()[1].1);
+        let saved = profile::parse("Documents-local-copy", &prefixed.profiles()[1].1).repository;
+        assert_eq!(saved, Some(format!("{home}/usb")));
         let with = |key: &str, path: &str| {
             let mut setup = setup.clone();
             setup.values.insert(key.into(), path.into());
