@@ -703,7 +703,7 @@ autostart-error-unsupported = nessun gestore di servizi conosciuto su questo com
 autostart-blocked = macOS blocca il server all'accesso. Apri Impostazioni di Sistema > Generali > Elementi di login ed estensioni e attiva { $app }
 autostart-unit-description = Server { -app }
 # Cosa dicono dell'app i desktop e il menu Start di Windows. Le traduzioni lo sostituiscono.
-app-description = Backup 3-2-1-1-0 pianificati per computer e server, basati su profili rustic, con interfaccia e notifiche
+app-description = Backup 3-2-1-1-0 pianificati per desktop e server, basati su profili rustic, con interfaccia e notifiche
 tray-quit = Esci (sospende i backup automatici)
 switch-at-boot = Avvia all'accensione
 switch-at-login = Avvia all'accesso

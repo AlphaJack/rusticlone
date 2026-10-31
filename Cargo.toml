@@ -1,6 +1,6 @@
 [package]
 name = "rusticlone"
-description = "Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications"
+description = "Scheduled 3-2-1-1-0 backups for desktops and servers built on rustic profiles, with UI and notifications"
 keywords = ["backup", "restore", "snapshot", "rustic", "restic"]
 categories = ["command-line-utilities"]
 version.workspace = true

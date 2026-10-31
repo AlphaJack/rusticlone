@@ -2,8 +2,8 @@
 [Desktop Entry]
 Type=Application
 Name=Rusticlone
-Comment=Scheduled 3-2-1-1-0 backups for computers and servers built on rustic profiles, with UI and notifications
-Comment[it]=Backup 3-2-1-1-0 pianificati per computer e server, basati su profili rustic, con interfaccia e notifiche
+Comment=Scheduled 3-2-1-1-0 backups for desktops and servers built on rustic profiles, with UI and notifications
+Comment[it]=Backup 3-2-1-1-0 pianificati per desktop e server, basati su profili rustic, con interfaccia e notifiche
 Exec="rusticlone" serve --open
 Icon=rusticlone
 Terminal=false

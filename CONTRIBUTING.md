@@ -2,7 +2,7 @@
 
 ## Design
 
-Rusticlone must stay out of the way of someone taking their first computer or server backup: easy to configure, easy to use and forget.
+Rusticlone must stay out of the way of someone taking their first desktop or server backup: easy to configure, easy to use and forget.
 Rustic profiles hold most of the configuration, and Rusticlone adds few flags and environment variables of its own.
 The README is the only public document for now, so it has to be a complete guide.
 
