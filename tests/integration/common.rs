@@ -572,6 +572,18 @@ pub(crate) mod cmd {
         }
     }
 
+    /// Ends once `file` exists, which the test creates when it lets the command end.
+    pub(crate) fn until_exists(file: &Path) -> String {
+        if cfg!(windows) {
+            format!(
+                "powershell -NoProfile -Command \"while (-not (Test-Path {})) {{ Start-Sleep -Milliseconds 100 }}\"",
+                quoted(file)
+            )
+        } else {
+            format!("sh -c 'while [ ! -e {} ]; do sleep 0.1; done'", file.display())
+        }
+    }
+
     /// Links `link` to the directory `target`, replacing a link there.
     pub(crate) fn link(target: &Path, link: &Path) -> String {
         let (target, link) = (quoted(target), quoted(link));
@@ -612,13 +624,18 @@ pub(crate) mod cmd {
 /// nothing, because with a parent snapshot rustic 0.11 does not read stdin and a writer would die of
 /// SIGPIPE.
 pub(crate) fn slow_profile(sb: &Sandbox, name: &str, seconds: u32, extra: &str) {
+    stdin_profile(sb, name, &cmd::sleep(seconds), extra);
+}
+
+/// A collection that backs up what `command` prints, which ends when the command does.
+pub(crate) fn stdin_profile(sb: &Sandbox, name: &str, command: &str, extra: &str) {
     sb.profile(
         name,
         &format!(
             "[global]\nuse-profiles = ['common']\n[repository]\nrepository = '{}'\n\
              [[backup.snapshots]]\nsources = ['-']\nstdin-command = {}\n{extra}",
             sb.path(&format!("local/{name}")).display(),
-            toml_str(&cmd::sleep(seconds))
+            toml_str(command)
         ),
     );
 }
