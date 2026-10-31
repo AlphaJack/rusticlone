@@ -1,4 +1,4 @@
-use std::{fs, process::Stdio, time::Instant};
+use std::{fs, process::Stdio, sync::mpsc, time::Instant};
 
 use serde_json::json;
 
@@ -138,31 +138,47 @@ fn a_stopped_prune_leaves_the_repository_whole() {
     let prune = || {
         sb.command("rustic").args(["-P", "Docs", "prune"]).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap()
     };
+    // Each file the prune adds to or removes from the repository, so that it is stopped by what it did, not by time,
+    // which another machine's speed changes.
+    let changes = || {
+        let (told, changes) = mpsc::channel();
+        let mut watcher = notify::recommended_watcher(move |e: notify::Result<notify::Event>| {
+            if e.is_ok_and(|e| e.kind.is_create() || e.kind.is_remove()) {
+                _ = told.send(());
+            }
+        })
+        .unwrap();
+        notify::Watcher::watch(&mut watcher, &repo, notify::RecursiveMode::Recursive).unwrap();
+        (watcher, changes)
+    };
     copy(&kept, &repo);
+    let (watcher, all) = changes();
     let started = Instant::now();
     assert!(prune().wait().unwrap().success());
     let whole = started.elapsed();
+    drop(watcher);
+    let total = all.try_iter().count();
+    assert!(total > 2, "the prune changed {total} files");
     let mut stopped = 0;
     for sixth in 1..6 {
-        // In the first half of its time, so that a prune on a machine twice as fast is still stopped.
-        let mut wait = whole * sixth / 12;
-        // A prune that ended before the kill, as the first one can be slower, starts again with half the wait.
-        for _ in 0..4 {
-            copy(&kept, &repo);
-            let mut pruning = prune();
-            std::thread::sleep(wait);
-            if pruning.try_wait().unwrap().is_some() {
-                wait /= 2;
-                continue;
-            }
-            stopped += 1;
-            _ = pruning.kill();
+        // After a sixth of its changes in the first half, so that each stop is at another step of the prune.
+        copy(&kept, &repo);
+        let (_watcher, changes) = changes();
+        let mut pruning = prune();
+        // Bounded by a whole prune's time, in case it changes less than the first.
+        let deadline = Instant::now() + whole * 2;
+        let seen = (0..(total * sixth / 12).max(1))
+            .all(|_| changes.recv_timeout(deadline.saturating_duration_since(Instant::now())).is_ok());
+        if !seen || pruning.try_wait().unwrap().is_some() {
             _ = pruning.wait();
-            // A killed prune could lose a pack or index. `check` verifies that every referenced one exists.
-            assert!(ok(&["check"]), "killed at {sixth}/6: the repository is damaged");
-            assert!(ok(&["prune"]) && ok(&["check"]), "killed at {sixth}/6: the next prune failed");
-            break;
+            continue;
         }
+        stopped += 1;
+        _ = pruning.kill();
+        _ = pruning.wait();
+        // A killed prune could lose a pack or index. `check` verifies that every referenced one exists.
+        assert!(ok(&["check"]), "killed at {sixth}/6: the repository is damaged");
+        assert!(ok(&["prune"]) && ok(&["check"]), "killed at {sixth}/6: the next prune failed");
     }
     assert!(stopped >= 3, "only {stopped} of 5 prunes were stopped before they ended");
 }
