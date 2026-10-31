@@ -110,6 +110,7 @@ pub(super) enum Button<'a> {
     CopyFolderPath,
     SeeHow,
     CronSyntax,
+    NewCollection,
 }
 
 /// A word or a state, in a table or a breadcrumb.
@@ -234,4 +235,6 @@ pub(super) enum Hint<'a> {
     WhereItWas,
     Now,
     Notify,
+    /// While a folder to back up is measured.
+    Measuring,
 }

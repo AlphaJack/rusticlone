@@ -45,6 +45,8 @@ impl Free {
 #[template(path = "free.html")]
 struct FreeView {
     free: Free,
+    /// Shown while the folders to back up are larger than the space left.
+    short: String,
 }
 
 /// The free space where the folder of the field that asks is, whatever the field's name.
@@ -53,7 +55,7 @@ pub(super) async fn free(base: Base, Query(field): Query<BTreeMap<String, String
     let free = tokio::task::spawn_blocking(move || Free::of(&first_run::repository_folder(&folder)))
         .await
         .unwrap_or(Free::Missing);
-    Html(render_str(&FreeView { free }, &base))
+    Html(render_str(&FreeView { free, short: crate::i18n::t!("free-short") }, &base))
 }
 
 #[cfg(test)]

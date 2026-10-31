@@ -58,16 +58,38 @@ const urlsOf = (text) => text.split(/[\s,;]+(?=[a-z0-9]+:\/\/)/i).map((url) => u
 /** @param {string} url @param {string} schemes space-separated */
 const ofSchemes = (url, schemes) => url.includes("://") && schemes.split(" ").includes(url.split("://")[0].toLowerCase());
 
-/** Shows the fields of each choice made in `form`. @param {HTMLFormElement} form */
+/** Whether `role`'s repository forgets backups: it is chosen and does not refuse deletes. @param {HTMLFormElement} form @param {string} role */
+const forgets = (form, role) => {
+  const kind = form.elements[role]?.value;
+  return Boolean(kind) && kind !== "none" && !form.elements[`${role}.${kind}.immutable`]?.checked;
+};
+
+/** Shows the fields of each choice made in `form`, and how long backups are kept while a repository forgets them. @param {HTMLFormElement} form */
 const showChosen = (form) => {
   for (const fields of form.querySelectorAll("[data-choice]")) {
     const chosen = form.elements[fields.dataset.choice];
     if (chosen) fields.hidden = fields.dataset.value !== chosen.value;
   }
+  const keep = form.querySelector("[data-keep]");
+  if (keep) keep.hidden = !["primary", "target"].some((role) => forgets(form, role));
 };
 document.addEventListener("change", (event) => event.target.form && showChosen(event.target.form));
 // Firefox fills a reloaded form with the choices made before, without a change event.
 window.addEventListener("pageshow", () => [...document.forms].forEach(showChosen));
+
+/**
+ * Warns where the folders to back up, as far as measured, are larger than the free space. Compression and
+ * deduplication may still make them fit. @param {HTMLFormElement | null} form
+ */
+const compareSizes = (form) => {
+  if (!form) return;
+  const total = [...form.querySelectorAll(".measured [data-bytes]")].reduce((sum, size) => sum + Number(size.dataset.bytes), 0);
+  for (const free of form.querySelectorAll(".free [data-bytes]")) {
+    const short = free.parentElement.querySelector("[data-short]");
+    if (short) short.hidden = total <= Number(free.dataset.bytes);
+  }
+};
+document.addEventListener("htmx:after:swap", (event) => compareSizes(event.target.closest?.("form")));
 
 // Folder rows: Add appends an empty one, Remove drops one but the first. Their fields are numbered again, as
 // the server reads them in order.
@@ -80,8 +102,14 @@ document.addEventListener("click", (event) => {
   if (add) {
     const row = rows().at(-1).cloneNode(true);
     row.querySelector("input").value = "";
+    row.querySelector(".measured")?.replaceChildren();
     rows().at(-1).after(row);
-  } else remove.closest(".source").remove();
+    // The clone's size request is wired like the original's.
+    htmx.process(row);
+  } else {
+    remove.closest(".source").remove();
+    compareSizes(list.closest("form"));
+  }
   rows().forEach((row, i) => {
     Object.assign(row.querySelector("input"), { name: `${list.dataset.field}.${i}`, id: `setup-${list.dataset.field}-${i}` });
   });

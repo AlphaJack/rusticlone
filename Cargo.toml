@@ -17,6 +17,7 @@ server = [
     "dep:askama",
     "dep:axum",
     "dep:futures-util",
+    "dep:jwalk",
     "dep:nix",
     "dep:open",
     "dep:quick_cache",
@@ -96,6 +97,8 @@ strum = { version = "0.28.0", features = ["derive"] }
 thiserror = "2.0.21"
 askama = { version = "0.16.1", optional = true }
 axum = { version = "0.8.9", optional = true }
+# Measures the folders that the setup form names on all cores.
+jwalk = { version = "0.9.0", optional = true }
 futures-util = { version = "0.3.34", default-features = false, optional = true }
 getrandom = "0.4.3"
 socket2 = { version = "0.6.5", optional = true }

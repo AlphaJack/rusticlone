@@ -92,6 +92,18 @@ pub(crate) enum Keep {
     All,
 }
 
+impl Every {
+    /// How often the repositories are checked for damage: often enough to find it before many backups depend
+    /// on a damaged one. Rarely enough not to read them over and over. Never without a schedule.
+    fn check(self) -> Self {
+        match self {
+            Self::Manual => Self::Manual,
+            Self::Hourly | Self::Daily | Self::Custom => Self::Weekly,
+            Self::Weekly | Self::Monthly => Self::Monthly,
+        }
+    }
+}
+
 impl Keep {
     /// How often what it no longer keeps is removed: often enough that a month's backups do not pile up, and
     /// never when it keeps everything.
@@ -168,6 +180,8 @@ pub(crate) enum Key {
     /// A variable in `[global.env]`.
     #[fluent(transparent)]
     Env(&'static str),
+    /// A repository that refuses deletes, ticked: it gets no `[forget]`, so it is never forgotten or pruned.
+    Immutable,
 }
 
 impl Key {
@@ -277,6 +291,11 @@ pub(crate) fn password() -> String {
     crate::i18n::t!("field-repository-password")
 }
 
+/// A repository that refuses deletes, under its name for this kind.
+const fn immutable(label: &'static str) -> Field {
+    Field { required: false, ..field(Key::Immutable, label, "") }
+}
+
 /// `root`: where in the service the repository is.
 const ROOT: Field = Field { required: false, ..field(Key::Option("root"), "path", "/backup") };
 
@@ -349,6 +368,7 @@ impl Kind {
                         ROOT,
                         field(Key::Option("access_key_id"), "access-key", ""),
                         secret(Key::Option("secret_access_key"), "secret-key"),
+                        immutable("object-lock"),
                     ]
                 }
             }
@@ -375,7 +395,14 @@ impl Kind {
                     ]
                 }
             }
-            Self::Rest => const { &[field(Key::Repository, "url", "https://me:password@backup.example.com:8000/me")] },
+            Self::Rest => {
+                const {
+                    &[
+                        field(Key::Repository, "url", "https://me:password@backup.example.com:8000/me"),
+                        immutable("append-only"),
+                    ]
+                }
+            }
             Self::Gdrive => const { &rclone("gdrive:backup") },
             Self::Onedrive => const { &rclone("onedrive:backup") },
             Self::Dropbox => const { &rclone("dropbox:backup") },
@@ -404,13 +431,11 @@ pub(crate) struct Setup {
     pub values: BTreeMap<String, String>,
     pub every: Every,
     pub keep: Keep,
-    /// How often the repositories are checked.
-    pub check: Every,
     pub notify: String,
 }
 
 /// `path` with a leading `~` as the home folder: rustic would read it as a folder named `~`.
-fn home(path: &str) -> String {
+pub(crate) fn home(path: &str) -> String {
     let rest =
         path.strip_prefix('~').filter(|rest| rest.is_empty() || rest.starts_with(['/', std::path::MAIN_SEPARATOR]));
     match (rest, etcetera::home_dir()) {
@@ -434,8 +459,28 @@ pub(crate) fn repository_folder(text: &str) -> String {
 /// The first backup works without a second disk.
 impl Default for Setup {
     fn default() -> Self {
+        Self::of_folder(FOLDERS[0])
+    }
+}
+
+/// The home folders a collection is first suggested for in this order.
+const FOLDERS: [&str; 6] = ["Documents", "Pictures", "Desktop", "Music", "Videos", "Downloads"];
+
+impl Setup {
+    /// A further collection: for the first home folder that exists and that no profile is named after yet.
+    #[cfg(feature = "server")]
+    #[expect(clippy::disallowed_methods, reason = "looks for the user's folders")]
+    pub(crate) fn next(profiles: &[String]) -> Self {
+        let home = etcetera::home_dir().unwrap_or_default();
+        let taken = |name: &str| profiles.iter().any(|p| p == name || p.starts_with(&format!("{name}-")));
+        let free = FOLDERS.iter().find(|name| !taken(name) && home.join(name).is_dir());
+        free.map_or_else(|| Self { name: String::new(), ..Self::default() }, |name| Self::of_folder(name))
+    }
+
+    /// The answers for backing up the home folder `name` (the system's files for root) to a folder named
+    /// after it.
+    fn of_folder(name: &str) -> Self {
         let home = etcetera::home_dir().unwrap_or_else(|_| "/home/me".into());
-        let name = "Documents";
         let source = match (sys::is_root(), cfg!(windows), cfg!(target_vendor = "apple")) {
             (false, ..) => home.join(name).display().to_string(),
             // Every account's files, which the system service reads.
@@ -459,7 +504,6 @@ impl Default for Setup {
             .into(),
             every: Every::Daily,
             keep: Keep::default(),
-            check: Every::Weekly,
             notify: desktop().unwrap_or_default().into(),
         }
     }
@@ -642,6 +686,21 @@ impl Setup {
         pasted(self.shown(role, self.kind(role), field))
     }
 
+    /// Whether `role`'s repository refuses deletes.
+    fn immutable(&self, role: Role) -> bool {
+        (self.kind(role).fields().iter()).any(|f| f.key == Key::Immutable && !self.value(role, f).is_empty())
+    }
+
+    /// Whether any repository forgets backups. Otherwise how long they are kept is not asked.
+    pub(crate) fn forgets(&self) -> bool {
+        <Role as strum::IntoEnumIterator>::iter().any(|r| self.kind(r) != Kind::None && !self.immutable(r))
+    }
+
+    /// How long backups are kept: all of them when no repository forgets any.
+    fn keep(&self) -> Keep {
+        if self.forgets() { self.keep } else { Keep::All }
+    }
+
     #[cfg(any(feature = "server", test))]
     fn check(&self) -> Result<(), Error> {
         let name = self.name.trim();
@@ -684,13 +743,12 @@ impl Setup {
         Ok(())
     }
 
-    /// Each step's setting, the form's name for it, and how often it runs.
     /// Each schedule's setting, the form's field, its answer and the question it answers.
     fn schedules(&self) -> [(settings::Setting, &'static str, Every, Question); 3] {
         [
             (settings::BACKUP, "every", self.every, Question::WhenBackUp),
-            (settings::CHECK, "check", self.check, Question::HowOftenCheck),
-            (settings::PRUNE, "prune", self.keep.prune(), Question::HowLongKeep),
+            (settings::CHECK, "check", self.every.check(), Question::HowOftenCheck),
+            (settings::PRUNE, "prune", self.keep().prune(), Question::HowLongKeep),
         ]
     }
 
@@ -753,6 +811,13 @@ impl Setup {
         backup["snapshots"] = Item::ArrayOfTables(snapshots.collect());
         primary["backup"] = Item::Table(backup);
         primary["repository"] = self.repository(Role::Primary, section(Question::WhereSaved));
+        let forget = (!self.keep().rules().is_empty()).then(|| {
+            let mut forget = section(Question::HowLongKeep);
+            for (keep, n) in self.keep().rules() {
+                forget[keep] = value(*n);
+            }
+            Item::Table(forget)
+        });
         let target = (self.target != Kind::None).then(|| {
             let name = self.profile_name(Role::Target);
             let mut copy = section(Question::WhereCopied);
@@ -760,18 +825,18 @@ impl Setup {
             primary["copy"] = Item::Table(copy);
             let mut target = DocumentMut::new();
             target["repository"] = self.repository(Role::Target, section(Question::WhereCopied));
+            // Kept as long as the backups, and checked and pruned on their schedules, which it inherits.
+            if let Some(forget) = forget.clone().filter(|_| !self.immutable(Role::Target)) {
+                target["forget"] = forget;
+            }
             let env: Table = self.env(Role::Target).collect();
             if !env.is_empty() {
                 target["global"] = implicit([("env", Item::Table(env))]);
             }
             (format!("{name}.toml"), target.to_string())
         });
-        if !self.keep.rules().is_empty() {
-            let mut forget = section(Question::HowLongKeep);
-            for (keep, n) in self.keep.rules() {
-                forget[keep] = value(*n);
-            }
-            primary["forget"] = Item::Table(forget);
+        if let Some(forget) = forget.filter(|_| !self.immutable(Role::Primary)) {
+            primary["forget"] = forget;
         }
         let mut vars = Table::new();
         vars.decor_mut().set_prefix("\n");
@@ -964,6 +1029,28 @@ mod tests {
     }
 
     #[test]
+    fn a_repository_keeps_as_long_as_the_backups_unless_it_refuses_deletes() {
+        let keeps = |setup: &Setup| profile::parse("Documents-rest", &setup.profiles()[1].1).has_keep;
+        let rest = target(Kind::Rest, &[("repository", "http://h/r")]);
+        assert!(rest.profiles()[1].1.contains("keep-last = 10"), "{:?}", rest.profiles());
+        assert!(!keeps(&Setup { keep: Keep::All, ..rest }));
+        assert!(!keeps(&target(Kind::Rest, &[("repository", "http://h/r"), ("immutable", "on")])));
+        let object_lock = target(Kind::S3, &[("endpoint", "https://s3"), ("immutable", "on")]);
+        let text = &object_lock.profiles()[1].1;
+        assert!(!text.contains("forget") && !text.contains("immutable"), "{text}");
+        let mut locked = target(Kind::Rest, &[("repository", "http://h/r")]);
+        locked.primary = Kind::S3;
+        locked.values.insert("primary.s3.immutable".into(), "on".into());
+        let profiles = locked.profiles();
+        assert!(!profiles[0].1.contains("keep-") && profiles[1].1.contains("keep-last"), "{profiles:?}");
+        // Neither forgets, so how long to keep is not asked and nothing is pruned.
+        locked.values.insert("target.rest.immutable".into(), "on".into());
+        assert!(!locked.forgets());
+        let profiles = locked.profiles();
+        assert!(profiles.iter().all(|(_, t)| !t.contains("keep-") && !t.contains(settings::PRUNE.key)), "{profiles:?}");
+    }
+
+    #[test]
     fn profiles_read_back_as_written() {
         let setup = target(Kind::Sftp, &[("user", "me"), ("endpoint", "ssh://nas:22")]);
         let profiles = setup.profiles();
@@ -994,10 +1081,10 @@ mod tests {
         assert!(primary.contains(&format!("{} = \"@monthly\"", settings::PRUNE.key)), "{primary}");
         let month = Setup { keep: Keep::Month, ..setup.clone() }.profiles();
         assert!(month[0].1.contains(&format!("{} = \"@weekly\"", settings::PRUNE.key)), "{}", month[0].1);
-        let manual = Setup { keep: Keep::All, check: Every::Manual, ..setup.clone() }.profiles();
+        let manual = Setup { keep: Keep::All, every: Every::Manual, ..setup.clone() }.profiles();
         assert!(!manual[0].1.contains(settings::PRUNE.key), "{}", manual[0].1);
         assert!(!manual[0].1.contains(settings::CHECK_SUBSETS.key), "{}", manual[0].1);
-        let mut custom = Setup { check: Every::Custom, ..setup.clone() };
+        let mut custom = Setup { every: Every::Custom, ..setup.clone() };
         assert!(matches!(custom.check(), Err(Error::NoCustom)));
         let signal = Setup { notify: "signal://localhost/+1 555 123 4567 macosx://".into(), ..setup.clone() };
         assert!(signal.check().is_ok(), "{:?}", signal.check());
@@ -1007,8 +1094,13 @@ mod tests {
                 "{notify}"
             );
         }
-        custom.values.insert("check.custom".into(), "0 3 * * 1".into());
-        assert!(custom.profiles()[0].1.contains(&format!("{} = \"0 3 * * 1\"", settings::CHECK.key)));
+        custom.values.insert("every.custom".into(), "0 3 * * 1".into());
+        let custom = &custom.profiles()[0].1;
+        assert!(custom.contains(&format!("{} = \"0 3 * * 1\"", settings::BACKUP.key)), "{custom}");
+        // Checks follow the backups: weekly for a custom schedule and monthly for weekly backups.
+        assert!(custom.contains(&format!("{} = \"@weekly\"", settings::CHECK.key)), "{custom}");
+        let weekly = &Setup { every: Every::Weekly, ..setup.clone() }.profiles()[0].1;
+        assert!(weekly.contains(&format!("{} = \"@monthly\"", settings::CHECK.key)), "{weekly}");
         assert!(<Every as strum::IntoEnumIterator>::iter().all(|e| Every::try_from(e.id()).is_ok_and(|c| c == e)));
         assert!(setup.check().is_ok());
         assert!(matches!(

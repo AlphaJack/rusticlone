@@ -455,6 +455,7 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copy folder path
 button-see-how = See how
 button-cron-syntax = Cron syntax
+button-new-collection = New collection
 
 ## The web UI: words and states, in the tables and the breadcrumbs
 
@@ -532,6 +533,7 @@ hint-cross-site = refused: another site sent it. Open { -name } directly and try
 hint-name-or-path = part of a name or path
 hint-where-it-was = where it was, or a folder such as /tmp/restored
 hint-now = now, or a time such as 2026-10-01 12:00
+hint-measuring = Calculating size…
 hint-notify = notification URLs, or nothing
 notice-started = { $collection }: { $what }
 notice-refreshing = { $collection }: refreshing
@@ -559,7 +561,10 @@ missing-run = run not found
 missing-repository = repository not found
 missing-snapshot = snapshot not found
 free-missing = folder or disk not found
+free-short = less than the folders to back up
 free-bytes = { $size } free
+measured-missing = { free-missing }
+measured-bytes = { $size } in { $files } files
 
 ## The metrics' help
 
@@ -613,6 +618,7 @@ keep-year = One year
 keep-month = One month
 keep-all = Everything
 first-run-key-repository = repository
+first-run-key-immutable = immutable
 field-repository-password = Repository password
 field-server-key = Server key
 field-choice-accept = Any key
@@ -634,6 +640,8 @@ field-secret-key = Secret key
 field-password = Password
 field-email = Email
 field-url = URL
+field-object-lock = This bucket has Object Lock
+field-append-only = This server is append-only
 first-run-guide = full configuration guide: { $url }
 first-run-no-choice = no choice { $choice }
 first-run-error-name = the name must start with a letter or a digit; the other characters can be letters, digits, `-`, `_` or `.`
