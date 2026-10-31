@@ -670,6 +670,7 @@ server-not-watching-dir = cannot watch { $dir }: { $error }
 server-dir-not-created = cannot create { $dir }: { $error }
 server-web-ui-failed = web UI: { $error }
 server-no-wall-clock = no wall clock timer ({ $error }): schedules can be late after a suspend
+server-not-kept-awake = cannot keep the computer awake during runs: { $error }
 server-runs-unread = { $runs ->
     [one] 1 run
    *[other] { $runs } runs
@@ -707,6 +708,7 @@ app-description = { -description }
 tray-quit = Quit (pause automatic backups)
 switch-at-boot = Start at boot
 switch-at-login = Start at login
+awake-why = A backup is running
 switch-auto-update = Update automatically
 update-current = { -name } { $current } is up to date
 update-available = { -name } { $to } is available, this is { $from }
@@ -756,6 +758,7 @@ setting-auto-update = Update { -name } and the rustic at each restart
 setting-backup-cron = Backup schedule (cron expression, @daily...)
 setting-check-cron = Check schedule of the repository
 setting-check-subsets = Data each check reads. N reads the next of N subsets (`--read-data-subset n/N`). `5%`, `2GiB` or `all` reads that much at random. 0 reads the structure only
+setting-keep-awake = Keep the computer from sleeping while a run goes on
 setting-listen = Web UI address
 setting-metrics-token = Token for Prometheus and other monitors, to send as `Authorization: Bearer`
 setting-notify-urls = Notification URLs (Mercurio) for when a collection's status changes

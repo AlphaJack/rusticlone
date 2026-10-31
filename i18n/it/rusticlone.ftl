@@ -670,6 +670,7 @@ server-not-watching-dir = impossibile osservare { $dir }: { $error }
 server-dir-not-created = impossibile creare { $dir }: { $error }
 server-web-ui-failed = interfaccia web: { $error }
 server-no-wall-clock = nessun timer legato all'orologio di sistema ({ $error }): le pianificazioni possono ritardare dopo una sospensione
+server-not-kept-awake = impossibile tenere sveglio il computer durante le esecuzioni: { $error }
 server-runs-unread = { $runs ->
     [one] 1 esecuzione non mostrata: scritta
    *[other] { $runs } esecuzioni non mostrate: scritte
@@ -707,6 +708,7 @@ app-description = Backup 3-2-1-1-0 pianificati per computer e server, basati su 
 tray-quit = Esci (sospende i backup automatici)
 switch-at-boot = Avvia all'accensione
 switch-at-login = Avvia all'accesso
+awake-why = È in corso un backup
 switch-auto-update = Aggiorna automaticamente
 update-current = { -name } { $current } è aggiornato
 update-available = { -name } { $to } è disponibile, questo è { $from }
@@ -756,6 +758,7 @@ setting-auto-update = Aggiorna { -name } e il rustic a ogni riavvio
 setting-backup-cron = Pianificazione dei backup (espressione cron, @daily...)
 setting-check-cron = Pianificazione delle verifiche dell'archivio
 setting-check-subsets = Dati letti da ogni verifica. N legge il prossimo di N sottoinsiemi (`--read-data-subset n/N`). `5%`, `2GiB` o `all` legge quella quantità a caso. 0 legge solo la struttura
+setting-keep-awake = Impedisce al computer di andare in sospensione durante un'esecuzione
 setting-listen = Indirizzo dell'interfaccia web
 setting-metrics-token = Token per Prometheus e altri sistemi di monitoraggio, da inviare come `Authorization: Bearer`
 setting-notify-urls = URL di notifica (Mercurio) per quando lo stato di una raccolta cambia

@@ -133,6 +133,8 @@ settings! {
     CHECK = "CHECK_CRON", None, Scope::Repository;
     CHECK_SUBSETS = "CHECK_SUBSETS", Some("10"), Scope::Repository;
     #[cfg(feature = "server")]
+    KEEP_AWAKE = "KEEP_AWAKE", Some("true"), Scope::Environment;
+    #[cfg(feature = "server")]
     LISTEN = "LISTEN", Some("127.0.0.1:32110"), Scope::Environment;
     #[cfg(feature = "server")]
     METRICS_TOKEN = "METRICS_TOKEN", None, Scope::Secret;
