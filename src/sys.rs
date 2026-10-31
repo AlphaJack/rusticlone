@@ -703,41 +703,84 @@ mod path_tests {
     }
 }
 
-/// Keeps the computer from sleeping when idle until dropped so that a run is not cut short. It uses `caffeinate`
-/// on macOS and a systemd inhibitor on Linux. Each ends when its input closes: when dropped, and when this process
-/// ends however it does. Where neither is found the computer may sleep as before.
-#[cfg(all(feature = "server", unix))]
-pub(crate) struct Awake(Option<std::process::Child>);
+/// Keeps the computer from sleeping when idle until dropped so that a run is not cut short. The system lets go
+/// when this process ends however it does. Where it refuses, the computer may sleep as before.
+#[cfg(all(feature = "server", target_vendor = "apple"))]
+pub(crate) struct Awake(Option<u32>);
 
-#[cfg(all(feature = "server", unix))]
-#[expect(clippy::disallowed_methods, reason = "starts the system's sleep inhibitor, not rustic")]
+/// A power assertion of `IOKit`, as `caffeinate` takes.
+#[cfg(all(feature = "server", target_vendor = "apple"))]
+#[expect(unsafe_code, reason = "IOKit's power assertions are C functions")]
 pub(crate) fn stay_awake() -> Awake {
-    use std::process::{Command, Stdio};
-    let mut command = if cfg!(target_vendor = "apple") {
-        // Until `cat` ends: `caffeinate` runs the command it is given and holds its assertion as long.
-        let mut c = Command::new("/usr/bin/caffeinate");
-        c.args(["-i", "cat"]);
-        c
-    } else {
-        let mut c = Command::new("systemd-inhibit");
-        let why = crate::i18n::t!("awake-why");
-        c.args(["--what=idle:sleep", "--mode=block", &format!("--who={}", crate::APP_NAME), &format!("--why={why}")]);
-        c.arg("cat");
-        c
+    use std::ffi::{CString, c_char, c_void};
+    #[link(name = "IOKit", kind = "framework")]
+    unsafe extern "C" {
+        fn IOPMAssertionCreateWithName(kind: *const c_void, level: u32, name: *const c_void, id: *mut u32) -> i32;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFStringCreateWithCString(allocator: *const c_void, text: *const c_char, encoding: u32) -> *const c_void;
+        fn CFRelease(object: *const c_void);
+    }
+    const UTF8: u32 = 0x0800_0100;
+    const ON: u32 = 255;
+    let string = |text: &str| {
+        let text = CString::new(text).unwrap_or_default();
+        // SAFETY: a C string that lives through the call, and the default allocator.
+        unsafe { CFStringCreateWithCString(std::ptr::null(), text.as_ptr(), UTF8) }
     };
-    command.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null());
-    Awake(command.spawn().ok())
+    let (kind, name) = (string("PreventUserIdleSystemSleep"), string(&crate::i18n::t!("awake-why")));
+    let mut id = 0;
+    // SAFETY: two strings that the call copies, released after, and where it writes the assertion's id.
+    let made = unsafe {
+        let made = !kind.is_null() && !name.is_null() && IOPMAssertionCreateWithName(kind, ON, name, &raw mut id) == 0;
+        for s in [kind, name].into_iter().filter(|s| !s.is_null()) {
+            CFRelease(s);
+        }
+        made
+    };
+    Awake(made.then_some(id))
 }
 
-#[cfg(all(feature = "server", unix))]
+#[cfg(all(feature = "server", target_vendor = "apple"))]
+#[expect(unsafe_code, reason = "IOKit's power assertions are C functions")]
 impl Drop for Awake {
     fn drop(&mut self) {
-        if let Some(child) = &mut self.0 {
-            // `cat` ends at the end of its input, and the inhibitor with it.
-            drop(child.stdin.take());
-            _ = child.wait();
+        #[link(name = "IOKit", kind = "framework")]
+        unsafe extern "C" {
+            fn IOPMAssertionRelease(id: u32) -> i32;
+        }
+        if let Some(id) = self.0 {
+            // SAFETY: an assertion this took and releases once.
+            unsafe { IOPMAssertionRelease(id) };
         }
     }
+}
+
+/// A logind inhibitor, held by the file it hands over: closing it lets go.
+#[cfg(all(feature = "server", target_os = "linux"))]
+pub(crate) struct Awake(#[expect(dead_code, reason = "held until dropped")] Option<std::os::fd::OwnedFd>);
+
+#[cfg(all(feature = "server", target_os = "linux"))]
+pub(crate) fn stay_awake() -> Awake {
+    let inhibit = async {
+        let bus = zbus::Connection::system().await?;
+        let (login, why) = ("org.freedesktop.login1", crate::i18n::t!("awake-why"));
+        let args = ("idle:sleep", crate::APP_NAME, why.as_str(), "block");
+        let reply = bus
+            .call_method(
+                Some(login),
+                "/org/freedesktop/login1",
+                Some("org.freedesktop.login1.Manager"),
+                "Inhibit",
+                &args,
+            )
+            .await?;
+        Ok::<_, zbus::Error>(std::os::fd::OwnedFd::from(reply.body().deserialize::<zbus::zvariant::OwnedFd>()?))
+    };
+    // Called from a run's thread, outside the server's runtime.
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
+    Awake(runtime.ok().and_then(|r| r.block_on(inhibit).ok()))
 }
 
 /// Windows keeps the computer awake while the thread that asked runs and until it asks no more.
@@ -763,10 +806,10 @@ impl Drop for Awake {
     }
 }
 
-#[cfg(all(feature = "server", not(any(unix, windows))))]
+#[cfg(all(feature = "server", not(any(target_vendor = "apple", target_os = "linux", windows))))]
 pub(crate) struct Awake(());
 
-#[cfg(all(feature = "server", not(any(unix, windows))))]
+#[cfg(all(feature = "server", not(any(target_vendor = "apple", target_os = "linux", windows))))]
 pub(crate) fn stay_awake() -> Awake {
     Awake(())
 }
@@ -784,8 +827,8 @@ mod awake_tests {
         out.map(|o| String::from_utf8_lossy(&o.stdout).into_owned()).unwrap_or_default()
     }
 
-    /// What `held` finds within 5 seconds: the inhibitor takes a moment to start.
-    #[cfg(unix)]
+    /// What `held` finds within 5 seconds: logind takes a moment to list it.
+    #[cfg(target_os = "linux")]
     #[expect(clippy::disallowed_methods, reason = "waits for another process, which wakes no clock")]
     fn held_soon(held: impl Fn() -> Option<Vec<String>>) -> Option<Vec<String>> {
         (0..50).find_map(|_| {
@@ -794,26 +837,26 @@ mod awake_tests {
         })
     }
 
-    /// The assertions that `caffeinate` holds on behalf of `pid`, as `pmset` lists them: it runs its command as
-    /// that process and asserts from another.
+    /// The idle sleep assertions that this process holds, as `pmset` lists them.
     #[cfg(target_vendor = "apple")]
-    fn assertions(pid: u32) -> Vec<String> {
+    fn assertions() -> Vec<String> {
         let all = output(&["/usr/bin/pmset", "-g", "assertions"]);
-        let lines: Vec<&str> = all.lines().collect();
-        let behalf = format!("on behalf of 'cat' (pid {pid})");
-        lines.windows(2).filter(|w| w[1].contains(&behalf)).map(|w| w[0].to_owned()).collect()
+        let own = format!("pid {}(", std::process::id());
+        all.lines()
+            .filter(|l| l.contains(&own) && l.contains("PreventUserIdleSystemSleep"))
+            .map(str::to_owned)
+            .collect()
     }
 
     #[cfg(target_vendor = "apple")]
     #[test]
-    fn caffeinate_holds_an_idle_sleep_assertion_until_dropped() {
+    fn iokit_holds_an_idle_sleep_assertion_until_dropped() {
         let awake = stay_awake();
-        let pid = awake.0.as_ref().expect("caffeinate started").id();
-        let held = held_soon(|| Some(assertions(pid)).filter(|a| !a.is_empty()));
-        let held = held.expect("caffeinate holds no assertion");
-        assert!(held.iter().any(|l| l.contains("PreventUserIdleSystemSleep")), "{held:?}");
+        assert!(awake.0.is_some(), "IOKit refused the assertion");
+        let held = assertions();
+        assert!(held.iter().any(|l| l.contains(&crate::i18n::t!("awake-why"))), "{held:?}");
         drop(awake);
-        assert!(assertions(pid).is_empty(), "the assertion outlived the run");
+        assert!(assertions().is_empty(), "the assertion outlived the run");
     }
 
     /// The inhibitors that rusticlone holds, as logind lists them.
