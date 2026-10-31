@@ -1,4 +1,4 @@
-use std::{fs, process::Stdio, sync::mpsc, time::Instant};
+use std::{fs, process::Stdio, sync::mpsc};
 
 use serde_json::json;
 
@@ -107,6 +107,12 @@ fn a_target_of_several_jobs_is_checked_once() {
     assert_eq!(out.stdout.matches("Shared: checked data subset").count(), 1, "{}", out.stdout);
 }
 
+/// What a watched prune does: a file it adds to or removes from the repository, or its end.
+enum Did {
+    Changed,
+    Ended,
+}
+
 /// A prune killed at any point leaves a consistent repository: it writes repacked data before it
 /// deletes the old data, which it removes a day later. The next prune removes what remains. Rustic
 /// options that are not passed (`--early-delete-index`) could change that. This test
@@ -135,41 +141,46 @@ fn a_stopped_prune_leaves_the_repository_whole() {
         assert!(std::process::Command::new("cp").arg("-a").arg(from).arg(to).status().unwrap().success());
     };
     copy(&repo, &kept);
+    // Each prune tells what it did as it does it, so that it is stopped by what it did, not by time, which another
+    // machine's speed and load change.
     let prune = || {
-        sb.command("rustic").args(["-P", "Docs", "prune"]).stdout(Stdio::null()).stderr(Stdio::null()).spawn().unwrap()
-    };
-    // Each file the prune adds to or removes from the repository, so that it is stopped by what it did, not by time,
-    // which another machine's speed changes.
-    let changes = || {
-        let (told, changes) = mpsc::channel();
+        let (told, did) = mpsc::channel();
+        let changed = told.clone();
         let mut watcher = notify::recommended_watcher(move |e: notify::Result<notify::Event>| {
             if e.is_ok_and(|e| e.kind.is_create() || e.kind.is_remove()) {
-                _ = told.send(());
+                _ = changed.send(Did::Changed);
             }
         })
         .unwrap();
         notify::Watcher::watch(&mut watcher, &repo, notify::RecursiveMode::Recursive).unwrap();
-        (watcher, changes)
+        let mut pruning = sb
+            .command("rustic")
+            .args(["-P", "Docs", "prune"])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        // Its output ends when it does, however it ends.
+        let mut output = pruning.stdout.take().unwrap();
+        std::thread::spawn(move || {
+            _ = std::io::copy(&mut output, &mut std::io::sink());
+            _ = told.send(Did::Ended);
+        });
+        (watcher, pruning, did)
     };
     copy(&kept, &repo);
-    let (watcher, all) = changes();
-    let started = Instant::now();
-    assert!(prune().wait().unwrap().success());
-    let whole = started.elapsed();
+    let (watcher, mut whole, did) = prune();
+    assert!(whole.wait().unwrap().success());
+    let total = did.iter().take_while(|d| matches!(d, Did::Changed)).count();
     drop(watcher);
-    let total = all.try_iter().count();
     assert!(total > 2, "the prune changed {total} files");
     let mut stopped = 0;
     for sixth in 1..6 {
         // After a sixth of its changes in the first half, so that each stop is at another step of the prune.
         copy(&kept, &repo);
-        let (_watcher, changes) = changes();
-        let mut pruning = prune();
-        // Bounded by a whole prune's time, in case it changes less than the first.
-        let deadline = Instant::now() + whole * 2;
-        let seen = (0..(total * sixth / 12).max(1))
-            .all(|_| changes.recv_timeout(deadline.saturating_duration_since(Instant::now())).is_ok());
-        if !seen || pruning.try_wait().unwrap().is_some() {
+        let (_watcher, mut pruning, did) = prune();
+        let changes = (total * sixth / 12).max(1);
+        if did.iter().take(changes).any(|d| matches!(d, Did::Ended)) {
             _ = pruning.wait();
             continue;
         }
