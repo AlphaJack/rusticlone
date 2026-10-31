@@ -705,16 +705,39 @@ mod path_tests {
 
 /// Whether this computer runs on battery: not plugged in. False when unknown as on a desktop.
 #[cfg(all(feature = "server", target_vendor = "apple"))]
-#[expect(clippy::disallowed_methods, reason = "asks the power manager, not rustic")]
 pub(crate) fn on_battery() -> bool {
-    let out = std::process::Command::new("/usr/bin/pmset").args(["-g", "ps"]).output();
-    out.is_ok_and(|o| pmset_on_battery(&String::from_utf8_lossy(&o.stdout)))
+    power_source().as_deref() == Some("Battery Power")
 }
 
-/// Whether `pmset -g ps` says the power comes from the battery.
-#[cfg(all(feature = "server", any(test, target_vendor = "apple")))]
-fn pmset_on_battery(out: &str) -> bool {
-    out.contains("'Battery Power'")
+/// The source that powers this computer as `IOKit` names it: `AC Power`, `Battery Power` or `UPS Power`.
+#[cfg(all(feature = "server", target_vendor = "apple"))]
+#[expect(unsafe_code, reason = "IOKit's power sources are C functions")]
+fn power_source() -> Option<String> {
+    use std::ffi::{CStr, c_char, c_void};
+    #[link(name = "IOKit", kind = "framework")]
+    unsafe extern "C" {
+        fn IOPSCopyPowerSourcesInfo() -> *const c_void;
+        fn IOPSGetProvidingPowerSourceType(snapshot: *const c_void) -> *const c_void;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFStringGetCString(string: *const c_void, buffer: *mut c_char, size: isize, encoding: u32) -> u8;
+        fn CFRelease(object: *const c_void);
+    }
+    const UTF8: u32 = 0x0800_0100;
+    let mut buffer: [c_char; 64] = [0; 64];
+    // SAFETY: a snapshot this owns and releases once the name it holds is copied into the buffer.
+    unsafe {
+        let snapshot = IOPSCopyPowerSourcesInfo();
+        if snapshot.is_null() {
+            return None;
+        }
+        let kind = IOPSGetProvidingPowerSourceType(snapshot);
+        let size = isize::try_from(buffer.len()).unwrap_or_default();
+        let read = !kind.is_null() && CFStringGetCString(kind, buffer.as_mut_ptr(), size, UTF8) != 0;
+        CFRelease(snapshot);
+        read.then(|| CStr::from_ptr(buffer.as_ptr()).to_string_lossy().into_owned())
+    }
 }
 
 /// A battery discharging as the kernel reports power supplies.
@@ -749,23 +772,31 @@ pub(crate) fn on_battery() -> bool {
     false
 }
 
-/// Whether NetworkManager says or guesses that the connection is metered: a phone's hotspot. False when
-/// unknown.
+/// Whether `NetworkManager` says or guesses that the connection is metered: a phone's hotspot. False when
+/// unknown, as without `NetworkManager`.
 #[cfg(all(feature = "server", target_os = "linux"))]
-#[expect(clippy::disallowed_methods, reason = "asks NetworkManager, not rustic")]
 pub(crate) fn metered() -> bool {
-    let nm = "org.freedesktop.NetworkManager";
-    let out = std::process::Command::new("busctl")
-        .args(["get-property", nm, "/org/freedesktop/NetworkManager", nm, "Metered"])
-        .output();
-    out.is_ok_and(|o| busctl_metered(&String::from_utf8_lossy(&o.stdout)))
+    network_manager_metered().is_some_and(metered_value)
 }
 
-/// Whether `NetworkManager`'s `Metered` property, as `busctl` prints it, is metered: `u 1` is metered and `u 3`
-/// guessed so. 2 and 4 are not metered. 0 is unknown.
+/// `NetworkManager`'s `Metered` property, read on a thread of its own: callers may be on the server's runtime,
+/// which cannot wait for another.
+#[cfg(all(feature = "server", target_os = "linux"))]
+fn network_manager_metered() -> Option<u32> {
+    let read = async {
+        let nm = "org.freedesktop.NetworkManager";
+        let bus = zbus::Connection::system().await?;
+        let proxy = zbus::Proxy::new(&bus, nm, "/org/freedesktop/NetworkManager", nm).await?;
+        proxy.get_property::<u32>("Metered").await
+    };
+    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().ok()?;
+    std::thread::scope(|s| s.spawn(|| runtime.block_on(read).ok()).join().ok().flatten())
+}
+
+/// Whether a `Metered` value is metered: 1 is and 3 is guessed so. 2 and 4 are not metered. 0 is unknown.
 #[cfg(all(feature = "server", any(test, target_os = "linux")))]
-fn busctl_metered(out: &str) -> bool {
-    matches!(out.trim(), "u 1" | "u 3")
+fn metered_value(value: u32) -> bool {
+    matches!(value, 1 | 3)
 }
 
 /// Whether macOS says the connection costs. It is "expensive" on an iPhone's hotspot or a cellular link. It is
@@ -814,28 +845,59 @@ pub(crate) fn metered() -> bool {
     metered.unwrap_or_default()
 }
 
-/// Whether Windows says the connection costs: one set as metered or a cellular link. The WinRT network
-/// information reports it. Windows PowerShell reads it without other dependencies.
+/// Whether Windows says the connection costs: one set as metered or a cellular link.
 #[cfg(all(feature = "server", windows))]
-#[expect(clippy::disallowed_methods, reason = "asks Windows for the connection's cost, not rustic")]
 pub(crate) fn metered() -> bool {
-    use std::os::windows::process::CommandExt;
-    /// Started without a console window that would flash on the desktop.
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    const COST: &str = "$p = [Windows.Networking.Connectivity.NetworkInformation, Windows.Networking.Connectivity, \
-        ContentType=WindowsRuntime]::GetInternetConnectionProfile(); if ($p) { $p.GetConnectionCost().NetworkCostType }";
-    let out = std::process::Command::new("powershell.exe")
-        .args(["-NoProfile", "-NonInteractive", "-Command", COST])
-        .creation_flags(CREATE_NO_WINDOW)
-        .output();
-    out.is_ok_and(|o| cost_metered(&String::from_utf8_lossy(&o.stdout)))
+    connection_cost().is_some_and(costs)
 }
 
-/// Whether a `NetworkCostType` costs: `Fixed` and `Variable` do. `Unrestricted` is not metered. `Unknown` means
-/// there is no connection.
+/// The machine's connection cost as the Network List Manager tells it: `NLM_CONNECTION_COST` flags.
+#[cfg(all(feature = "server", windows))]
+#[expect(unsafe_code, reason = "the Network List Manager is a COM object")]
+fn connection_cost() -> Option<u32> {
+    use std::ffi::c_void;
+    use windows_sys::{
+        Win32::System::Com::{CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize},
+        core::GUID,
+    };
+    const NETWORK_LIST_MANAGER: GUID = GUID::from_u128(0xdcb0_0c01_570f_4a9b_8d69_199f_dba5_723b);
+    const COST_MANAGER: GUID = GUID::from_u128(0xdcb0_0008_570f_4a9b_8d69_199f_dba5_723b);
+    /// The start of `INetworkCostManager`'s table: `IUnknown`'s methods, then `GetCost`.
+    #[repr(C)]
+    struct Methods {
+        query_interface: *const c_void,
+        add_ref: *const c_void,
+        release: unsafe extern "system" fn(*mut c_void) -> u32,
+        get_cost: unsafe extern "system" fn(*mut c_void, *mut u32, *const c_void) -> i32,
+    }
+    // SAFETY: COM set up for this call on this thread, an object released once, and its cost written to `cost`.
+    unsafe {
+        let set_up = CoInitializeEx(std::ptr::null(), u32::try_from(COINIT_MULTITHREADED).unwrap_or_default()) >= 0;
+        let mut manager: *mut c_void = std::ptr::null_mut();
+        let mut cost = None;
+        let made =
+            CoCreateInstance(&NETWORK_LIST_MANAGER, std::ptr::null_mut(), CLSCTX_ALL, &COST_MANAGER, &raw mut manager);
+        if made >= 0 && !manager.is_null() {
+            let methods = *manager.cast::<*const Methods>();
+            let mut value = 0;
+            if ((*methods).get_cost)(manager, &raw mut value, std::ptr::null()) >= 0 {
+                cost = Some(value);
+            }
+            ((*methods).release)(manager);
+        }
+        if set_up {
+            CoUninitialize();
+        }
+        cost
+    }
+}
+
+/// Whether `NLM_CONNECTION_COST` flags cost: fixed and variable do. Unrestricted is not metered.
 #[cfg(all(feature = "server", any(test, windows)))]
-fn cost_metered(out: &str) -> bool {
-    matches!(out.trim(), "Fixed" | "Variable")
+fn costs(cost: u32) -> bool {
+    /// `NLM_CONNECTION_COST_FIXED` and `NLM_CONNECTION_COST_VARIABLE`.
+    const METERED: u32 = 0x2 | 0x4;
+    cost & METERED != 0
 }
 
 #[cfg(all(feature = "server", not(any(target_os = "linux", target_vendor = "apple", windows))))]
@@ -845,13 +907,22 @@ pub(crate) fn metered() -> bool {
 
 #[cfg(all(test, feature = "server"))]
 mod power_tests {
-    use super::{busctl_metered, cost_metered, pmset_on_battery, supplies_on_battery};
+    use super::{costs, metered_value, supplies_on_battery};
 
+    /// The CI's Macs and this one are plugged in or on battery: never unknown.
+    #[cfg(target_vendor = "apple")]
     #[test]
-    fn pmset_says_where_power_comes_from() {
-        let battery = "Now drawing from 'Battery Power'\n -InternalBattery-0 (id=4653155)\t87%; discharging;";
-        let plugged = "Now drawing from 'AC Power'\n -InternalBattery-0 (id=4653155)\t87%; charging;";
-        assert!(pmset_on_battery(battery) && !pmset_on_battery(plugged) && !pmset_on_battery(""));
+    fn iokit_names_the_power_source() {
+        let source = super::power_source();
+        assert!(matches!(source.as_deref(), Some("AC Power" | "Battery Power" | "UPS Power")), "{source:?}");
+    }
+
+    /// Windows answers with the cost of the network it is on, or as unrestricted without one.
+    #[cfg(windows)]
+    #[test]
+    fn the_network_list_manager_tells_the_cost() {
+        let cost = super::connection_cost().expect("the Network List Manager did not answer");
+        assert!(cost & 0x7 != 0, "no cost among the flags {cost:#x}");
     }
 
     /// A laptop unplugged, then plugged in. A desktop has no battery. A missing folder is not on battery.
@@ -879,13 +950,14 @@ mod power_tests {
 
     #[test]
     fn networkmanager_says_whether_metered() {
-        assert!(busctl_metered("u 1\n") && busctl_metered("u 3"));
-        assert!(["u 0", "u 2", "u 4", ""].iter().all(|o| !busctl_metered(o)));
+        assert!(metered_value(1) && metered_value(3));
+        assert!([0, 2, 4].into_iter().all(|v| !metered_value(v)));
     }
 
+    /// Fixed and variable cost, alone or with roaming or a data limit near. Unrestricted does not.
     #[test]
     fn windows_says_whether_the_connection_costs() {
-        assert!(cost_metered("Fixed\r\n") && cost_metered("Variable"));
-        assert!(["Unrestricted", "Unknown", ""].iter().all(|o| !cost_metered(o)));
+        assert!(costs(0x2) && costs(0x4) && costs(0x4 | 0x4_0000));
+        assert!(!costs(0x1) && !costs(0));
     }
 }

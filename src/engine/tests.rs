@@ -482,7 +482,8 @@ fn a_scheduled_run_waits_for_power_then_an_unmetered_network() {
     };
     let scheduled = start(Trigger::Schedule);
     let run = super::Run::new(&collections[0], Some(scheduled.live.clone()));
-    let (mut answers, mut shown) = (vec![None, Some(Waiting::UnmeteredNetwork), Some(Waiting::Power)], Vec::new());
+    let (mut answers, mut shown) =
+        (vec![None, Some(Waiting::UnmeteredNetwork), Some(Waiting::PowerSupply)], Vec::new());
     let waited = wait_while(&run, std::time::Duration::ZERO, || {
         shown.push(scheduled.live.activities().into_iter().find_map(|a| a.doing).map(|d| d.to_string()));
         answers.pop().flatten()
@@ -491,8 +492,8 @@ fn a_scheduled_run_waits_for_power_then_an_unmetered_network() {
         Some(crate::result::Doing::WaitingFor { lock: w.resource().to_owned(), by: Vec::new() }.to_string())
     };
     assert!(waited);
-    assert_eq!(shown, [None, doing(Waiting::Power), doing(Waiting::UnmeteredNetwork)]);
+    assert_eq!(shown, [None, doing(Waiting::PowerSupply), doing(Waiting::UnmeteredNetwork)]);
     let by_hand = start(Trigger::Web);
     let run = super::Run::new(&collections[0], Some(by_hand.live.clone()));
-    assert!(!wait_while(&run, std::time::Duration::ZERO, || Some(Waiting::Power)));
+    assert!(!wait_while(&run, std::time::Duration::ZERO, || Some(Waiting::PowerSupply)));
 }

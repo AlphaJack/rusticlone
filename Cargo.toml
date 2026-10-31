@@ -26,6 +26,7 @@ server = [
     "dep:fluent-langneg",
     "dep:tokio-util",
     "dep:block2",
+    "dep:zbus",
 ]
 
 desktop = [
@@ -40,7 +41,6 @@ desktop = [
     "dep:dispatch2",
     "dep:objc2-service-management",
     "dep:ksni",
-    "dep:zbus",
     "dep:winresource",
 ]
 
@@ -187,6 +187,7 @@ windows-sys = { version = "0.61.2", features = [
     "Wdk_System_SystemServices",
     "Win32_Foundation",
     "Win32_Security",
+    "Win32_System_Com",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
