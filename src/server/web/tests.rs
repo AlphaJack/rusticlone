@@ -136,6 +136,14 @@ fn collection_pages() {
     assert_eq!(copies, 2);
     // Each source and repository shows whether it is on a disk or reached over a network.
     assert_eq!(page.texts("td [data-copy] use").len(), 4);
+    // A browser on this computer shows each repository's profile and opens each source's folder instead.
+    let mut local_browser = CollectionMain::build(healthy(), LogView::default());
+    local_browser.local_browser = true;
+    let local_browser = Page::of(&local_browser);
+    let shown = local_browser.attrs("td button[hx-post$='/folder']", "hx-vals");
+    assert_eq!(shown.iter().filter(|v| v.contains(r#""repo""#)).count(), 3, "{shown:?}");
+    assert_eq!(shown.iter().filter(|v| v.contains(r#""source": "0/0""#)).count(), 1, "{shown:?}");
+    assert!(local_browser.texts("td [data-copy] use").is_empty());
     assert_eq!(page.0.select(&scraper::Selector::parse("use[href='#cloud']").unwrap()).count(), 1);
     assert!(page.texts(".issues li").is_empty());
 

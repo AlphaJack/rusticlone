@@ -167,9 +167,10 @@ objc2-app-kit = { version = "0.3.2", default-features = false, features = [
     "NSStatusBarButton",
     "NSStatusItem",
     "NSView",
+    "NSWorkspace",
 ], optional = true }
 objc2-core-graphics = { version = "0.3.2", default-features = false, features = ["std", "CGSession"], optional = true }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSGeometry", "NSDate", "NSURL", "NSString"], optional = true }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSArray", "NSGeometry", "NSDate", "NSURL", "NSString"], optional = true }
 dispatch2 = { version = "0.3.1", optional = true }
 # Whether the user allowed the server to start at login.
 objc2-service-management = { version = "0.3.2", default-features = false, features = ["std", "SMAppService", "objc2", "objc2-foundation"], optional = true }
@@ -184,6 +185,7 @@ windows-sys = { version = "0.61.2", features = [
     "Wdk_System_SystemServices",
     "Win32_Foundation",
     "Win32_Security",
+    "Win32_System_Com",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
@@ -195,6 +197,8 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_Shell_Common",
     "Win32_UI_WindowsAndMessaging",
 ] }
 

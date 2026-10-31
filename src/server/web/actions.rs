@@ -13,8 +13,8 @@ use axum::{
 use serde::Deserialize;
 
 use super::{
-    App, Base, Button, Error, Heading, Hint, Label, Missing, Notice, Result, Route, RunPath, auth::Here, blocking,
-    flash, render_str,
+    App, Base, Button, Error, Heading, Hint, Label, Missing, Notice, Result, Route, RunPath, auth::LocalBrowser,
+    blocking, flash, render_str,
 };
 use crate::{
     first_run,
@@ -72,7 +72,7 @@ const INSTALLER: &str = concat!(
 pub(super) struct SetupSaved {
     pub(super) dir: String,
     /// A browser on this computer, which can open their folder.
-    pub(super) here: bool,
+    pub(super) local_browser: bool,
     /// The command lines that restore every collection, then back up as before.
     pub(super) restore: String,
     pub(super) resume: String,
@@ -187,12 +187,16 @@ pub(super) async fn refresh(State(app): State<Arc<App>>, selection: Selection) -
 }
 
 /// Saves the first collection, which the watcher then reads, and shows its profiles to keep a copy of.
-pub(super) async fn save_setup(base: Base, Here(here): Here, Form(setup): Form<first_run::Setup>) -> Response {
+pub(super) async fn save_setup(
+    base: Base,
+    LocalBrowser(local_browser): LocalBrowser,
+    Form(setup): Form<first_run::Setup>,
+) -> Response {
     blocking(move || match first_run::save(&setup) {
         Ok(dir) => {
             let saved = SetupSaved {
                 dir: dir.display().to_string(),
-                here,
+                local_browser,
                 restore: crate::args::command_line("restore", &[("all", None)]),
                 resume: crate::args::command_line("install", &[("auto_update", None)]),
             };
@@ -205,8 +209,8 @@ pub(super) async fn save_setup(base: Base, Here(here): Here, Form(setup): Form<f
 
 /// Opens the profiles' folder in the file manager, for a browser on this computer, so that its user copies
 /// them somewhere safe. Elsewhere, there is no such page.
-pub(super) async fn open_profile_folder(Here(here): Here) -> Response {
-    match crate::profile::own_dir().filter(|_| here) {
+pub(super) async fn open_profile_folder(LocalBrowser(local_browser): LocalBrowser) -> Response {
+    match crate::profile::own_dir().filter(|_| local_browser) {
         Some(dir) if crate::server::open_on_desktop(dir.display().to_string()) => {
             StatusCode::NO_CONTENT.into_response()
         }
@@ -292,4 +296,42 @@ pub(super) async fn dismiss(
         }
     })
     .await
+}
+
+#[derive(Deserialize)]
+pub(super) struct OpenForm {
+    repo: Option<String>,
+    source: Option<String>,
+}
+
+/// Shows what the page names selected in its folder in the file manager, for a browser on this computer: a
+/// repository's profile (the file users edit) or a source. Its path comes from the profile. The file manager only
+/// shows it, so a page never opens a file or a program. Elsewhere the page copies the path instead.
+#[expect(clippy::disallowed_methods, reason = "shows only a source that exists")]
+pub(super) async fn open_collection_folder(
+    State(app): State<Arc<App>>,
+    LocalBrowser(local_browser): LocalBrowser,
+    Path(collection): Path<String>,
+    Form(form): Form<OpenForm>,
+) -> Response {
+    let engine = app.engine();
+    let Some(j) = engine.collection(&collection).filter(|_| local_browser) else {
+        return Error::NotFound(Missing::Page).into_response();
+    };
+    let shown = match (&form.repo, &form.source) {
+        (Some(repo), _) => j.repo(repo).and_then(|p| p.files().into_iter().next()),
+        (None, Some(source)) => (|| {
+            let (entry, item) = source.split_once('/')?;
+            let entry = j.primary.sources.get(entry.parse::<usize>().ok()?).filter(|s| s.in_place())?;
+            Some(PathBuf::from(entry.sources.get(item.parse::<usize>().ok()?)?)).filter(|p| p.exists())
+        })(),
+        (None, None) => None,
+    };
+    let Some(shown) = shown else { return Error::NotFound(Missing::Page).into_response() };
+    drop(engine);
+    if crate::server::reveal_on_desktop(&shown).await {
+        StatusCode::NO_CONTENT.into_response()
+    } else {
+        Error::Refused(Notice::FolderNotOpened).into_response()
+    }
 }

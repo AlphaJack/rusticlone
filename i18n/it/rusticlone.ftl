@@ -455,6 +455,11 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copia il percorso della cartella
 button-see-how = Vedi come
 button-cron-syntax = Sintassi cron
+button-show-profile = { $os ->
+    [macos] Mostra il profilo nel Finder
+    [windows] Mostra il profilo in Esplora file
+   *[other] Mostra il profilo nel file manager
+}
 
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 

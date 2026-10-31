@@ -10,7 +10,7 @@
     <tbody>
     {% for group in collection.sources %}
     <tr>
-      <td class="name">{% for source in group.sources %}{{ m::place(false, source) }}<code title="{{ source }}">{{ source }}</code> {% endfor %}</td>
+      <td class="name">{% for (source, id) in group.sources.iter().zip(group.ids.iter()) %}{% if local_browser && group.on_disk %}{{ m::reveal(base, collection.name, "source", id, "disk", Button::OpenFolder) }}{% else %}{{ m::place(false, source) }}{% endif %}<code title="{{ source }}">{{ source }}</code> {% endfor %}</td>
       <td></td>
       <td class="right num">{{ group.files }}</td>
       <td class="right num nowrap wide">{{ group.size }}</td>

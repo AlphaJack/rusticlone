@@ -81,9 +81,9 @@ fn set_cookie(name: &str, value: &str, max_age: i64) -> (HeaderName, String) {
 /// A browser on this computer, logged in from the login page, so that what the server opens on its desktop is
 /// in front of its user: not a script or a reverse proxy, which use the token or forward the request.
 #[derive(Clone, Copy)]
-pub(in crate::server) struct Here(pub(in crate::server) bool);
+pub(in crate::server) struct LocalBrowser(pub(in crate::server) bool);
 
-impl FromRequestParts<Arc<App>> for Here {
+impl FromRequestParts<Arc<App>> for LocalBrowser {
     type Rejection = Infallible;
 
     async fn from_request_parts(parts: &mut Parts, app: &Arc<App>) -> Result<Self, Infallible> {

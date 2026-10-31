@@ -17,6 +17,7 @@ use tokio::sync::{broadcast, watch};
 
 use super::{
     App, Base, Changes, Flash, Notice,
+    auth::LocalBrowser,
     collections::{collection_main, index_main},
     render_str,
     repo::{RepoMain, repo_view},
@@ -49,12 +50,12 @@ fn render_main(
     view: &View,
     shown: Option<(i64, u64)>,
     base: &Base,
+    local_browser: bool,
 ) -> Option<(String, Option<(i64, u64)>)> {
     match (&view.collection, &view.repo) {
         (None, _) => Some((render_str(&index_main(app), base), None)),
-        (Some(collection), None) => {
-            collection_main(app, collection, view.run, shown).map(|m| (render_str(&m, base), m.log.shown()))
-        }
+        (Some(collection), None) => collection_main(app, collection, view.run, shown, local_browser)
+            .map(|m| (render_str(&m, base), m.log.shown())),
         (Some(collection), Some(repo)) => {
             repo_view(app, collection, repo).map(|repo| (render_str(&RepoMain { repo }, base), None))
         }
@@ -62,8 +63,14 @@ fn render_main(
 }
 
 /// The page's `<main>`, the log it shows, and that log's lines added since `shown`, if any.
-fn render_update(app: &Arc<App>, view: &View, shown: Option<(i64, u64)>, base: &Base) -> Option<Update> {
-    let (html, log) = render_main(app, view, shown, base)?;
+fn render_update(
+    app: &Arc<App>,
+    view: &View,
+    shown: Option<(i64, u64)>,
+    base: &Base,
+    local_browser: bool,
+) -> Option<Update> {
+    let (html, log) = render_main(app, view, shown, base, local_browser)?;
     let (Some((run, at)), Some(collection)) = (log, &view.collection) else { return Some((html, log, None)) };
     let (lines, at) = log_tail(&app.engine(), collection, run, Some(at));
     Some((html, Some((run, at)), (!lines.0.is_empty()).then(|| render_str(&lines, base))))
@@ -77,6 +84,8 @@ struct Stream {
     app: Arc<App>,
     view: View,
     base: Base,
+    /// A browser on this computer: see [`LocalBrowser`].
+    local_browser: bool,
     changes: watch::Receiver<Changes>,
     /// The change count it was rendered at.
     seen: u64,
@@ -99,6 +108,18 @@ struct Stream {
     language: Language,
 }
 
+impl Stream {
+    /// Its page's `<main>` as of now, and when that changes with time. `None` if what it shows no longer exists.
+    async fn render(&self) -> Option<(Update, Option<Timestamp>)> {
+        let (app, view, shown, base) = (self.app.clone(), self.view.clone(), self.log, self.base.clone());
+        let (language, local_browser) = (self.language, self.local_browser);
+        let render =
+            move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base, local_browser)));
+        let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
+        Some((update?, changes_at))
+    }
+}
+
 /// Waits until `at`, or forever.
 #[expect(clippy::disallowed_methods, reason = "what a page shows changes with time at `at`, which no event tells")]
 async fn until(at: Option<Timestamp>) {
@@ -116,6 +137,7 @@ pub(super) async fn events(
     State(app): State<Arc<App>>,
     headers: HeaderMap,
     base: Base,
+    LocalBrowser(local_browser): LocalBrowser,
     Query(view): Query<View>,
 ) -> impl IntoResponse {
     // What a reconnecting page shows is unknown.
@@ -140,6 +162,7 @@ pub(super) async fn events(
         language: Language::current(),
         view,
         base,
+        local_browser,
         changes,
         failures,
     };
@@ -175,10 +198,7 @@ pub(super) async fn events(
             (s.wait, s.rendered) = (true, tokio::time::Instant::now());
             s.seen = s.changes.borrow_and_update().count;
             let version = s.seen.to_string();
-            let (app, view, shown, base, language) = (s.app.clone(), s.view.clone(), s.log, s.base.clone(), s.language);
-            let render = move || clock::next_change(|| language.scope(|| render_update(&app, &view, shown, &base)));
-            let (update, changes_at) = tokio::task::spawn_blocking(render).await.ok()?;
-            let (html, log, lines) = update?;
+            let ((html, log, lines), changes_at) = s.render().await?;
             s.changes_at = changes_at;
             if learning {
                 s.last = Some(sys::fnv1a(html.as_bytes()));

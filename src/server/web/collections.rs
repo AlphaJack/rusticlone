@@ -12,8 +12,9 @@ use axum::{
 };
 
 use super::{
-    Access, Age, App, Base, Button, Error, Heading, Hint, Label, LiveQuery, Missing, Route, RunPath, Size, blocking,
-    layout, live, now, render_str,
+    Access, Age, App, Base, Button, Error, Heading, Hint, Label, LiveQuery, Missing, Route, RunPath, Size,
+    auth::LocalBrowser,
+    blocking, layout, live, now, render_str,
     runs::{LogView, RunRow, collection_run_rows, log_view},
 };
 use crate::{
@@ -69,6 +70,13 @@ fn lacks(status: &RepoStatus) -> bool {
     matches!(status, RepoStatus::Behind { .. } | RepoStatus::Stale { .. } | RepoStatus::CopyFailing)
 }
 
+impl RepoRow {
+    /// Its icon: a cloud when reached over a network, else a disk.
+    pub(super) fn place_icon(&self) -> &'static str {
+        if self.remote { "cloud" } else { "disk" }
+    }
+}
+
 /// A schedule's icon: lit when scheduled, red when invalid. Its tooltip shows the expression and
 /// the next run.
 pub(super) struct ScheduleView {
@@ -122,6 +130,26 @@ struct SourceView {
     sources: Vec<String>,
     files: String,
     size: Size,
+    /// Folders on this computer, which a browser here opens: not stdin nor a remote source.
+    on_disk: bool,
+    /// Each source's name for the page's open action: `entry/source` by their places in the profile.
+    ids: Vec<String>,
+}
+
+impl SourceView {
+    /// The `entry`th of the profile's sources, with what its newest snapshot among `snapshots` holds.
+    fn new(entry: usize, s: Sources, snapshots: &[Snapshot]) -> Self {
+        let group = rustic::source_key(&s.paths());
+        let newest = snapshots.iter().filter(|sn| sn.source() == group).max_by_key(|sn| sn.time);
+        let summary = newest.and_then(|sn| sn.summary.as_ref());
+        Self {
+            on_disk: s.in_place(),
+            ids: (0..s.sources.len()).map(|i| format!("{entry}/{i}")).collect(),
+            files: summary.map_or(Label::Unknown.to_string(), |s| s.total_files_processed.to_string()),
+            size: Size(summary.map(|s| s.total_bytes_processed)),
+            sources: s.sources,
+        }
+    }
 }
 
 /// Everything a collection's view needs from the engine and the store, so that building the view reads
@@ -286,16 +314,6 @@ impl CollectionView {
             true => std::iter::once(row(&s.primary, true)).chain(s.targets.iter().map(|t| row(t, false))).collect(),
             false => Vec::new(),
         };
-        let source = |s: Sources| {
-            let group = rustic::source_key(&s.paths());
-            let newest = snapshots.iter().filter(|sn| sn.source() == group).max_by_key(|sn| sn.time);
-            let summary = newest.and_then(|sn| sn.summary.as_ref());
-            SourceView {
-                files: summary.map_or(Label::Unknown.to_string(), |s| s.total_files_processed.to_string()),
-                size: Size(summary.map(|s| s.total_bytes_processed)),
-                sources: s.sources,
-            }
-        };
         CollectionView {
             copy_blocked,
             restore_blocked: (!repos.is_empty() && !repos.iter().any(|r| r.restorable))
@@ -305,7 +323,7 @@ impl CollectionView {
             repos,
             issues: s.issues,
             configured,
-            sources: sources.into_iter().map(source).collect(),
+            sources: sources.into_iter().enumerate().map(|(entry, s)| SourceView::new(entry, s, &snapshots)).collect(),
             file,
             notifies,
             name,
@@ -398,6 +416,8 @@ pub(super) struct CollectionMain {
     pub(super) log: LogView,
     runs: Vec<RunRow>,
     with_collection: bool,
+    /// A browser on this computer: it opens the folders of sources and repositories.
+    pub(super) local_browser: bool,
 }
 
 pub(super) fn collection_main(
@@ -405,12 +425,13 @@ pub(super) fn collection_main(
     name: &str,
     picked: Option<i64>,
     shown: Option<(i64, u64)>,
+    local_browser: bool,
 ) -> Option<CollectionMain> {
     let engine = app.engine();
     let collection = engine.collection(name)?;
     let input = CollectionInput::read(app, &engine, Some(&collection), engine.status_of(&collection), usize::MAX);
     let log = log_view(&engine, name, &input.runs, picked, shown);
-    Some(CollectionMain::build(input, log))
+    Some(CollectionMain { local_browser, ..CollectionMain::build(input, log) })
 }
 
 impl CollectionMain {
@@ -419,7 +440,13 @@ impl CollectionMain {
         for r in &mut runs {
             r.shown = log.shown().is_some_and(|(run, _)| r.id == run);
         }
-        CollectionMain { log, runs, collection: CollectionView::build(input), with_collection: false }
+        CollectionMain {
+            log,
+            runs,
+            collection: CollectionView::build(input),
+            with_collection: false,
+            local_browser: false,
+        }
     }
 }
 
@@ -427,11 +454,12 @@ pub(super) async fn collection_page(
     State(app): State<Arc<App>>,
     access: Access,
     base: Base,
+    LocalBrowser(local_browser): LocalBrowser,
     Path(p): Path<RunPath>,
 ) -> Response {
     blocking(move || {
         let live = live(&app, Some(&p.collection), None, p.id);
-        match collection_main(&app, &p.collection, p.id, None) {
+        match collection_main(&app, &p.collection, p.id, None, local_browser) {
             Some(main) if p.id.is_none_or(|id| main.log.shown().is_some_and(|(run, _)| run == id)) => Ok(layout(
                 &main.collection.title,
                 Some(LiveQuery { log: main.log.shown(), ..live }),
