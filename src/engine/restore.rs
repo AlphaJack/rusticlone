@@ -29,13 +29,33 @@ fn repo_named<'a>(run: &Run<'a>, name: Option<&str>) -> Result<&'a RusticProfile
 
 impl Engine {
     /// Reads the tested snapshots of `from`, or of the repository a restore reads, as a restore would, and
-    /// reports what restoring them in place would create and replace. Writes nothing.
+    /// reports what restoring them in place would create and replace. Writes nothing. If reading the newest
+    /// fails, it reads the next newest repository's, as a restore falls back to it.
     pub(super) fn test_restore(&self, run: &Run<'_>, from: Option<&str>, tested: &Tested) -> Result<()> {
         let collection = run.collection;
         self.learn_from_repositories(run);
         let (repo, picks) = match (from, tested) {
             (None, Tested::Newest(source)) => {
-                self.newest_repo(run, None, &collection.primary.groups_of(*source), None)?
+                let groups = collection.primary.groups_of(*source);
+                let mut ranked = self.newest_repos(run, None, &groups, None)?.into_iter();
+                let Some((mut repo, picks)) = ranked.next() else {
+                    return Err(Error::NoMatchingSnapshot { repo: collection.title.to_owned() }.into());
+                };
+                if picks.len() < groups.len() {
+                    run.push(StepResult::SomeSources { found: picks.len(), of: groups.len() });
+                }
+                let mut done = self.read_as_restore(run, repo, &picks);
+                for (next, next_picks) in ranked {
+                    let Err(e) = &done else { break };
+                    if run.cx.stopping() {
+                        break;
+                    }
+                    let (from, to, error) = (repo.name.clone(), next.name.clone(), format!("{e:#}"));
+                    run.push(StepResult::FallingBack { repo: from, to, error });
+                    repo = next;
+                    done = self.read_as_restore(run, repo, &next_picks);
+                }
+                return done;
             }
             (from, Tested::Snapshot(id)) => {
                 let repo = repo_named(run, from)?;
@@ -49,6 +69,13 @@ impl Engine {
         if picks.is_empty() {
             return Err(Error::NoSnapshotOfThem { repo: repo.name.clone() }.into());
         }
+        self.read_as_restore(run, repo, &picks)
+    }
+
+    /// Reads `picks` of `repo` as a restore would, and reports what restoring them in place would create and
+    /// replace.
+    fn read_as_restore(&self, run: &Run<'_>, repo: &RusticProfile, picks: &[Snapshot]) -> Result<()> {
+        let collection = run.collection;
         let _locks = self.lock(run, false, &[(repo, Use::Read)])?;
         for sn in picks.iter().take_while(|_| !run.cx.stopping()) {
             run.activity(Some(Doing::Snapshot { snapshot: sn.id.short().to_owned() }), true);
@@ -189,25 +216,6 @@ impl Engine {
             }
         }
         done.map(|complete| (src, picks, complete))
-    }
-
-    /// The repository with the newest snapshots of `groups` not after `at`, among `from` or all of the
-    /// collection's, and those snapshots.
-    fn newest_repo<'a>(
-        &self,
-        run: &Run<'a>,
-        from: Option<&str>,
-        groups: &[Vec<String>],
-        at: Option<Timestamp>,
-    ) -> Result<(&'a RusticProfile, Vec<Snapshot>)> {
-        let ranked = self.newest_repos(run, from, groups, at)?;
-        let Some((src, picks)) = ranked.into_iter().next() else {
-            return Err(Error::NoMatchingSnapshot { repo: run.collection.title.to_owned() }.into());
-        };
-        if picks.len() < groups.len() {
-            run.push(StepResult::SomeSources { found: picks.len(), of: groups.len() });
-        }
-        Ok((src, picks))
     }
 
     /// The repositories with snapshots of `groups` not after `at`, among `from` or all of the collection's,

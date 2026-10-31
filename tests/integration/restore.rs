@@ -83,6 +83,19 @@ fn a_restore_falls_back_to_the_copy_when_the_primary_is_damaged() {
     assert_eq!(sb.tree("source"), original);
 }
 
+/// A dry run reads the copy when the primary's data is damaged, as the restore would.
+#[test]
+fn a_dry_run_falls_back_to_the_copy_when_the_primary_is_damaged() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    for pack in walk(&sb.path("local/Docs/data")) {
+        fs::write(pack, b"damaged").unwrap();
+    }
+    sb.run(&["restore", "--dry-run", "--all"])
+        .assert_result("falling-back", json!({"repo": "Docs", "to": "Docs-remote"}))
+        .assert_result("test-restored", json!({"repo": "Docs-remote"}));
+}
+
 /// Every file below `dir`.
 fn walk(dir: &std::path::Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
