@@ -1,10 +1,8 @@
 //! Scheduled runs that wait for the power cable, or for a network that is not metered to reach a remote
 //! repository, when settings ask. Runs started by hand still run.
 
-use std::time::Duration;
-
 use super::Run;
-use crate::{request::Trigger, result::Doing, settings, state::Holds, sys};
+use crate::{clock, request::Trigger, result::Doing, settings, state::Holds, sys};
 
 /// What scheduled runs wait for when [`settings::SKIP_ON_BATTERY`] and [`settings::SKIP_ON_METERED`] ask.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, crate::i18n::Fluent)]
@@ -23,21 +21,18 @@ impl Waiting {
     }
 }
 
-/// How often a run that waits asks the system again.
-const WAIT_CHECK: Duration = Duration::from_mins(1);
-
-/// What scheduled runs wait for now, and with `remote` those that reach a remote repository. A setting that does
-/// not read as true or false is off.
-pub(crate) fn waiting(remote: bool) -> Option<Waiting> {
+/// What scheduled runs wait for now as `system` tells it, and with `remote` those that reach a remote repository.
+/// A setting that does not read as true or false is off.
+pub(crate) fn waiting(system: &dyn sys::Conditions, remote: bool) -> Option<Waiting> {
     let on = |s: &settings::Setting| s.enabled().unwrap_or_default();
     waiting_for(
-        (on(&settings::SKIP_ON_BATTERY), sys::on_battery),
-        (remote && on(&settings::SKIP_ON_METERED), sys::metered),
+        (on(&settings::SKIP_ON_BATTERY), || system.on_battery()),
+        (remote && on(&settings::SKIP_ON_METERED), || system.metered()),
     )
 }
 
 /// What to wait for with each setting on or off and how to read the system. The system is asked only for what a
-/// setting turns on: reading a connection's cost starts a process on Windows.
+/// setting turns on.
 fn waiting_for(battery: (bool, impl FnOnce() -> bool), metered: (bool, impl FnOnce() -> bool)) -> Option<Waiting> {
     if battery.0 && battery.1() {
         Some(Waiting::PowerSupply)
@@ -48,24 +43,22 @@ fn waiting_for(battery: (bool, impl FnOnce() -> bool), metered: (bool, impl FnOn
     }
 }
 
-/// Holds a scheduled `run` back while it waits, shown as waiting for `power` or `unmetered` as
-/// for a lock. Returns whether it waited.
-pub(super) fn wait(run: &Run<'_>, remote: bool) -> bool {
-    wait_while(run, WAIT_CHECK, || waiting(remote))
-}
-
-/// [`wait`] for what `now` says, asking it again `every` so often.
-pub(super) fn wait_while(run: &Run<'_>, every: Duration, mut now: impl FnMut() -> Option<Waiting>) -> bool {
+/// Holds a scheduled `run` back while `now` says what it waits for, shown as waiting for `power` or `unmetered` as
+/// for a lock. It asks again when woken: by [`sys::watch_conditions`] as the system tells a change, or as the run
+/// stops. Returns whether it waited.
+pub(super) fn wait_while(run: &Run<'_>, mut now: impl FnMut() -> Option<Waiting>) -> bool {
     let Some(live) = run.live.as_deref().filter(|l| l.trigger() == Trigger::Schedule) else { return false };
     let (step, mut waited) = (run.cx.step(), None);
-    while let Some(now) = now().filter(|_| !run.cx.stopping()) {
+    loop {
+        let seen = clock::wakes();
+        let Some(now) = now().filter(|_| !run.cx.stopping()) else { break };
         if waited != Some(now) {
             let resource = now.resource().to_owned();
             run.activity(Some(Doing::WaitingFor { lock: resource.clone(), by: Vec::new() }), false);
             live.set_holds(step, Holds { using: Vec::new(), waiting_for: Some(resource) });
             waited = Some(now);
         }
-        crate::clock::sleep(every, &|| run.cx.stopping());
+        clock::wait(seen);
     }
     waited.is_some()
 }
