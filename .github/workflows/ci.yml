@@ -136,6 +136,11 @@ jobs:
       - name: Check vendored htmx
         if: runner.os == 'Linux'
         run: cargo xtask vendor --check
+      - name: Keep the computer awake as the system's server does, as root
+        if: runner.os == 'Linux'
+        run: |
+          tests=$(cargo test --lib --no-run --locked --message-format=json | jq -r 'select(.profile.test and .target.kind == ["lib"]) | .executable')
+          sudo "$tests" --exact sys::awake_tests::logind_lists_the_inhibitor_until_dropped
       - name: Check the systemd units, as the system's and a user's
         if: runner.os == 'Linux'
         run: |

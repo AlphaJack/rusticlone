@@ -864,8 +864,16 @@ mod awake_tests {
 
     #[cfg(target_os = "linux")]
     #[test]
+    /// As root, as the system's server runs. Polkit asks another user to authenticate, which no server can: CI
+    /// runs this test again as root.
     fn logind_lists_the_inhibitor_until_dropped() {
-        let awake = stay_awake().unwrap();
+        let awake = match stay_awake() {
+            Err(e) if !super::is_root() => {
+                assert!(format!("{e:#}").contains("InteractiveAuthorizationRequired"), "{e:#}");
+                return;
+            }
+            awake => awake.unwrap(),
+        };
         // logind lists it before it answers the call.
         let held = inhibitors();
         assert!(!held.is_empty(), "logind lists no inhibitor: the system bus refused it");
