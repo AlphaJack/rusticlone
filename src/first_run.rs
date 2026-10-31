@@ -425,6 +425,12 @@ pub(crate) fn pasted(text: &str) -> &str {
     text.strip_prefix('"').and_then(|t| t.strip_suffix('"')).unwrap_or(text)
 }
 
+/// A repository's folder as typed, without the `local:` that rustic also takes, and with `~` as the home folder.
+pub(crate) fn repository_folder(text: &str) -> String {
+    let text = pasted(text);
+    home(text.strip_prefix("local:").unwrap_or(text))
+}
+
 /// The first backup works without a second disk.
 impl Default for Setup {
     fn default() -> Self {
@@ -616,7 +622,7 @@ impl Setup {
     fn folder(&self, role: Role) -> Option<String> {
         let kind = self.kind(role);
         let field = kind.fields().iter().find(|f| f.key == Key::Repository).filter(|_| kind.scheme().is_empty())?;
-        Some(self.value(role, field)).filter(|folder| !folder.is_empty()).map(home)
+        Some(self.value(role, field)).filter(|folder| !folder.is_empty()).map(repository_folder)
     }
 
     /// The form's folder fields in order, blank ones too, or one blank field.
@@ -796,9 +802,14 @@ impl Setup {
     /// Refuses a repository folder that a source holds or that holds a source. Refuses one with other files but no
     /// repository's `config` too. The folder of an existing repository is kept to back up into it again.
     fn check_folders(&self) -> Result<(), Error> {
-        use std::path::Path;
-        // As written and as the disk resolves it: `/tmp` is a link to `/private/tmp` on macOS.
-        let forms = |p: &str| [Some(Path::new(p).to_path_buf()), Path::new(p).canonicalize().ok()];
+        use std::path::{Path, PathBuf};
+        // As written and as the disk resolves it, up to its nearest folder that exists: `/tmp` is a link to
+        // `/private/tmp` on macOS, and `/users/new` is `/Users/new` on a disk that ignores case.
+        let resolved = |p: &Path| -> Option<PathBuf> {
+            let base = p.ancestors().find_map(|a| Some((a, a.canonicalize().ok()?)))?;
+            Some(base.1.join(p.strip_prefix(base.0).ok()?))
+        };
+        let forms = |p: &str| [Some(Path::new(p).to_path_buf()), resolved(Path::new(p))];
         let sources = self.sources();
         for folder in <Role as strum::IntoEnumIterator>::iter().filter_map(|role| self.folder(role)) {
             for source in &sources {
@@ -881,6 +892,8 @@ mod tests {
         assert_eq!(setup.sources(), [format!("{home}/Documents")]);
         assert!(setup.profiles()[1].1.contains(&format!("{home}/usb")), "{}", setup.profiles()[1].1);
         assert!(setup.check().is_ok());
+        let prefixed = target(Kind::Local, &[("repository", "local:~/usb")]);
+        assert!(prefixed.profiles()[1].1.contains(&format!("\"{home}/usb\"")), "{}", prefixed.profiles()[1].1);
         let with = |key: &str, path: &str| {
             let mut setup = setup.clone();
             setup.values.insert(key.into(), path.into());
@@ -914,6 +927,14 @@ mod tests {
         assert!(matches!(into(&path(&["full"])), Err(Error::NotEmpty { .. })));
         assert!(into(&path(&["repo"])).is_ok(), "an existing repository");
         assert!(into(&path(&["new", "backup"])).is_ok());
+        assert!(
+            matches!(into(&format!("local:{}", path(&["docs", "backup"]))), Err(Error::Inside)),
+            "as rustic reads it"
+        );
+        // On a disk that ignores case, a new folder written in another case is still in the source.
+        if dir.join("DOCS").exists() {
+            assert!(matches!(into(&path(&["DOCS", "new", "backup"])), Err(Error::Inside)));
+        }
     }
 
     /// Each folder is its own entry, with its own snapshots. One given twice is backed up once.
