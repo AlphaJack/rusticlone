@@ -33,6 +33,7 @@ static COMMAND: Mutex<Option<Command>> = Mutex::new(None);
 
 /// Does this command, `label`, with `f`, drawn in a terminal with each [`step`] that `f` does. There, an error
 /// is shown in the run instead of returned, as the command's failure.
+#[expect(clippy::disallowed_methods, reason = "a spinner turns with time, which no event tells")]
 pub(in crate::cli) fn command(label: &str, f: impl FnOnce() -> anyhow::Result<Level>) -> anyhow::Result<Level> {
     if !log::is_live() {
         return f();

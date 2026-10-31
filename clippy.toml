@@ -5,6 +5,11 @@ too-many-lines-threshold = 80
 disallowed-methods = [
   { path = "rusticlone::sys::presence", reason = "a source is read through rustic, whose hooks may mount or fill it" },
   { path = "std::thread::sleep", reason = "use condition-based waits or a clock abstraction" },
+  { path = "rusticlone::clock::sleep", reason = "wait for a notification: clock::wait, a channel or a signal" },
+  { path = "tokio::time::sleep", reason = "wait for a notification: a channel, a watch or a signal" },
+  { path = "tokio::time::sleep_until", reason = "wait for a notification: a channel, a watch or a signal" },
+  { path = "tokio::time::interval", reason = "wait for a notification: a channel, a watch or a signal" },
+  { path = "tokio::time::interval_at", reason = "wait for a notification: a channel, a watch or a signal" },
   { path = "std::process::Command::new", reason = "rustic runs through rustic::Runner" },
   { path = "jiff::Timestamp::now", reason = "time comes from clock::Clock (Store::now)" },
   { path = "std::time::SystemTime::now", reason = "time comes from clock::Clock (Store::now)" },
