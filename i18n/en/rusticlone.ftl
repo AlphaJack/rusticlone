@@ -758,6 +758,7 @@ setting-auto-update = Update { -name } and the rustic at each restart
 setting-backup-cron = Backup schedule (cron expression, @daily...)
 setting-check-cron = Check schedule of the repository
 setting-check-subsets = Data each check reads. N reads the next of N subsets (`--read-data-subset n/N`). `5%`, `2GiB` or `all` reads that much at random. 0 reads the structure only
+setting-keep-awake = Keep the computer from sleeping while a run goes on
 setting-listen = Web UI address
 setting-metrics-token = Token for Prometheus and other monitors, to send as `Authorization: Bearer`
 setting-notify-urls = Notification URLs (Mercurio) for when a collection's status changes

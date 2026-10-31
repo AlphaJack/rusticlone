@@ -758,6 +758,7 @@ setting-auto-update = Aggiorna { -name } e il rustic a ogni riavvio
 setting-backup-cron = Pianificazione dei backup (espressione cron, @daily...)
 setting-check-cron = Pianificazione delle verifiche dell'archivio
 setting-check-subsets = Dati letti da ogni verifica. N legge il prossimo di N sottoinsiemi (`--read-data-subset n/N`). `5%`, `2GiB` o `all` legge quella quantità a caso. 0 legge solo la struttura
+setting-keep-awake = Impedisce al computer di andare in sospensione durante un'esecuzione
 setting-listen = Indirizzo dell'interfaccia web
 setting-metrics-token = Token per Prometheus e altri sistemi di monitoraggio, da inviare come `Authorization: Bearer`
 setting-notify-urls = URL di notifica (Mercurio) per quando lo stato di una raccolta cambia
