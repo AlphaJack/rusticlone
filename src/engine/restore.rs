@@ -85,18 +85,20 @@ impl Engine {
             return self.restore_snapshots(run, repo, &[sn], options).map(drop);
         }
         self.learn_from_repositories(run);
-        let groups = collection.primary.groups_of(options.source);
-        let found = self.newest_repo(run, options.from.as_deref(), &groups, options.at);
+        let mut groups = collection.primary.groups_of(options.source);
+        let mut ranked = self.newest_repos(run, options.from.as_deref(), &groups, options.at)?;
         // Made on another computer, where this one's links lead elsewhere: as the profile writes the paths.
         let written = collection.primary.written_groups_of(options.source);
-        let unmatched = |e: &anyhow::Error| matches!(e.downcast_ref(), Some(Error::NoMatchingSnapshot { .. }));
-        let (groups, (src, picks)) = match found {
-            Err(e) if unmatched(&e) && written != groups => {
-                let found = self.newest_repo(run, options.from.as_deref(), &written, options.at)?;
-                (written, found)
-            }
-            found => (groups, found?),
-        };
+        if ranked.is_empty() && written != groups {
+            ranked = self.newest_repos(run, options.from.as_deref(), &written, options.at)?;
+            groups = written;
+        }
+        let mut ranked = ranked.into_iter();
+        let (src, picks) =
+            ranked.next().ok_or_else(|| Error::NoMatchingSnapshot { repo: collection.title.to_owned() })?;
+        if picks.len() < groups.len() {
+            run.push(StepResult::SomeSources { found: picks.len(), of: groups.len() });
+        }
         // Every source, as it is now, to where it was.
         let all = options.at.is_none() && options.source.is_none() && options.to.is_none();
         // Asked for everything and the primary was lost with the sources: it is re-created from where they come
@@ -128,7 +130,7 @@ impl Engine {
             }
             None => (src, picks),
         };
-        let complete = self.restore_snapshots(run, src, &picks, options)?;
+        let (src, picks, complete) = self.restore_falling_back(run, (src, picks), ranked, options)?;
         // Every source restored from its newest snapshot: the next backup continues from there.
         let whole = complete && all && picks.len() == groups.len();
         if let Some(oldest) =
@@ -152,6 +154,43 @@ impl Engine {
         Ok(())
     }
 
+    /// Restores `picks` from `src`, then, if that failed and no repository was asked for, from each next newest
+    /// of `ranked` until one succeeds: a repository whose data is damaged fails partway, and the next one's files
+    /// overwrite what it left. Returns the repository and snapshots the restore ended with, and whether it is
+    /// complete. Fails as the last attempt did.
+    fn restore_falling_back<'a>(
+        &self,
+        run: &Run<'a>,
+        (mut src, mut picks): (&'a RusticProfile, Vec<Snapshot>),
+        ranked: impl Iterator<Item = (&'a RusticProfile, Vec<Snapshot>)>,
+        options: &RestoreOptions,
+    ) -> Result<(&'a RusticProfile, Vec<Snapshot>, bool)> {
+        let attempt = |src: &RusticProfile, picks: &[Snapshot]| {
+            let failed = run.failures();
+            let restored = self.restore_snapshots(run, src, picks, options);
+            restored.and_then(|complete| match run.failures() {
+                n if n == failed => Ok(complete),
+                _ => Err(Error::PartlyRestored { repo: src.name.clone() }.into()),
+            })
+        };
+        let mut done = attempt(src, &picks);
+        if options.from.is_none() && !options.dry_run {
+            for (next, next_picks) in ranked.filter(|(p, _)| p.name != src.name) {
+                let Err(e) = &done else { break };
+                // Only what rustic failed to read: another repository cannot help a folder this computer refuses.
+                let read = matches!(e.downcast_ref(), Some(Error::NotRestored { .. } | Error::PartlyRestored { .. }));
+                if !read || run.cx.stopping() {
+                    break;
+                }
+                let (repo, to, error) = (src.name.clone(), next.name.clone(), format!("{e:#}"));
+                run.push(StepResult::FallingBack { repo, to, error });
+                (src, picks) = (next, next_picks);
+                done = attempt(src, &picks);
+            }
+        }
+        done.map(|complete| (src, picks, complete))
+    }
+
     /// The repository with the newest snapshots of `groups` not after `at`, among `from` or all of the
     /// collection's, and those snapshots.
     fn newest_repo<'a>(
@@ -161,19 +200,37 @@ impl Engine {
         groups: &[Vec<String>],
         at: Option<Timestamp>,
     ) -> Result<(&'a RusticProfile, Vec<Snapshot>)> {
+        let ranked = self.newest_repos(run, from, groups, at)?;
+        let Some((src, picks)) = ranked.into_iter().next() else {
+            return Err(Error::NoMatchingSnapshot { repo: run.collection.title.to_owned() }.into());
+        };
+        if picks.len() < groups.len() {
+            run.push(StepResult::SomeSources { found: picks.len(), of: groups.len() });
+        }
+        Ok((src, picks))
+    }
+
+    /// The repositories with snapshots of `groups` not after `at`, among `from` or all of the collection's,
+    /// newest first. On a tie the collection's order decides: the primary, then its targets.
+    fn newest_repos<'a>(
+        &self,
+        run: &Run<'a>,
+        from: Option<&str>,
+        groups: &[Vec<String>],
+        at: Option<Timestamp>,
+    ) -> Result<Vec<(&'a RusticProfile, Vec<Snapshot>)>> {
         let collection = run.collection;
         let candidates: Vec<&RusticProfile> = match from {
             Some(_) => vec![repo_named(run, from)?],
             None => collection.repos().collect(),
         };
-        let mut best: Option<(&RusticProfile, Vec<Snapshot>)> = None;
-        let mut unreadable = Vec::new();
+        let (mut ranked, mut unreadable) = (Vec::new(), Vec::new());
         for p in &candidates {
             match self.list(run, p) {
                 Ok(snapshots) => {
                     let picks = pick(&snapshots, groups, at);
-                    if !picks.is_empty() && best.as_ref().is_none_or(|(_, b)| newest(&picks) > newest(b)) {
-                        best = Some((*p, picks));
+                    if !picks.is_empty() {
+                        ranked.push((*p, picks));
                     }
                 }
                 Err(e) => {
@@ -194,13 +251,9 @@ impl Engine {
             let (repos, files) = (repos.collect::<Vec<_>>().join("; "), files.collect::<Vec<_>>().join(", "));
             return Err(Error::Unreadable { collection: collection.title.to_owned(), repos, files }.into());
         }
-        let Some((src, picks)) = best else {
-            return Err(Error::NoMatchingSnapshot { repo: collection.title.to_owned() }.into());
-        };
-        if picks.len() < groups.len() {
-            run.push(StepResult::SomeSources { found: picks.len(), of: groups.len() });
-        }
-        Ok((src, picks))
+        // Stable: equal times keep the collection's order.
+        ranked.sort_by_key(|(_, picks)| std::cmp::Reverse(newest(picks)));
+        Ok(ranked)
     }
 
     /// Restores each path of each snapshot in place, or below `to`. With `missing`, only paths that are
