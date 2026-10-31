@@ -4,14 +4,15 @@
 
 Rusticlone must stay out of the way of someone taking their first computer or server backup: easy to configure, easy to use and forget.
 Rustic profiles hold most of the configuration, and Rusticlone adds few flags and environment variables of its own.
-The README is the only public document for now, so it has to be a complete guide.
+The [book](docs/src/SUMMARY.md) is the complete guide, published at https://alphajack.github.io/rusticlone/. The README stays short: what Rusticlone is, how to install it and a link to the book.
+Run `mdbook serve docs --open` to read it while editing.
 
 ## Setup
 
 ```sh
 cargo install cargo-binstall
 rustup component add rust-analyzer # needed by cargo xtask acyclic
-cargo binstall cargo-nextest cargo-insta rustic-rs cargo-deny
+cargo binstall cargo-nextest cargo-insta rustic-rs cargo-deny mdbook
 ```
 
 Or open the repository in its dev container (`.devcontainer`), which sets all of this up on Linux.
@@ -75,7 +76,7 @@ $R backup --all
 
 ## DRY principle
 
-- A setting is a line of `settings!` in `src/settings.rs`. `packaging/rusticlone.env` is generated from the settings read at startup and committed. `documented_variables_exist` fails on a README variable that no setting reads.
+- A setting is a line of `settings!` in `src/settings.rs`. `packaging/rusticlone.env` is generated from the settings read at startup and committed. The book's settings page is generated from the same settings and their `setting-` messages. `documented_variables_exist` fails on a variable in the README or the book that no setting reads.
 - A table of the state is a line of `tables!` in `src/state.rs`.
 - Text for users is a message in `i18n/en/rusticlone.ftl`. `#[derive(Fluent)]` looks a message up by the name of the type and variant it describes, and `t!` by its id. Both fail the build on a missing message or argument, and `tests/literals.rs` fails on English in `src`. Another language is a folder beside `en`.
 
@@ -93,13 +94,13 @@ Set `read_by_previous` when the previous release already reads the new shape. A 
 ## Tools
 
 ```sh
-cargo xtask generate     # rewrite the generated files: env file, Linux packages and the logo's renderings
+cargo xtask generate     # rewrite the generated files: env file, the book's reference pages, Linux packages and the logo's renderings
 cargo xtask fixtures     # record the installed rustic's output into tests/fixtures/rustic-MAJOR.MINOR
 cargo insta review       # check changed snapshots and accept them
 cargo xtask vendor       # download htmx
 cargo xtask acyclic      # find dependency cycles between modules and between items
 cargo xtask translations # list the messages each translation lacks, shown in English
-cargo xtask screenshots  # take the README's screenshots anew, in Docker, in about 25 minutes
+cargo xtask screenshots  # take the book's screenshots anew, in Docker, in about 25 minutes
 cargo xtask screenshots --setup              # or keep the computer they show running,
 cargo xtask screenshots --only web prune     # take some of them again on it,
 cargo xtask screenshots --teardown           # and remove it

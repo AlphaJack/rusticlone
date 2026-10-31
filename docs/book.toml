@@ -1,0 +1,12 @@
+[book]
+title = "Rusticlone"
+language = "en"
+src = "src"
+
+[output.html]
+git-repository-url = "https://github.com/AlphaJack/rusticlone"
+edit-url-template = "https://github.com/AlphaJack/rusticlone/edit/main/docs/{path}"
+site-url = "/rusticlone/"
+default-theme = "light"
+preferred-dark-theme = "coal"
+additional-css = ["theme.css"]

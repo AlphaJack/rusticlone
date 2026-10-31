@@ -88,6 +88,7 @@ mod tests {
                         format!("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- {header} -->\n{content}")
                     }
                     Some("ps1") => format!("\u{feff}# {header}\n{content}"),
+                    Some("md") => format!("<!-- {header} -->\n\n{content}"),
                     _ => format!("# {header}\n{content}"),
                 };
                 if std::fs::read_to_string(&path).is_ok_and(|before| before == file) {
