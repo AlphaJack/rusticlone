@@ -171,7 +171,7 @@ fn capture(sb: &Sandbox, docs: &str) -> Result<Vec<(&'static str, String)>> {
     let snapshots = sb.stdout(&["snapshots", "--json"])?;
     let ids = snapshot_ids(&snapshots)?;
     let [first, second] = &ids[..] else { bail!("expected 2 snapshots, got {ids:?}") };
-    sb.rustic("a", &["copy", "--filter-paths-exact", "/nonexistent", "--target", "u", "--init"])?;
+    sb.rustic("a", &["copy", "--filter-last", "0", "--target", "u", "--init"])?;
     sb.rustic("a", &["copy", first, "--target", "u"])?;
 
     let source = format!("{ROOT}/src/docs");
