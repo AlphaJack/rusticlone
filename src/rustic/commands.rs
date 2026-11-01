@@ -12,10 +12,6 @@ use super::{
 };
 use crate::profile::RusticProfile;
 
-/// Matches no snapshot. `copy --init` with it creates the target with the source's chunker.
-/// `rustic init` cannot do that: it picks a random chunker, and copies need matching ones.
-const NOTHING: &str = "/nonexistent/nothing";
-
 /// What a backup saved, and the paths it could not read, with the reason.
 pub(crate) struct Backup {
     pub snapshots: Vec<SnapshotId>,
@@ -217,7 +213,8 @@ impl Rustic {
     }
 
     /// Copies `ids` from `from` to the profile `to`. With no ids, it only creates `to` (`init`) with
-    /// `from`'s chunker. Rustic exits 0 even when the target fails, so the caller must list the target.
+    /// `from`'s chunker: `--filter-last 0` matches no snapshot. `rustic init` cannot do that: it picks a random
+    /// chunker, and copies need matching ones. Rustic exits 0 even when the target fails, so the caller must list the target.
     /// Returns rustic's own error text, to explain missing snapshots.
     pub(crate) fn copy(
         &self,
@@ -231,7 +228,7 @@ impl Rustic {
         let mut args = vec!["copy"];
         args.extend(ids.iter().map(|id| id.as_str()));
         if ids.is_empty() {
-            args.extend(["--filter-paths-exact", NOTHING]);
+            args.extend(["--filter-last", "0"]);
         }
         args.extend(["--target", to]);
         if init {
