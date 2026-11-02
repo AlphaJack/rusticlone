@@ -1,0 +1,284 @@
+use super::{Error, Logged, Path, PathBuf, Result, path_var, run};
+use crate::{APP_NAME, NAME, sys};
+
+/// What macOS keys the user's approval and the app's permissions on: it never changes.
+const BUNDLE_ID: &str = "io.github.alphajack.rusticlone";
+const LSREGISTER: &str =
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+/// System Settings, General, Login Items & Extensions.
+const LOGIN_ITEMS: &str = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension";
+
+/// A binary property list holding one array of short ASCII strings, as macOS keeps a file's Spotlight
+/// keywords: the header, the array of references to the strings, the strings, the offset of each, and the
+/// trailer that says how wide offsets and references are, how many objects there are and where the offsets
+/// are. `None` if a count, length or offset needs more than a byte.
+pub(super) fn bplist(strings: &[&str]) -> Option<Vec<u8>> {
+    /// A marker's low nibble holds a count or a length below this, which says that a longer one follows.
+    const SHORT: u8 = 15;
+    /// The markers of an array and of an ASCII string.
+    const ARRAY: u8 = 0xA0;
+    const ASCII: u8 = 0x50;
+    // One byte holds a count or a length below SHORT, an object reference, and an offset below 256.
+    let short = |n: usize| u8::try_from(n).ok().filter(|n| *n < SHORT);
+    let count = short(strings.len())?;
+    let mut plist = b"bplist00".to_vec();
+    let mut offsets = vec![u8::try_from(plist.len()).ok()?];
+    plist.push(ARRAY | count);
+    plist.extend(1..=count);
+    for string in strings {
+        offsets.push(u8::try_from(plist.len()).ok()?);
+        plist.push(ASCII | short(string.len()).filter(|_| string.is_ascii())?);
+        plist.extend(string.as_bytes());
+    }
+    let table = u64::try_from(plist.len()).ok()?;
+    plist.extend(offsets);
+    plist.extend([0, 0, 0, 0, 0, 0, 1, 1]);
+    for n in [u64::from(count) + 1, 0, table] {
+        plist.extend(n.to_be_bytes());
+    }
+    Some(plist)
+}
+
+fn plist() -> Result<PathBuf> {
+    Ok(if sys::is_root() {
+        PathBuf::from("/Library/LaunchDaemons")
+    } else {
+        etcetera::home_dir()?.join("Library/LaunchAgents")
+    }
+    .join(format!("{NAME}.plist")))
+}
+
+/// The launchd domain: the system's as root, else the user's login session.
+fn domain() -> String {
+    // SAFETY: no preconditions.
+    #[expect(unsafe_code, reason = "getuid has no preconditions")]
+    let uid = unsafe { libc::getuid() };
+    if sys::is_root() { "system".into() } else { format!("gui/{uid}") }
+}
+
+/// The app that runs the server, so that Login Items shows its name and icon and Spotlight finds it, and
+/// that opens the web UI from Finder.
+fn app() -> Result<PathBuf> {
+    Ok(if sys::is_root() { PathBuf::from("/Applications") } else { etcetera::home_dir()?.join("Applications") }
+        .join(format!("{APP_NAME}.app")))
+}
+
+fn escape(text: &str) -> String {
+    text.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+fn property_list(dict: &str) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+{dict}</dict>
+</plist>
+"#
+    )
+}
+
+/// The app, registered so that Finder and the Dock show its icon.
+fn write_app(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
+    let bundled = bundle(app, exe, version)?;
+    // Finder and the Dock keep showing the icon they cached until the app is registered again.
+    run(LSREGISTER, &["-f", &app.to_string_lossy()])?;
+    Ok(bundled)
+}
+
+/// The app, with a copy of this executable, signed as itself rather than by the linker's anonymous
+/// signature. A copy rather than a link, which macOS would resolve to the executable outside the app.
+pub(super) fn bundle(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
+    let contents = app.join("Contents");
+    // Named as the app: Login Items and Activity Monitor show it.
+    let bundled = contents.join("MacOS").join(APP_NAME);
+    for dir in ["MacOS", "Resources"] {
+        std::fs::create_dir_all(contents.join(dir))?;
+    }
+    if exe != bundled {
+        // Replaced whole, so that a copy that runs keeps its file. Removed first, as a disk that ignores
+        // case would keep the old name's case.
+        let partial = bundled.with_extension("partial");
+        std::fs::copy(exe, &partial)?;
+        _ = std::fs::remove_file(&bundled);
+        std::fs::rename(&partial, &bundled)?;
+        // A package manager's executable, which it updates, is copied again at start when it no longer is
+        // the one copied: see `refresh_app`. Named with its SHA-256, as signing the app changes the copy.
+        let source = source_file(&contents);
+        if crate::install::managed(exe) {
+            let copied = sys::sha256(std::fs::read(exe)?);
+            std::fs::write(&source, format!("{}\n{copied}\n", exe.display()))?;
+        } else {
+            _ = std::fs::remove_file(&source);
+        }
+    }
+    std::fs::write(
+        contents.join("Resources").join(format!("{NAME}.icns")),
+        include_bytes!("../../../assets/images/logo.icns"),
+    )?;
+    let info = format!(
+        "  <key>CFBundleIdentifier</key><string>{BUNDLE_ID}</string>
+  <key>CFBundleName</key><string>{APP_NAME}</string>
+  <key>CFBundleExecutable</key><string>{APP_NAME}</string>
+  <key>CFBundleIconFile</key><string>{NAME}</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>{version}</string>
+  <key>LSUIElement</key><true/>
+"
+    );
+    std::fs::write(contents.join("Info.plist"), property_list(&info))?;
+    run("codesign", &["--force", "--sign", "-", &app.to_string_lossy()])?;
+    // Kept outside the signature, which a later one would not take.
+    if let Some(keywords) = bplist(&env!("KEYWORDS").split(';').collect::<Vec<_>>()) {
+        let hex: String = keywords.iter().map(|b| format!("{b:02x}")).collect();
+        run("xattr", &["-wx", "com.apple.metadata:kMDItemKeywords", &hex, &app.to_string_lossy()])?;
+    }
+    Ok(bundled)
+}
+
+/// Where the app names the package manager's executable that it is a copy of, and that one's SHA-256.
+fn source_file(contents: &Path) -> PathBuf {
+    contents.join("Resources").join("source")
+}
+
+/// The package manager's executable that the app holding `exe` copied, and the SHA-256 it had then.
+fn source(exe: &Path) -> Option<(PathBuf, String)> {
+    if !exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) {
+        return None;
+    }
+    let text = std::fs::read_to_string(source_file(exe.parent()?.parent()?)).ok()?;
+    let mut lines = text.lines();
+    Some((PathBuf::from(lines.next()?), lines.next().unwrap_or_default().to_owned()))
+}
+
+pub(super) fn app_source(exe: &Path) -> Option<PathBuf> {
+    source(exe).map(|(path, _)| path)
+}
+
+/// The package manager's executable when it changed since the app that holds `exe` copied it: not when the
+/// app's signature changed the copy, else each start would copy it again.
+#[cfg(any(feature = "self-update", test))]
+pub(super) fn stale(exe: &Path) -> Option<PathBuf> {
+    let (source, copied) = source(exe)?;
+    let new = std::fs::read(&source).ok()?;
+    (sys::sha256(new) != copied).then_some(source)
+}
+
+/// The package manager's executable, copied into the app that holds this one when it changed since the
+/// last copy: its version, or `None` when it is the same, or gone.
+#[cfg(feature = "self-update")]
+#[expect(clippy::disallowed_methods, reason = "asks the package manager's rusticlone its version")]
+pub(super) fn refresh_app() -> Result<Option<String>> {
+    let exe = std::env::current_exe()?;
+    let Some(source) = stale(&exe) else { return Ok(None) };
+    let out = std::process::Command::new(&source).arg("--version").output()?;
+    let version = String::from_utf8_lossy(&out.stdout).split_whitespace().last().unwrap_or_default().to_owned();
+    let app = exe.parent().and_then(Path::parent).and_then(Path::parent).unwrap_or(&exe);
+    write_app(app, &source, &version)?;
+    Ok(Some(version))
+}
+
+/// The app that holds this executable, written again with `version`.
+#[cfg(feature = "self-update")]
+pub(super) fn rewrite_app(version: &str) -> Result<()> {
+    let exe = std::env::current_exe()?;
+    // The executable, in `Contents/MacOS` of the app.
+    match exe.parent().and_then(Path::parent).and_then(Path::parent) {
+        Some(app) if exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) => {
+            write_app(app, &exe, version).map(drop)
+        }
+        _ => Ok(()),
+    }
+}
+
+/// Whether the plist is installed and the user switched it off. macOS 13 introduced the switch.
+#[expect(unsafe_code, reason = "asks Service Management about a plist's path")]
+pub(super) fn blocked() -> bool {
+    use objc2_foundation::{NSString, NSURL};
+    use objc2_service_management::{SMAppService, SMAppServiceStatus};
+    let Ok(file) = plist() else { return false };
+    if !file.exists() || objc2::runtime::AnyClass::get(c"SMAppService").is_none() {
+        return false;
+    }
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&file.to_string_lossy()));
+    // SAFETY: a file URL; Apple states no other requirement.
+    unsafe { SMAppService::statusForLegacyURL(&url) == SMAppServiceStatus::RequiresApproval }
+}
+
+/// Started now and at load, restarted after a failure, at low priority, as the systemd unit.
+pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
+    let (file, dir) = (plist()?, crate::profile::own_dir().ok_or(Error::NoProfileDir)?);
+    // rustic's profile directory, so that the server reads no profiles from wherever it started.
+    std::fs::create_dir_all(&dir)?;
+    // Stopped before its app is replaced. Loaded already when installed before.
+    _ = run("launchctl", &["bootout", &format!("{}/{NAME}", domain())]);
+    let exe = write_app(&app()?, exe, env!("CARGO_PKG_VERSION"))?;
+    let text = property_list(&format!(
+        "  <key>Label</key><string>{NAME}</string>
+  <key>ProgramArguments</key><array><string>{}</string>{}</array>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>{}</string></dict>
+  <key>WorkingDirectory</key><string>{}</string>
+  <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
+  <key>Nice</key><integer>10</integer>
+  <key>LowPriorityIO</key><true/>
+",
+        escape(&exe.to_string_lossy()),
+        serve.iter().map(|a| format!("<string>{}</string>", escape(a))).collect::<String>(),
+        escape(&path_var()),
+        escape(&dir.to_string_lossy())
+    ));
+    std::fs::create_dir_all(file.parent().unwrap_or(&file))?;
+    std::fs::write(&file, text)?;
+    run("launchctl", &["bootstrap", &domain(), &file.to_string_lossy()])?;
+    Ok(file)
+}
+
+/// Whether `launchctl disable` keeps launchd from loading the plist at login. Older macOS says `true`.
+fn disabled() -> bool {
+    let listed = std::process::Command::new("launchctl").args(["print-disabled", &domain()]).output();
+    let entry = format!("\"{NAME}\" =>");
+    listed.is_ok_and(|out| {
+        String::from_utf8_lossy(&out.stdout).lines().filter_map(|l| l.trim().strip_prefix(&entry)).any(|state| {
+            let state = state.trim();
+            state == "disabled" || state == "true"
+        })
+    })
+}
+
+pub(super) fn at_login() -> Option<bool> {
+    plist().ok().filter(|f| f.exists())?;
+    Some(!disabled() && !blocked())
+}
+
+/// Switched in launchd. Switched off in Login Items, the server waits for the user there, so it opens.
+pub(super) fn set_at_login(on: bool) -> Result<()> {
+    run("launchctl", &[if on { "enable" } else { "disable" }, &format!("{}/{NAME}", domain())])?;
+    if on && blocked() {
+        run("open", &[LOGIN_ITEMS])?;
+    }
+    Ok(())
+}
+
+/// Asks launchd to start the installed server, as installed, unless it runs; false if not installed, or
+/// kept from starting at login, when launchd may not have loaded it.
+pub(super) fn start() -> Result<bool> {
+    if !plist()?.exists() || disabled() {
+        return Ok(false);
+    }
+    run("launchctl", &["kickstart", &format!("{}/{NAME}", domain())])?;
+    Ok(true)
+}
+
+/// `None` if not installed.
+pub(super) fn uninstall() -> Result<Option<Logged>> {
+    let file = plist()?;
+    if !file.exists() {
+        return Ok(None);
+    }
+    // Not loaded if it stopped, or after a reboot that failed to load it.
+    _ = run("launchctl", &["bootout", &format!("{}/{NAME}", domain())]);
+    std::fs::remove_file(&file)?;
+    _ = std::fs::remove_dir_all(app()?);
+    Ok(Some(Logged::Uninstalled { file: file.display().to_string() }))
+}
