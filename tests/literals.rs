@@ -1,8 +1,7 @@
 //! Text for users is in the catalog, `i18n/en/rusticlone.ftl`, which `#[derive(Fluent)]` and `t!` read: none is
 //! in the code, the templates or `app.js`. Constants under `src/rustic` hold rustic's text, which rusticlone
-//! matches, `native` what a user types on each system, and attributes developers' reasons, such as
-//! `#[expect(reason)]`. Numbers are named constants or
-//! `match self` arms,
+//! matches, `native` what a user types on each system, paths the names the system gives files, and attributes
+//! developers' reasons, such as `#[expect(reason)]`. Numbers are named constants or `match self` arms,
 //! except -1, 0, 1, 2 and 100: identities, pairs and halves, percent, and C's error return. Code
 //! elsewhere passes values.
 
@@ -168,11 +167,27 @@ impl<'ast> Visit<'ast> for Literals {
         self.literal(literal);
     }
 
-    /// `native(windows, macos, other)` takes what a user types on each system, such as a command.
+    /// `native(windows, macos, other)` takes what a user types on each system, such as a command, and
+    /// `Path::new` or `PathBuf::from` the name of a file or folder, which the system gives it.
     fn visit_expr_call(&mut self, call: &'ast syn::ExprCall) {
-        let native = matches!(&*call.func, syn::Expr::Path(p) if p.path.is_ident("native"));
-        if !native {
+        let names = |p: &syn::ExprPath| p.path.segments.iter().map(|s| s.ident.to_string()).collect::<Vec<_>>();
+        let named = |p: &syn::ExprPath, ends: [&str; 2]| names(p).ends_with(&ends.map(String::from));
+        let syn::Expr::Path(func) = &*call.func else { return visit::visit_expr_call(self, call) };
+        if func.path.is_ident("native") {
+        } else if named(func, ["Path", "new"]) || named(func, ["PathBuf", "from"]) {
+            call.args.iter().filter(|a| !matches!(a, syn::Expr::Lit(_))).for_each(|a| self.visit_expr(a));
+        } else {
             visit::visit_expr_call(self, call);
+        }
+    }
+
+    /// `join` takes the name of a file or folder, which the system gives it.
+    fn visit_expr_method_call(&mut self, call: &'ast syn::ExprMethodCall) {
+        if call.method == "join" {
+            self.visit_expr(&call.receiver);
+            call.args.iter().filter(|a| !matches!(a, syn::Expr::Lit(_))).for_each(|a| self.visit_expr(a));
+        } else {
+            visit::visit_expr_method_call(self, call);
         }
     }
 

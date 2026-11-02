@@ -246,7 +246,7 @@ pub(crate) fn system_bins() -> Vec<PathBuf> {
 
 /// Linux's alone: containers run Linux.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
-pub(crate) fn container_markers() -> Option<[std::path::PathBuf; 2]> {
+pub(crate) fn container_markers() -> Option<[PathBuf; 2]> {
     None
 }
 
