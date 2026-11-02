@@ -1,4 +1,4 @@
-//! Windows's keepers: WinGet, Chocolatey and Scoop.
+//! Windows's keepers: `WinGet`, Chocolatey and Scoop.
 
 #![expect(clippy::disallowed_methods, reason = "lays out package managers' folders")]
 
