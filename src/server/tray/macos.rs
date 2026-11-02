@@ -47,7 +47,7 @@ define_class!(
         #[unsafe(method(applicationShouldHandleReopen:hasVisibleWindows:))]
         fn reopened(&self, _app: &NSApplication, _visible: bool) -> bool {
             if let Some(login) = LOGIN.lock().clone() {
-                _ = crate::server::open_on_desktop(login);
+                _ = crate::server::open_on_desktop(&login);
             }
             false
         }

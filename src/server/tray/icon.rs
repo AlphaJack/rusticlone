@@ -28,7 +28,7 @@ pub(super) fn open_clicked() {
         QUIT => quit(),
         id => match id.parse::<Switch>() {
             Ok(switch) => switch.toggle(),
-            Err(_) => _ = crate::server::open_on_desktop(id.to_owned()),
+            Err(_) => _ = crate::server::open_on_desktop(id),
         },
     }));
 }

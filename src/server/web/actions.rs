@@ -191,7 +191,7 @@ pub(super) async fn save_setup(base: Base, Here(here): Here, Form(setup): Form<s
 /// them somewhere safe. Elsewhere, there is no such page.
 pub(super) async fn open_profile_folder(Here(here): Here) -> Response {
     match crate::profile::own_dir().filter(|_| here) {
-        Some(dir) if crate::server::open_on_desktop(dir.display().to_string()) => {
+        Some(dir) if crate::server::open_on_desktop(&dir.display().to_string()) => {
             StatusCode::NO_CONTENT.into_response()
         }
         Some(_) => Error::Refused(Notice::FolderNotOpened).into_response(),

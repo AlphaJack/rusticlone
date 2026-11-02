@@ -336,7 +336,7 @@ fn bind(listen: &str) -> std::io::Result<tokio::net::TcpListener> {
 /// starting at login. The token is in the fragment, which stays in the browser: the login page sends it as
 /// the form would.
 fn announce(url: String, tokens: &Tokens, open: bool) {
-    let opened = open && open_on_desktop(login_url(&url, tokens));
+    let opened = open && open_on_desktop(&login_url(&url, tokens));
     log::event(
         None,
         &if opened { Logged::ServingOpened { url } } else { Logged::serving(url, tokens.file.as_deref()) },
@@ -359,7 +359,7 @@ pub(crate) fn open_running(listen: &str) -> Result<bool> {
         return Ok(false);
     }
     let tokens = login_tokens(&settings::state_dir()?)?;
-    open_on_desktop(login_url(&local_url(addr), &tokens));
+    open_on_desktop(&login_url(&local_url(addr), &tokens));
     Ok(true)
 }
 
