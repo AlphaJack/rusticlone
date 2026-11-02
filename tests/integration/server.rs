@@ -10,7 +10,10 @@ use serde_json::json;
 
 use crate::{
     client::Server,
-    common::{KEEP, NAME, Sandbox, docs_with_remote, global_env, json_has, noise, slow_profile, var, wait_for},
+    common::{
+        KEEP, NAME, Sandbox, cmd, docs_with_remote, global_env, json_has, noise, slow_profile, stdin_profile, var,
+        wait_for,
+    },
 };
 
 #[test]
@@ -383,12 +386,17 @@ fn server_runs_jobs_independently() {
     sb.backup_profile_in("Fast", repo.to_str().unwrap(), &[&["fast"]], &[], &global_env(&[("CHECK_CRON", "@daily")]));
     sb.write("fast/a.txt", "a");
     sb.run(&["backup", "--collection", "Fast"]).assert_exit(0);
-    slow_profile(&sb, "Slow", 4, &global_env(&[("BACKUP_CRON", "@daily")]));
+    // Slow's backup goes on until the test lets it end, however long Fast's check takes.
+    let release = sb.path("release");
+    stdin_profile(&sb, "Slow", &cmd::until_exists(&release), &global_env(&[("BACKUP_CRON", "@daily")]));
     sb.scheduled_long_ago(&["check:Fast"]);
     let server = sb.server(&[]);
+    let slow_runs = || server.collection("Slow")["running"][0]["activities"][0].is_object();
+    wait_for(30, "Slow's backup to start", slow_runs);
     // Fast's check does not wait for Slow's backup.
     wait_for(30, "Fast's check", || server.collection("Fast")["primary"]["check"]["last_ok"].is_string());
-    assert!(server.collection("Slow")["running"][0]["activities"][0].is_object(), "Slow should still be running");
+    assert!(slow_runs(), "Slow should still be running");
+    fs::write(&release, "").unwrap();
     wait_for(60, "Slow's backup", || server.collection("Slow")["snapshot"]["last_ok"].is_string());
     fs::remove_dir_all(&repo).unwrap();
     _ = fs::remove_dir(repo.parent().unwrap());
