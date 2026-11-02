@@ -10,14 +10,12 @@
 
 use std::{fs, path::Path};
 
+use super::root;
+
 use proc_macro2::{TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 
 /// The repository, from what cargo and nextest set for each test.
-fn root() -> std::path::PathBuf {
-    std::env::var_os("CARGO_MANIFEST_DIR").map(std::path::PathBuf::from).unwrap_or_default()
-}
-
 /// Two words, or a word beside a value a format puts in: English, not a key, a path or a format argument.
 fn is_text(literal: &str) -> bool {
     // Not a protocol's keyword in capitals, such as Prometheus's `# HELP`.

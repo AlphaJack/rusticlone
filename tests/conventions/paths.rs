@@ -6,6 +6,8 @@
 
 use std::{fs, path::Path};
 
+use super::root;
+
 use syn::{
     Expr, ExprCall, ExprMethodCall, Lit, Macro, Token,
     punctuated::Punctuated,
@@ -74,10 +76,6 @@ impl<'ast> Visit<'ast> for Slashed {
         }
         visit::visit_expr_call(self, call);
     }
-}
-
-fn root() -> std::path::PathBuf {
-    std::env::var_os("CARGO_MANIFEST_DIR").map(std::path::PathBuf::from).unwrap_or_default()
 }
 
 fn sources(dir: &Path, found: &mut Vec<String>) {

@@ -71,16 +71,16 @@ $R backup --all
 - One type per concept. A match that maps one enum's variants one to one onto another's is a sign to merge the two, or to derive one from the other. A field that mirrors another is derived instead.
 - Lookups go through the `Store` and `Ledger` helpers, not keys rebuilt by hand.
 - Unused code goes, and so does code that only an earlier version needed.
-- Paths are joined a component at a time, `dir.join("a").join("b")`, as Windows shows `dir.join("a/b")` with both separators. An absolute Unix path such as `/usr/bin` stays whole. `tests/paths.rs` checks it.
+- Paths are joined a component at a time, `dir.join("a").join("b")`, as Windows shows `dir.join("a/b")` with both separators. An absolute Unix path starts from its first component, `Path::new("/usr").join("bin")`. `tests/conventions/paths.rs` checks it.
 - No hacks: data structures, algorithms and interactions are built for the long run. A kernel notification and SSE, not polling and a page that reloads itself.
 - What should be refactored is refactored first, in a PR of its own, not built upon.
-- A system's calls go in a file per system, picked by a `cfg` over its `mod` declaration and a `use ... as imp;`. Each such file defines the same functions, so no other code needs a system's `cfg`. `tests/systems.rs` checks it.
+- A system's calls go in a file per system, picked by a `cfg` over its `mod` declaration and a `use ... as imp;`. Each such file defines the same functions, so no other code needs a system's `cfg`. `tests/conventions/systems.rs` checks it.
 
 ## DRY principle
 
 - A setting is a line of `settings!` in `src/settings.rs`. `packaging/rusticlone.env` is generated from the settings read at startup and committed. `documented_variables_exist` fails on a README variable that no setting reads.
 - A table of the state is a line of `tables!` in `src/state.rs`.
-- Text for users is a message in `i18n/en/rusticlone.ftl`. `#[derive(Fluent)]` looks a message up by the name of the type and variant it describes, and `t!` by its id. Both fail the build on a missing message or argument, and `tests/literals.rs` fails on English in `src`. Another language is a folder beside `en`.
+- Text for users is a message in `i18n/en/rusticlone.ftl`. `#[derive(Fluent)]` looks a message up by the name of the type and variant it describes, and `t!` by its id. Both fail the build on a missing message or argument, and `tests/conventions/literals.rs` fails on English in `src`. Another language is a folder beside `en`.
 
 ## Migrations
 
