@@ -9,7 +9,11 @@ use ksni::{
 };
 use zbus::{Connection, MatchRule, MessageStream, message::Type, zvariant::OwnedValue};
 
-use super::{Row, SIDE, Switch, ink, level, open_label, pixels, quit, quit_label, tooltip, version_label};
+use super::{
+    Row, Switch,
+    logo::{SIDE, ink, pixels},
+    menu::{level, open_label, quit, quit_label, tooltip, version_label},
+};
 use crate::{APP_NAME, NAME};
 
 /// The desktop portal's settings, where the color scheme is: 1 prefers dark, 2 light, 0 says nothing.

@@ -22,8 +22,6 @@ use windows as imp;
 
 pub(super) use imp::Tray;
 use imp::managed;
-use logo::{DOT, Rgb, SIDE, dot, ink, pixels};
-use menu::{level, open_label, quit, quit_label, tooltip, version_label};
 
 use std::{sync::Arc, time::Duration};
 

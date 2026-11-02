@@ -22,7 +22,7 @@ use windows_sys::{
     w,
 };
 
-use super::{Row, Switch, icon, ink};
+use super::{Row, Switch, icon, logo::ink};
 
 /// Where Windows says whether the taskbar is light or dark.
 const PERSONALIZE: *const u16 = w!(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");

@@ -14,7 +14,10 @@ use objc2_app_kit::{
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use parking_lot::Mutex;
 
-use super::{DOT, Rgb, Row, SIDE, Switch, dot, icon, ink};
+use super::{
+    Row, Switch, icon,
+    logo::{DOT, Rgb, SIDE, dot, ink},
+};
 
 /// The page that logs in to the web UI, once the server serves it.
 static LOGIN: Mutex<Option<String>> = Mutex::new(None);
