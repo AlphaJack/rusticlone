@@ -69,7 +69,7 @@ jobs:
         run: cargo xtask acyclic
 
   test:
-    name: test (${{ matrix.os }}${{ matrix.partition && format(', {0}', matrix.partition) || '' }})
+    name: test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -79,10 +79,6 @@ jobs:
           # Its timers, disks and privacy rules differ: Linux runs none of that code.
           - os: macos-latest
             target: aarch64-apple-darwin
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 1/4 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 2/4 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 3/4 }
-          - { os: windows-latest, target: x86_64-pc-windows-msvc, partition: 4/4 }
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -104,14 +100,7 @@ jobs:
         if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          save-if: ${{ github.ref == 'refs/heads/main' && (!matrix.partition || matrix.partition == '1/4') }}
-      - name: Turn off Defender's real-time scanning
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Set-MpPreference -DisableRealtimeMonitoring $true
-          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
-          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
@@ -130,9 +119,7 @@ jobs:
         if: runner.os == 'macOS'
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Test
-        env:
-          PARTITION: ${{ matrix.partition }}
-        run: cargo nextest run --workspace --locked ${PARTITION:+--partition "hash:$PARTITION"}
+        run: cargo nextest run --workspace --locked
       - name: Check vendored htmx
         if: runner.os == 'Linux'
         run: cargo xtask vendor --check
@@ -144,6 +131,90 @@ jobs:
             systemd-analyze verify "$unit"
             systemd-analyze --user verify "$unit"
           done
+
+  # Windows builds slowly: one job builds the tests, and four run them from its archive.
+  build-tests-windows:
+    name: build tests (windows-latest)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Turn off Defender's real-time scanning
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+      - name: Install sccache
+        if: vars.CI_USE_SCCACHE == 'true'
+        uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
+      - name: Cache cargo registry and target
+        if: vars.CI_USE_SCCACHE != 'true'
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest
+      - name: Build the tests
+        run: cargo nextest archive --workspace --locked --archive-file tests.tar.zst
+      - name: Upload the tests
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tests-windows
+          path: tests.tar.zst
+          retention-days: 1
+
+  test-windows:
+    name: test (windows-latest, ${{ matrix.partition }})
+    needs: build-tests-windows
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [1/4, 2/4, 3/4, 4/4]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Turn off Defender's real-time scanning
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true
+          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cargo-nextest and cargo-binstall
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest,cargo-binstall
+      # The rustic pinned in Cargo.toml, which the tests run.
+      - name: Install rustic
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
+      - name: Download the tests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: tests-windows
+      # Round-robin, which spreads the slow tests more evenly than hashing their names.
+      - name: Test
+        env:
+          PARTITION: ${{ matrix.partition }}
+        run: cargo nextest run --archive-file tests.tar.zst --workspace-remap . --partition "slice:$PARTITION"
 
   clippy-windows:
     name: clippy (windows-latest)

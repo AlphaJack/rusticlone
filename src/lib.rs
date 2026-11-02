@@ -69,6 +69,13 @@ pub use state::{Event, RunRecord, Store};
 
 #[cfg(test)]
 mod tests {
+    /// The repository, from what cargo and nextest set for each test, so that an archive of the tests runs
+    /// wherever it is unpacked.
+    #[expect(clippy::disallowed_methods, reason = "where cargo or nextest put the repository")]
+    pub(crate) fn root() -> std::path::PathBuf {
+        std::env::var_os("CARGO_MANIFEST_DIR").map(std::path::PathBuf::from).unwrap_or_default()
+    }
+
     /// Writes each file at its path in the repository, as its content renders in English, under a line that says
     /// `source` generates it: a comment in the file's own syntax, after what has to come first. Fails when that
     /// changes one, as they are committed. The `generated_*` tests call it, and `cargo xtask generate` runs them.
@@ -79,7 +86,7 @@ mod tests {
         let source = source.replace('\\', "/");
         let written: Vec<String> = (files.iter())
             .filter_map(|(path, content)| {
-                let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+                let path = root().join(path);
                 let content = crate::i18n::Language::english().scope(content);
                 let header = format!("Generated from {source} by cargo xtask generate");
                 let file = match path.extension().and_then(|e| e.to_str()) {
@@ -105,7 +112,7 @@ mod tests {
     #[cfg(feature = "server")]
     #[expect(clippy::disallowed_methods, reason = "reads Cargo.toml")]
     pub(crate) fn dist_targets(os: &str) -> Vec<String> {
-        let manifest = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml")).unwrap_or_default();
+        let manifest = std::fs::read_to_string(root().join("Cargo.toml")).unwrap_or_default();
         let manifest: toml_edit::DocumentMut = manifest.parse().unwrap_or_default();
         let targets = manifest["workspace"]["metadata"]["dist"]["targets"].as_array().into_iter().flatten();
         let os = format!("-{os}-");

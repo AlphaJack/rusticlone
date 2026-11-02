@@ -443,7 +443,6 @@ impl Store {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
 
     use super::*;
     use crate::{request::RunKind, rustic::Reading, state::tests::store};
@@ -488,7 +487,7 @@ mod tests {
     /// drops the shapes that earlier versions stored.
     #[test]
     fn runs_stored_by_earlier_versions_are_still_read() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/runs.jsonl");
+        let path = crate::tests::root().join("tests/fixtures/runs.jsonl");
         if !path.exists() {
             let store = store("runs-fixture");
             let runs: Vec<String> =

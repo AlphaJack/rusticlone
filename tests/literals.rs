@@ -14,6 +14,11 @@ use std::{fs, path::Path};
 use proc_macro2::{TokenStream, TokenTree};
 use syn::visit::{self, Visit};
 
+/// The repository, from what cargo and nextest set for each test.
+fn root() -> std::path::PathBuf {
+    std::env::var_os("CARGO_MANIFEST_DIR").map(std::path::PathBuf::from).unwrap_or_default()
+}
+
 /// Two words: English, not a key, a path or a format argument.
 fn is_text(literal: &str) -> bool {
     let word = |w: &&str| w.len() > 1 && w.chars().all(char::is_alphabetic);
@@ -184,10 +189,10 @@ fn sources(dir: &Path, found: &mut Literals) {
         if path.is_dir() {
             sources(&path, found);
         } else if path.extension().is_some_and(|e| e == "rs") && path.file_name().is_some_and(|f| f != "tests.rs") {
-            let rustic = path.starts_with(Path::new(env!("CARGO_MANIFEST_DIR")).join("src/rustic"));
+            let rustic = path.starts_with(root().join("src/rustic"));
             let mut literals = Literals { rustic, ..Literals::default() };
             literals.visit_file(&syn::parse_file(&fs::read_to_string(&path).unwrap()).unwrap());
-            let file = path.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap_or(&path).display().to_string();
+            let file = path.strip_prefix(root()).unwrap_or(&path).display().to_string();
             found.texts.extend(literals.texts.into_iter().map(|t| format!("{file}: {t}")));
             found.numbers.extend(literals.numbers.into_iter().map(|n| format!("{file}: {n}")));
         }
@@ -196,7 +201,7 @@ fn sources(dir: &Path, found: &mut Literals) {
 
 fn found() -> Literals {
     let mut found = Literals::default();
-    sources(&Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut found);
+    sources(&root().join("src"), &mut found);
     found
 }
 
@@ -230,10 +235,10 @@ fn markup(template: &str) -> String {
 #[test]
 fn templates_contain_no_text() {
     let mut found = Vec::new();
-    for entry in fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("templates")).unwrap() {
+    for entry in fs::read_dir(root().join("templates")).unwrap() {
         let path = entry.unwrap().path();
         let html = scraper::Html::parse_fragment(&markup(&fs::read_to_string(&path).unwrap()));
-        let path = path.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap_or(&path).to_owned();
+        let path = path.strip_prefix(root()).unwrap_or(&path).to_owned();
         for node in html.root_element().descendants() {
             let code = node
                 .parent()
@@ -259,7 +264,7 @@ fn templates_contain_no_text() {
 /// The sentences of `app.js`: its strings that start with a capital and have two words.
 #[test]
 fn scripts_contain_no_text() {
-    let script = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/app.js")).unwrap();
+    let script = fs::read_to_string(root().join("assets/app.js")).unwrap();
     let code: String =
         script.lines().filter(|l| !l.trim_start().starts_with(['/', '*'])).collect::<Vec<_>>().join("\n");
     let strings = code.split(['"', '`']).skip(1).step_by(2);
