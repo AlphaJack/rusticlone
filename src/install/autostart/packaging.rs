@@ -1,4 +1,5 @@
-//! The files that Linux packages install, and `install` writes on Linux: the systemd unit and the desktop entry.
+//! The files that packages carry: the systemd unit and desktop entry, which `install` also writes on Linux, and
+//! the Chocolatey package's scripts.
 
 /// The systemd unit of the server, which packages install too. In English, as packages carry it.
 pub(crate) fn unit() -> String {
