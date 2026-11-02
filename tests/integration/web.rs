@@ -815,7 +815,9 @@ fn unfinished_requests_survive_a_restart() {
     // restore waiting for it.
     assert!(crate::common::signal(server.pid(), "TERM"));
     wait_for(20, "the server to stop", || !server.running());
-    assert_eq!(sb.queued("Slow"), 2);
+    let runs = sb.store().runs("Slow", usize::MAX);
+    let seen: Vec<String> = runs.iter().map(|r| format!("{} {}", json!(r.kind), json!(r.status))).collect();
+    assert_eq!(sb.queued("Slow"), 2, "the backup and the test restore are both queued again: {seen:?}");
     drop(server);
     // Restarted: the waiting requests run.
     let _server = sb.server(&[]);
