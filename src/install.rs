@@ -68,11 +68,10 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 #[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
 pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
     use std::path::Path;
-    // The file that each puts in its containers, which only Linux runs: elsewhere none is there.
-    for (marker, keeper) in [("/.dockerenv", Keeper::Docker), ("/run/.containerenv", Keeper::Podman)] {
-        if Path::new(marker).exists() {
-            return Some(keeper);
-        }
+    match crate::sys::container() {
+        Some(crate::sys::Container::Docker) => return Some(Keeper::Docker),
+        Some(crate::sys::Container::Podman) => return Some(Keeper::Podman),
+        None => {}
     }
     #[cfg(feature = "desktop")]
     if let Some(source) = autostart::app_source(exe) {
@@ -98,7 +97,7 @@ pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
         }
     });
     // Packages' folders, which root can write too: a copy of root's own goes in `/usr/local/bin`.
-    let system = |dir: &Path| ["/usr/bin", "/bin", "/usr/sbin"].iter().any(|d| dir == Path::new(d));
+    let system = |dir: &Path| crate::sys::system_bins().iter().any(|d| dir == d);
     let kept = kept.or_else(|| exe.parent().filter(|dir| system(dir)).map(|_| Keeper::System));
     kept.or_else(|| (!exe.parent().is_some_and(crate::sys::writable)).then_some(Keeper::System))
 }

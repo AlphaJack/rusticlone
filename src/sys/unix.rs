@@ -125,3 +125,9 @@ mod tests {
         assert_eq!(device(&root.join("not yet").join("created")), device(root));
     }
 }
+
+/// The system packages' folders, which root can write too.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn system_bins() -> Vec<PathBuf> {
+    vec![Path::new("/usr").join("bin"), PathBuf::from("/bin"), Path::new("/usr").join("sbin")]
+}

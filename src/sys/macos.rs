@@ -64,6 +64,17 @@ pub(super) fn network_fs(path: &Path) -> bool {
     NETWORK.iter().any(|n| name.starts_with(n))
 }
 
+/// Linux's alone: containers run Linux.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn container_markers() -> Option<[std::path::PathBuf; 2]> {
+    None
+}
+
+/// Linux's alone: macOS has no `/proc` to tell what is mounted.
+pub(crate) fn mount_tables() -> Option<[std::path::PathBuf; 2]> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;

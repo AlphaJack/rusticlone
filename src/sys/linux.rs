@@ -64,6 +64,19 @@ pub(super) fn network_fs(path: &Path) -> bool {
     NETWORK.iter().any(|&m| i128::from(m) == magic)
 }
 
+/// The files that Docker and Podman put in their containers.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+#[expect(clippy::unnecessary_wraps, reason = "other systems run no containers")]
+pub(crate) fn container_markers() -> Option<[PathBuf; 2]> {
+    Some([PathBuf::from("/.dockerenv"), Path::new("/run").join(".containerenv")])
+}
+
+/// What is mounted, and what `/etc/fstab` mounts at boot.
+#[expect(clippy::unnecessary_wraps, reason = "other systems have no such tables")]
+pub(crate) fn mount_tables() -> Option<[PathBuf; 2]> {
+    Some([Path::new("/proc").join("self").join("mounts"), Path::new("/etc").join("fstab")])
+}
+
 #[cfg(test)]
 mod tests {
     use std::{fs, os::unix::fs::symlink};

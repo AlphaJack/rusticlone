@@ -238,6 +238,23 @@ pub(crate) fn release_own_console() {
     }
 }
 
+/// Unix's alone: Windows keeps no packages' folder that a copy of root's own would share.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn system_bins() -> Vec<PathBuf> {
+    Vec::new()
+}
+
+/// Linux's alone: containers run Linux.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn container_markers() -> Option<[std::path::PathBuf; 2]> {
+    None
+}
+
+/// Linux's alone.
+pub(crate) fn mount_tables() -> Option<[PathBuf; 2]> {
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
