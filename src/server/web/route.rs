@@ -26,6 +26,8 @@ pub(in crate::server) enum Route<'a> {
     Run(&'a str, i64),
     Step(&'a str, i64, usize),
     CollectionRefresh(&'a str),
+    /// Opens the folder of a repository or source of the collection on this computer's desktop.
+    CollectionFolder(&'a str),
     /// A step's failure, by its [`crate::request::StepKey`].
     Failure(&'a str, &'a str),
     Notifications(&'a str),
@@ -74,6 +76,7 @@ impl Route<'_> {
             Self::Run(c, id) => run(c, id),
             Self::Step(c, id, step) => [and(run(c, id), "steps"), vec![Value("step", step.to_string())]].concat(),
             Self::CollectionRefresh(c) => and(collection(c), "refresh"),
+            Self::CollectionFolder(c) => and(collection(c), "folder"),
             Self::Failure(c, key) => [and(collection(c), "failures"), vec![Value("key", key.to_owned())]].concat(),
             Self::Notifications(c) => and(collection(c), "notifications"),
             Self::Repo(c, r) => repo(c, r),

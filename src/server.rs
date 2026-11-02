@@ -23,7 +23,7 @@ mod watcher;
 mod web;
 mod workers;
 
-use desktop::open_on_desktop;
+use desktop::{open_on_desktop, reveal_on_desktop};
 use listing::Listings;
 use notice::Notice;
 use service::{Hangups, Phase, interrupted, report, serve_web};
