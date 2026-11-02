@@ -1,7 +1,4 @@
-use super::{
-    Path, PathBuf, Removed, Result,
-    unix::{path_var, run},
-};
+use super::{Path, PathBuf, Removed, Result, unix::path_var};
 use crate::{NAME, sys};
 
 const ICON: &[u8] = include_bytes!("../../../assets/images/logo.svg");
@@ -16,9 +13,77 @@ fn desktop_files() -> Result<Option<[PathBuf; 2]>> {
     Ok(Some([entry, data.join("icons").join("hicolor").join("scalable").join("apps").join(format!("{NAME}.svg"))]))
 }
 
-fn systemctl(args: &[&str]) -> Result<()> {
-    let user = (!sys::is_root()).then_some("--user");
-    run("systemctl", &user.into_iter().chain(args.iter().copied()).collect::<Vec<_>>())
+/// The bus that systemd's manager of the server is on: the system's for root, else the user's.
+async fn bus() -> zbus::Result<zbus::Connection> {
+    if sys::is_root() { zbus::Connection::system().await } else { zbus::Connection::session().await }
+}
+
+/// Calls `method` of systemd's manager with `args`, as `systemctl` does, and reads its answer as `T`.
+fn manager<T>(method: &str, args: &(impl serde::Serialize + zbus::zvariant::DynamicType)) -> Result<T>
+where
+    T: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+{
+    let call = async {
+        let systemd = "org.freedesktop.systemd1";
+        let reply = bus()
+            .await?
+            .call_method(
+                Some(systemd),
+                "/org/freedesktop/systemd1",
+                Some("org.freedesktop.systemd1.Manager"),
+                method,
+                args,
+            )
+            .await?;
+        reply.body().deserialize::<T>()
+    };
+    Ok(tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(call)?)
+}
+
+/// Has systemd read the units again.
+fn reload() -> Result<()> {
+    manager::<()>("Reload", &())
+}
+
+/// Enabled, so that it starts at login, or with the computer for root.
+fn enable(service: &str) -> Result<()> {
+    manager::<(bool, Vec<(String, String, String)>)>("EnableUnitFiles", &(&[service][..], false, true)).map(drop)
+}
+
+fn disable(service: &str) -> Result<()> {
+    manager::<Vec<(String, String, String)>>("DisableUnitFiles", &(&[service][..], false)).map(drop)
+}
+
+/// Asks systemd to start, restart or stop `service`, without waiting for it.
+fn job(method: &str, service: &str) -> Result<()> {
+    manager::<zbus::zvariant::OwnedObjectPath>(method, &(service, "replace")).map(drop)
+}
+
+/// The unit file's state, as `systemctl is-enabled` prints it, or `None` when systemd has no such unit.
+fn state(service: &str) -> Option<String> {
+    manager::<String>("GetUnitFileState", &(service,)).ok()
+}
+
+/// Keeps the user's services running without a login, as `loginctl enable-linger` does.
+#[expect(unsafe_code, reason = "getuid has no preconditions")]
+fn linger() -> Result<()> {
+    // SAFETY: no preconditions.
+    let uid = unsafe { libc::getuid() };
+    let call = async {
+        let bus = zbus::Connection::system().await?;
+        let login = "org.freedesktop.login1";
+        let args = (uid, true, false);
+        bus.call_method(
+            Some(login),
+            "/org/freedesktop/login1",
+            Some("org.freedesktop.login1.Manager"),
+            "SetUserLinger",
+            &args,
+        )
+        .await
+    };
+    tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(call)?;
+    Ok(())
 }
 
 fn dir() -> Result<PathBuf> {
@@ -38,7 +103,7 @@ pub(super) fn headless() -> bool {
 /// so that a running server takes them. Headless, systemd keeps the user's services running without a login.
 pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
     if headless() {
-        run("loginctl", &["enable-linger"])?;
+        linger()?;
     }
     let (dir, service) = (dir()?, format!("{NAME}.service"));
     let unit = dir.join(&service);
@@ -54,9 +119,9 @@ pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<Pat
     let serve = serve.join(" ");
     let conf = format!("[Service]\nExecStart=\nExecStart=\"{escaped}\" {serve}\nEnvironment=\"PATH={path}\"\n");
     std::fs::write(drop_in.join("install.conf"), conf)?;
-    systemctl(&["daemon-reload"])?;
-    systemctl(&["enable", &service])?;
-    systemctl(&["restart", &service])?;
+    reload()?;
+    enable(&service)?;
+    job("RestartUnit", &service)?;
     if let Some([entry, icon]) = desktop_files()? {
         for (path, content) in [(&entry, super::packaging::desktop_entry(&exe).into_bytes()), (&icon, ICON.to_vec())] {
             std::fs::create_dir_all(path.parent().unwrap_or(path))?;
@@ -68,15 +133,19 @@ pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<Pat
 
 /// Whether systemd has the unit, from `install` or a package: a packaged one serves without `install`.
 fn known() -> bool {
-    systemctl(&["cat", &format!("{NAME}.service")]).is_ok()
+    state(&format!("{NAME}.service")).is_some()
 }
 
+/// Whether it starts at login, as `systemctl is-enabled` succeeds.
 pub(super) fn at_login() -> Option<bool> {
-    known().then(|| systemctl(&["is-enabled", "--quiet", &format!("{NAME}.service")]).is_ok())
+    /// The states in which `systemctl is-enabled` succeeds.
+    const ENABLED: [&str; 7] = ["enabled", "enabled-runtime", "static", "alias", "indirect", "generated", "transient"];
+    state(&format!("{NAME}.service")).map(|s| ENABLED.contains(&s.as_str()))
 }
 
 pub(super) fn set_at_login(on: bool) -> Result<()> {
-    systemctl(&[if on { "enable" } else { "disable" }, &format!("{NAME}.service")])
+    let service = format!("{NAME}.service");
+    if on { enable(&service) } else { disable(&service) }
 }
 
 /// Asks systemd to start the server unless it runs; false without its unit.
@@ -84,7 +153,7 @@ pub(super) fn start() -> Result<bool> {
     if !known() {
         return Ok(false);
     }
-    systemctl(&["start", &format!("{NAME}.service")])?;
+    job("StartUnit", &format!("{NAME}.service"))?;
     Ok(true)
 }
 
@@ -95,14 +164,15 @@ pub(super) fn uninstall() -> Result<Option<Removed>> {
     if !drop_in.join("install.conf").exists() {
         return Ok(None);
     }
-    systemctl(&["disable", "--now", &service])?;
+    disable(&service)?;
+    job("StopUnit", &service)?;
     std::fs::remove_file(drop_in.join("install.conf"))?;
     _ = std::fs::remove_dir(&drop_in);
     // A packaged unit stays.
     if std::fs::read_to_string(dir.join(&service)).is_ok_and(|u| u == super::packaging::unit()) {
         std::fs::remove_file(dir.join(&service))?;
     }
-    systemctl(&["daemon-reload"])?;
+    reload()?;
     for file in desktop_files()?.into_iter().flatten() {
         _ = std::fs::remove_file(file);
     }

@@ -34,6 +34,8 @@ struct Occurrence {
     /// Of a definition: the whole item, body included.
     enclosing: Option<Range>,
     in_body: bool,
+    /// Of a definition: in an `extern` block, a C function that no module owns.
+    foreign: bool,
 }
 
 pub(crate) fn check(mermaid: bool) -> Result<()> {
@@ -134,7 +136,9 @@ fn index(root: &Path, name: &str) -> Result<Vec<Vec<Occurrence>>> {
         .map(|(path, occurrences)| {
             let mut occurrences: Vec<Occurrence> =
                 occurrences.into_iter().filter_map(|o| Some(Occurrence { symbol: local(&o.symbol)?, ..o })).collect();
-            mark_bodies(&mut occurrences, &fs::read_to_string(root.join(path))?);
+            let source = fs::read_to_string(root.join(path))?;
+            mark_bodies(&mut occurrences, &source);
+            mark_foreign(&mut occurrences, &source);
             Ok(occurrences)
         })
         .collect::<Result<_>>()?;
@@ -162,6 +166,8 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph, BTreeSet<
             }
         }
     }
+    let foreign: BTreeSet<&str> =
+        documents.iter().flatten().filter(|o| o.definition && o.foreign).map(|o| o.symbol.as_str()).collect();
     let (mut modules, mut items, mut upcalls) = (Graph::new(), Graph::new(), BTreeSet::new());
     for occurrences in documents {
         for used in occurrences.iter().filter(|o| !o.definition) {
@@ -181,7 +187,8 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph, BTreeSet<
             // code is, which for a trait's `impl` may not be where its type is.
             let (a, b) = (module(&within.symbol), module(&used.symbol));
             // A free function's symbol ends in `().`, a method's has its type's `#` before.
-            let free = used.symbol.ends_with(").") && !used.symbol.contains('#');
+            let free =
+                used.symbol.ends_with(").") && !used.symbol.contains('#') && !foreign.contains(used.symbol.as_str());
             if free && b.len() < a.len() && a.starts_with(&b) {
                 let path =
                     |symbol: &str| format!("{name}::{}", symbol.replace('/', "::").trim_end_matches(['(', ')', '.']));
@@ -201,6 +208,22 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph, BTreeSet<
         }
     }
     (modules, items, upcalls)
+}
+
+/// Marks the definitions in an `extern` block: rust-analyzer may index two declarations of one C function as
+/// a single item of the crate's root, which would read as a call up to it.
+fn mark_foreign(occurrences: &mut [Occurrence], source: &str) {
+    let lines: Vec<&str> = source.lines().collect();
+    for o in occurrences.iter_mut().filter(|o| o.definition) {
+        let Ok(line) = usize::try_from(o.range[0]) else { continue };
+        // The block around the definition: the first line above it that opens more braces than it closes.
+        let (mut opened, mut closed) = (0, 0);
+        let opening = lines.iter().take(line).rev().find(|text| {
+            (opened, closed) = (opened + text.matches('{').count(), closed + text.matches('}').count());
+            opened > closed
+        });
+        o.foreign = opening.is_some_and(|text| text.contains("extern \""));
+    }
 }
 
 /// Marks what a function's body names: from the first `{` after the function's name to its end, which
@@ -286,7 +309,7 @@ fn occurrence(bytes: &[u8]) -> Option<Occurrence> {
             _ => {}
         }
     }
-    Some(Occurrence { range: range?, symbol, definition, enclosing, in_body: false })
+    Some(Occurrence { range: range?, symbol, definition, enclosing, in_body: false, foreign: false })
 }
 
 /// From `[line, column, end column]` on one line, else `[line, column, end line, end column]`.

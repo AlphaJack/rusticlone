@@ -1,15 +1,26 @@
-use super::{
-    Path, PathBuf, Removed, Result,
-    unix::{path_var, run},
-};
+use super::{Path, PathBuf, Removed, Result, unix::path_var};
 use crate::{APP_NAME, NAME, sys};
+
+#[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
+#[fluent(prefix = "autostart-error")]
+pub(crate) enum Error {
+    CannotRun { program: String, source: std::io::Error },
+    Failed { command: String, error: String },
+}
+
+/// Runs a command of macOS's that has no API, as launchd's and codesign's, failing with its output.
+fn run(program: &str, args: &[&str]) -> Result<()> {
+    let out = (std::process::Command::new(program).args(args).output())
+        .map_err(|source| Error::CannotRun { program: program.to_owned(), source })?;
+    if !out.status.success() {
+        let (command, output) = (format!("{program} {}", args.join(" ")), String::from_utf8_lossy(&out.stderr));
+        return Err(Error::Failed { command, error: output.trim().to_owned() }.into());
+    }
+    Ok(())
+}
 
 /// What macOS keys the user's approval and the app's permissions on: it never changes.
 const BUNDLE_ID: &str = "io.github.alphajack.rusticlone";
-const LSREGISTER: &str =
-    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
-/// System Settings, General, Login Items & Extensions.
-const LOGIN_ITEMS: &str = "x-apple.systempreferences:com.apple.LoginItems-Settings.extension";
 
 /// A binary property list holding one array of short ASCII strings, as macOS keeps a file's Spotlight
 /// keywords: the header, the array of references to the strings, the strings, the offset of each, and the
@@ -86,8 +97,48 @@ fn property_list(dict: &str) -> String {
 fn write_app(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
     let bundled = bundle(app, exe, version)?;
     // Finder and the Dock keep showing the icon they cached until the app is registered again.
-    run(LSREGISTER, &["-f", &app.to_string_lossy()])?;
+    register(app)?;
     Ok(bundled)
+}
+
+/// Registers `app` with Launch Services again, as `lsregister -f` does.
+#[expect(unsafe_code, reason = "Launch Services and CoreFoundation are C functions")]
+fn register(app: &Path) -> Result<()> {
+    use std::{ffi::c_void, os::unix::ffi::OsStrExt};
+    #[link(name = "CoreServices", kind = "framework")]
+    unsafe extern "C" {
+        fn LSRegisterURL(url: *const c_void, update: bool) -> i32;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFURLCreateFromFileSystemRepresentation(
+            allocator: *const c_void,
+            path: *const u8,
+            len: isize,
+            directory: bool,
+        ) -> *const c_void;
+        fn CFRelease(object: *const c_void);
+    }
+    let path = app.as_os_str().as_bytes();
+    // SAFETY: a path that lives through the call, and a URL released once.
+    let status = unsafe {
+        let url = CFURLCreateFromFileSystemRepresentation(
+            std::ptr::null(),
+            path.as_ptr(),
+            isize::try_from(path.len())?,
+            true,
+        );
+        if url.is_null() {
+            return Err(std::io::Error::from(std::io::ErrorKind::InvalidInput).into());
+        }
+        let status = LSRegisterURL(url, true);
+        CFRelease(url);
+        status
+    };
+    match status {
+        0 => Ok(()),
+        code => Err(std::io::Error::other(format!("{code}")).into()),
+    }
 }
 
 /// The app, with a copy of this executable, signed as itself rather than by the linker's anonymous
@@ -134,10 +185,19 @@ pub(super) fn bundle(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
     run("codesign", &["--force", "--sign", "-", &app.to_string_lossy()])?;
     // Kept outside the signature, which a later one would not take.
     if let Some(keywords) = bplist(&env!("KEYWORDS").split(';').collect::<Vec<_>>()) {
-        let hex: String = keywords.iter().map(|b| format!("{b:02x}")).collect();
-        run("xattr", &["-wx", "com.apple.metadata:kMDItemKeywords", &hex, &app.to_string_lossy()])?;
+        set_attribute(app, c"com.apple.metadata:kMDItemKeywords", &keywords)?;
     }
     Ok(bundled)
+}
+
+/// Sets the extended attribute `name` of `path` to `value`, as `xattr -w` does.
+#[expect(unsafe_code, reason = "setxattr reads the NUL-terminated path and name, and the value, it is given")]
+fn set_attribute(path: &Path, name: &std::ffi::CStr, value: &[u8]) -> Result<()> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = std::ffi::CString::new(path.as_os_str().as_bytes())?;
+    // SAFETY: a path, a name and a value that live through the call.
+    let set = unsafe { libc::setxattr(path.as_ptr(), name.as_ptr(), value.as_ptr().cast(), value.len(), 0, 0) };
+    if set == 0 { Ok(()) } else { Err(std::io::Error::last_os_error().into()) }
 }
 
 /// The package manager's executable when it changed since the app that holds `exe` copied it: not when the
@@ -239,7 +299,11 @@ pub(super) fn at_login() -> Option<bool> {
 pub(super) fn set_at_login(on: bool) -> Result<()> {
     run("launchctl", &[if on { "enable" } else { "disable" }, &format!("{}/{NAME}", domain())])?;
     if on && blocked() {
-        run("open", &[LOGIN_ITEMS])?;
+        // SAFETY: Apple states no requirement.
+        #[expect(unsafe_code, reason = "opens System Settings through Service Management")]
+        unsafe {
+            objc2_service_management::SMAppService::openSystemSettingsLoginItems();
+        }
     }
     Ok(())
 }
@@ -322,6 +386,20 @@ mod tests {
         assert!(signed_copy_differs, "codesign no longer changes the copy: the test proves less");
         assert_eq!(after_install, None);
         assert_eq!(after_upgrade, Some(source));
+    }
+
+    /// The app keeps its Spotlight keywords in the attribute that `xattr` reads.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "reads the attribute with xattr, which the code no longer runs")]
+    fn the_app_has_its_keywords() {
+        let app = std::env::temp_dir().join(format!("{}-keywords-{}.app", crate::NAME, std::process::id()));
+        super::bundle(&app, std::path::Path::new("/usr/bin/true"), "2.0.1").unwrap();
+        let read =
+            std::process::Command::new("xattr").args(["-px", "com.apple.metadata:kMDItemKeywords"]).arg(&app).output();
+        let hex: String = String::from_utf8(read.unwrap().stdout).unwrap().split_whitespace().collect();
+        std::fs::remove_dir_all(&app).unwrap();
+        let keywords = super::bplist(&env!("KEYWORDS").split(';').collect::<Vec<_>>()).unwrap();
+        assert_eq!(hex.to_lowercase(), keywords.iter().map(|b| format!("{b:02x}")).collect::<String>());
     }
 
     /// An update replaces the executable inside the app, which breaks its signature: written again, the app
