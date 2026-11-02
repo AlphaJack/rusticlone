@@ -140,10 +140,11 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Turn off Defender's real-time scanning
+      # Before anything is checked out, installed, built or written, so that no scanner reads it.
+      - name: Turn off Defender's scanners
         shell: pwsh
         run: |
-          Set-MpPreference -DisableRealtimeMonitoring $true
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true -DisableBlockAtFirstSeen $true
           "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
           "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
       - name: Check out repository
@@ -187,10 +188,11 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Turn off Defender's real-time scanning
+      # Before anything is checked out, installed, built or written, so that no scanner reads it.
+      - name: Turn off Defender's scanners
         shell: pwsh
         run: |
-          Set-MpPreference -DisableRealtimeMonitoring $true
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true -DisableBlockAtFirstSeen $true
           "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
           "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
       - name: Check out repository
@@ -220,6 +222,11 @@ jobs:
     name: clippy (windows-latest)
     runs-on: windows-latest
     steps:
+      # Before anything is checked out, installed, built or written, so that no scanner reads it.
+      - name: Turn off Defender's scanners
+        shell: pwsh
+        run: |
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true -DisableBlockAtFirstSeen $true
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
