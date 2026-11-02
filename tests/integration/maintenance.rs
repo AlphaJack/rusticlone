@@ -1,4 +1,9 @@
-use std::{fs, process::Stdio, sync::mpsc};
+use std::{
+    collections::BTreeSet,
+    fs,
+    path::{Path, PathBuf},
+    process::Stdio,
+};
 
 use serde_json::json;
 
@@ -107,16 +112,24 @@ fn a_target_of_several_jobs_is_checked_once() {
     assert_eq!(out.stdout.matches("Shared: checked data subset").count(), 1, "{}", out.stdout);
 }
 
-/// What a watched prune does: a file it adds to or removes from the repository, or its end.
-enum Did {
-    Changed,
-    Ended,
+/// The files under `dir`, read as they are, even while a prune adds and removes them.
+fn files(dir: &Path) -> BTreeSet<PathBuf> {
+    let mut found = BTreeSet::new();
+    for entry in fs::read_dir(dir).into_iter().flatten().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            found.extend(files(&path));
+        } else {
+            found.insert(path);
+        }
+    }
+    found
 }
 
 /// A prune killed at any point leaves a consistent repository: it writes repacked data before it
 /// deletes the old data, which it removes a day later. The next prune removes what remains. Rustic
 /// options that are not passed (`--early-delete-index`) could change that. This test
-/// repacks everything unused, the most a prune can do.
+/// repacks every pack, the most a prune can do.
 #[test]
 fn a_stopped_prune_leaves_the_repository_whole() {
     let sb = Sandbox::new();
@@ -132,61 +145,47 @@ fn a_stopped_prune_leaves_the_repository_whole() {
     };
     let ok = |args: &[&str]| sb.rustic(&[&["-P", "Docs"], args].concat()).status.success();
     write(24);
-    assert!(ok(&["backup", "--init"]));
+    // Small packs, so that the prune has many to repack, and so many steps to be stopped at.
+    assert!(ok(&["init"]) && ok(&["config", "--set-datapack-size", "1MiB", "--set-datapack-size-limit", "1MiB"]));
+    assert!(ok(&["backup"]));
     write(12);
     assert!(ok(&["backup"]) && ok(&["forget", "--keep-last", "1"]));
     let (repo, kept) = (sb.path("local/Docs"), sb.path("kept"));
-    let copy = |from: &std::path::Path, to: &std::path::Path| {
+    let copy = |from: &Path, to: &Path| {
         _ = fs::remove_dir_all(to);
         assert!(std::process::Command::new("cp").arg("-a").arg(from).arg(to).status().unwrap().success());
     };
     copy(&repo, &kept);
-    // Each prune tells what it did as it does it, so that it is stopped by what it did, not by time, which another
-    // machine's speed and load change.
+    // Each prune is stopped by the files it added or removed, not by time, which another machine's speed and load
+    // change. The files are listed, not watched: kqueue reports a new file as a change to its directory.
+    let before = files(&repo);
+    let changed = || before.symmetric_difference(&files(&repo)).count();
     let prune = || {
-        let (told, did) = mpsc::channel();
-        let changed = told.clone();
-        let mut watcher = notify::recommended_watcher(move |e: notify::Result<notify::Event>| {
-            if e.is_ok_and(|e| e.kind.is_create() || e.kind.is_remove()) {
-                _ = changed.send(Did::Changed);
-            }
-        })
-        .unwrap();
-        notify::Watcher::watch(&mut watcher, &repo, notify::RecursiveMode::Recursive).unwrap();
-        let mut pruning = sb
-            .command("rustic")
-            .args(["-P", "Docs", "prune"])
-            .stdout(Stdio::piped())
+        sb.command("rustic")
+            .args(["-P", "Docs", "prune", "--repack-all"])
+            .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .unwrap();
-        // Its output ends when it does, however it ends.
-        let mut output = pruning.stdout.take().unwrap();
-        std::thread::spawn(move || {
-            _ = std::io::copy(&mut output, &mut std::io::sink());
-            _ = told.send(Did::Ended);
-        });
-        (watcher, pruning, did)
+            .unwrap()
     };
-    copy(&kept, &repo);
-    let (watcher, mut whole, did) = prune();
+    let mut whole = prune();
     assert!(whole.wait().unwrap().success());
-    let total = did.iter().take_while(|d| matches!(d, Did::Changed)).count();
-    drop(watcher);
+    let total = changed();
     assert!(total > 2, "the prune changed {total} files");
     let mut stopped = 0;
     for sixth in 1..6 {
         // After a sixth of its changes in the first half, so that each stop is at another step of the prune.
         copy(&kept, &repo);
-        let (_watcher, mut pruning, did) = prune();
+        let mut pruning = prune();
         let changes = (total * sixth / 12).max(1);
-        if did.iter().take(changes).any(|d| matches!(d, Did::Ended)) {
-            _ = pruning.wait();
+        while pruning.try_wait().unwrap().is_none() && changed() < changes {
+            std::thread::yield_now();
+        }
+        _ = pruning.kill();
+        if pruning.wait().unwrap().success() {
             continue;
         }
         stopped += 1;
-        _ = pruning.kill();
-        _ = pruning.wait();
         // A killed prune could lose a pack or index. `check` verifies that every referenced one exists.
         assert!(ok(&["check"]), "killed at {sixth}/6: the repository is damaged");
         assert!(ok(&["prune"]) && ok(&["check"]), "killed at {sixth}/6: the next prune failed");
