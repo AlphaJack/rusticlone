@@ -3,7 +3,7 @@ allow-expect-in-tests = true
 allow-panic-in-tests = true
 too-many-lines-threshold = 80
 disallowed-methods = [
-  { path = "rusticlone::sys::presence", reason = "a source is read through rustic, whose hooks may mount or fill it" },
+  { path = "rusticlone::sys::disk::presence", reason = "a source is read through rustic, whose hooks may mount or fill it" },
   { path = "std::thread::sleep", reason = "use condition-based waits or a clock abstraction" },
   { path = "rusticlone::clock::sleep", reason = "wait for a notification: clock::wait, a channel or a signal" },
   { path = "tokio::time::sleep", reason = "wait for a notification: a channel, a watch or a signal" },
