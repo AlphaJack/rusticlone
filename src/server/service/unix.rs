@@ -47,3 +47,21 @@ pub(super) fn report(phase: Phase) {
     };
     _ = sd_notify::notify(&[state]);
 }
+
+/// Windows's alone.
+pub(super) fn running() -> bool {
+    false
+}
+
+/// Windows's alone: systemd and launchd run the server as any process.
+pub(super) fn as_service() -> bool {
+    false
+}
+
+/// Windows's alone: [`as_service`] is never true here.
+pub(super) fn run_service(serve: Box<dyn FnOnce() -> anyhow::Result<()> + Send>) -> anyhow::Result<()> {
+    serve()
+}
+
+/// Signals stop the server here: see [`signal`].
+pub(super) fn stop_on_request() {}

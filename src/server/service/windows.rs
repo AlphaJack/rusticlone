@@ -34,8 +34,32 @@ pub(super) fn report(phase: Phase) {
     _ = phase;
 }
 
-#[cfg(feature = "desktop")]
-pub(in crate::server) use manager::{run, running, stop_on_request};
+/// Whether the service manager started this process.
+pub(super) fn running() -> bool {
+    #[cfg(feature = "desktop")]
+    return manager::running();
+    #[cfg(not(feature = "desktop"))]
+    false
+}
+
+/// An administrator's server is the system service, which only the desktop build installs.
+pub(super) fn as_service() -> bool {
+    cfg!(feature = "desktop") && crate::sys::is_root()
+}
+
+/// Runs `serve` as the service if the service manager started this process, else as it is.
+pub(super) fn run_service(serve: Box<dyn FnOnce() -> anyhow::Result<()> + Send>) -> anyhow::Result<()> {
+    #[cfg(feature = "desktop")]
+    return manager::run(serve);
+    #[cfg(not(feature = "desktop"))]
+    serve()
+}
+
+/// Stops the server when Windows ends the user's session.
+pub(super) fn stop_on_request() {
+    #[cfg(feature = "desktop")]
+    manager::stop_on_request();
+}
 
 /// The service manager's side, which only the desktop build installs.
 #[cfg(feature = "desktop")]

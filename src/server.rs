@@ -2,11 +2,23 @@
 
 mod desktop;
 mod listing;
+#[cfg(not(tray))]
+mod no_tray;
 mod notice;
 mod service;
 mod timer;
 #[cfg(tray)]
 mod tray;
+#[cfg(not(tray))]
+use no_tray as tray;
+#[cfg(unix)]
+mod unix;
+#[cfg(unix)]
+use unix as os;
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as os;
 mod watcher;
 mod web;
 mod workers;
@@ -16,7 +28,6 @@ use listing::Listings;
 use notice::Notice;
 use service::{Hangups, Phase, interrupted, report, serve_web};
 use timer::wall_clock;
-#[cfg(tray)]
 use tray::Tray;
 use watcher::{Reload, watch_files};
 use web::{Browsed, Tokens, login_tokens};
@@ -183,7 +194,7 @@ pub(crate) enum Fault {
         source: std::io::Error,
     },
     /// Ends the Windows service after an update, so that the service manager starts the new executable.
-    #[cfg(all(windows, feature = "desktop", feature = "self-update"))]
+    #[cfg(feature = "self-update")]
     Restarting,
     NoSession(#[source] getrandom::Error),
     NoToken(#[source] getrandom::Error),
@@ -256,7 +267,6 @@ pub(crate) fn serve(
     listen: &str,
     open: bool,
 ) -> Result<()> {
-    #[cfg(windows)]
     crate::sys::release_own_console();
     let listen = listen.to_owned();
     let serve = move |tray| {
@@ -277,16 +287,11 @@ pub(crate) fn serve(
         runtime.block_on(run(Arc::new(build), &listen, open, tray))
     };
     // The system service runs without a desktop, so without a tray.
-    #[cfg(all(windows, feature = "desktop"))]
-    if crate::sys::is_root() {
-        return service::windows::run(Box::new(move || serve(None)));
+    if service::as_service() {
+        return service::run_service(Box::new(move || serve(None)));
     }
-    #[cfg(all(windows, feature = "desktop"))]
-    service::windows::stop_on_request();
-    #[cfg(tray)]
-    return tray::beside(open, serve);
-    #[cfg(not(tray))]
-    serve(None)
+    service::stop_on_request();
+    tray::beside(open, serve)
 }
 
 /// Starts the executable, just replaced, in place of this process, with the same arguments: on Unix as the
@@ -295,31 +300,12 @@ pub(crate) fn serve(
 #[cfg(feature = "self-update")]
 #[expect(clippy::disallowed_methods, reason = "starts the updated rusticlone, not rustic")]
 fn restart(exe: &std::path::Path) -> Result<()> {
+    if service::running() {
+        return Err(Fault::Restarting.into());
+    }
     let mut command = std::process::Command::new(exe);
     command.args(std::env::args_os().skip(1));
-    #[cfg(unix)]
-    return Err(std::os::unix::process::CommandExt::exec(&mut command).into());
-    #[cfg(windows)]
-    {
-        #[cfg(feature = "desktop")]
-        if service::windows::running() {
-            return Err(Fault::Restarting.into());
-        }
-        let flags = windows_sys::Win32::System::Threading::DETACHED_PROCESS;
-        std::os::windows::process::CommandExt::creation_flags(&mut command, flags).spawn()?;
-        Ok(())
-    }
-}
-
-/// No tray icon on other systems, nor without the desktop.
-#[cfg(not(tray))]
-struct Tray(std::convert::Infallible);
-
-#[cfg(not(tray))]
-impl Tray {
-    fn follow(self, _: Arc<App>, _: String, _: String) -> std::future::Ready<()> {
-        match self.0 {}
-    }
+    os::restart(&mut command)
 }
 
 fn local_url(addr: SocketAddr) -> String {
@@ -335,9 +321,7 @@ fn bind(listen: &str) -> std::io::Result<tokio::net::TcpListener> {
         if addr.is_ipv6() {
             socket.set_only_v6(false)?;
         }
-        // As std does, so that a restart need not wait for the old connections to time out.
-        #[cfg(unix)]
-        socket.set_reuse_address(true)?;
+        os::reuse_address(&socket)?;
         socket.set_nonblocking(true)?;
         socket.bind(&addr.into())?;
         socket.listen(LISTEN_BACKLOG)?;

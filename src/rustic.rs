@@ -35,6 +35,8 @@ pub(crate) use output::{Failure, Output, Progress, Pruned};
 pub(crate) use process::kill;
 #[cfg(all(windows, feature = "server"))]
 pub(crate) use process::tie;
+#[cfg(feature = "server")]
+pub(crate) use process::tie_child;
 #[cfg(test)]
 mod replay;
 #[cfg(test)]

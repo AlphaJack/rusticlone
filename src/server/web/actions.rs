@@ -1,6 +1,7 @@
 //! Actions that pages start, cancel, dismiss or refresh, for every collection, one collection or one repository,
 //! as the path names it.
 
+use crate::sys::INSTALLER;
 use askama::Template;
 use std::{path::PathBuf, sync::Arc};
 
@@ -46,25 +47,6 @@ impl FromRequestParts<Arc<App>> for Selection {
 fn whose(app: &App, selection: &Selection) -> String {
     selection.collection().map_or_else(|| Label::EveryCollection.to_string(), |c| app.engine().title(c))
 }
-
-/// The installer's command on this system, without `install`: on a new computer, the server would back up the
-/// folders before they are restored.
-#[cfg(windows)]
-const INSTALLER: &str = concat!(
-    "irm ",
-    env!("CARGO_PKG_REPOSITORY"),
-    "/releases/latest/download/",
-    env!("CARGO_PKG_NAME"),
-    "-installer.ps1 | iex"
-);
-#[cfg(not(windows))]
-const INSTALLER: &str = concat!(
-    "curl -LsSf ",
-    env!("CARGO_PKG_REPOSITORY"),
-    "/releases/latest/download/",
-    env!("CARGO_PKG_NAME"),
-    "-installer.sh | sh"
-);
 
 /// Where the profiles were saved, and how to restore from them on a new computer.
 #[derive(Template)]

@@ -16,6 +16,26 @@ use windows as imp;
 
 pub(super) use imp::Hangups;
 
+/// Whether the Windows service manager started this process.
+pub(super) fn running() -> bool {
+    imp::running()
+}
+
+/// Whether the server runs as the system service: an administrator's, on Windows.
+pub(super) fn as_service() -> bool {
+    imp::as_service()
+}
+
+/// Runs `serve` as the system service.
+pub(super) fn run_service(serve: Box<dyn FnOnce() -> anyhow::Result<()> + Send>) -> anyhow::Result<()> {
+    imp::run_service(serve)
+}
+
+/// Stops the server when the system asks, as when Windows ends the user's session.
+pub(super) fn stop_on_request() {
+    imp::stop_on_request();
+}
+
 /// Asks the server to stop, as SIGTERM does: the tray's Quit, and the Windows service manager.
 #[cfg(feature = "desktop")]
 pub(super) static STOP: tokio::sync::Notify = tokio::sync::Notify::const_new();
