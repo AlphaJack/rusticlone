@@ -105,13 +105,22 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           save-if: ${{ github.ref == 'refs/heads/main' && (!matrix.partition || matrix.partition == '1/4') }}
+      # The tests' sandboxes write many small files, which a Dev Drive's ReFS writes faster.
+      - name: Put the tests' temporary files on a Dev Drive
+        if: runner.os == 'Windows'
+        uses: samypr100/setup-dev-drive@562171fe8df7401fdf582d766cd3b6ab80d5b1a0 # v4.1.0
+        with:
+          drive-size: 4GB
+          trusted-dev-drive: true
+          env-mapping: |
+            TEMP,{{ DEV_DRIVE }}/tmp
+            TMP,{{ DEV_DRIVE }}/tmp
       - name: Turn off Defender's real-time scanning
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Set-MpPreference -DisableRealtimeMonitoring $true
-          "TEMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
-          "TMP=$env:RUNNER_TEMP" >> $env:GITHUB_ENV
+          New-Item -ItemType Directory -Force "$env:TEMP" | Out-Null
       - name: Install cargo-nextest
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
