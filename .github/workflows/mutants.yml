@@ -82,7 +82,6 @@ jobs:
       - name: Mutate the library
         env:
           SHARD: ${{ matrix.shard }}
-        # -v and -V log each caught and unbuildable mutant as it ends, so the log moves.
         run: cargo mutants -vV --in-place --test-tool nextest --shard "$SHARD/40" --no-shuffle
       - name: Upload what the tests missed
         if: always()
