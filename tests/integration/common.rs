@@ -573,6 +573,7 @@ pub(crate) mod cmd {
     }
 
     /// Ends once `file` exists, which the test creates when it lets the command end.
+    #[cfg(feature = "server")]
     pub(crate) fn until_exists(file: &Path) -> String {
         if cfg!(windows) {
             format!(
