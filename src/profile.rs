@@ -322,7 +322,7 @@ pub(crate) fn load(name: &str, dir: &Path, config: &Config) -> Result<RusticProf
         return Err(Error::SlashedDrive { location: repository.to_owned() });
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
-        && let Some(scheme) = backslash_after_scheme(repository, cfg!(windows))
+        && let Some(scheme) = backslash_after_scheme(repository, std::path::MAIN_SEPARATOR == '\\')
     {
         let (location, scheme) = (repository.to_owned(), scheme.to_owned());
         return Err(Error::BackslashAfterScheme { location, scheme });
@@ -553,9 +553,10 @@ mod tests {
         assert_eq!(paths(&["../other"]), [abs("a/other")]);
         assert_eq!(paths(&["sub", "../other"]), [abs("a/b/sub"), abs("a/other")]);
         // Another system's folders stay as that system recorded them.
-        let foreign = if cfg!(windows) { "/home/me/Docs" } else { r"C:\Users\me\Docs" };
+        let backslashed = std::path::MAIN_SEPARATOR == '\\';
+        let foreign = if backslashed { "/home/me/Docs" } else { r"C:\Users\me\Docs" };
         assert_eq!(paths(&[foreign]), [foreign]);
-        let (separator, root) = if cfg!(windows) { ("/", "/") } else { ("\\", "D:\\") };
+        let (separator, root) = if backslashed { ("/", "/") } else { ("\\", "D:\\") };
         assert_eq!(paths(&[&format!("{foreign}{separator}")]), [foreign], "rustic drops a trailing separator");
         assert_eq!(paths(&[root]), [root]);
         fs::remove_dir_all(dir).unwrap();

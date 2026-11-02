@@ -145,11 +145,16 @@ pub(crate) fn system_bins() -> Vec<PathBuf> {
 pub(crate) fn release_own_console() {}
 
 /// Read and written by its owner alone.
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", all(feature = "desktop", feature = "self-update")))]
 const OWNER_ONLY: u32 = 0o600;
 
 /// Lets only this user read and write the file `options` opens.
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", all(feature = "desktop", feature = "self-update")))]
 pub(crate) fn only_owner(options: &mut std::fs::OpenOptions) {
     std::os::unix::fs::OpenOptionsExt::mode(options, OWNER_ONLY);
+}
+
+/// Where `app` keeps its state for this user: machine-local, not the purgeable caches.
+pub(crate) fn user_state_dir(base: &impl etcetera::BaseStrategy, app: &str) -> PathBuf {
+    base.state_dir().unwrap_or_else(|| base.data_dir()).join(app)
 }
