@@ -1,0 +1,48 @@
+name: Mutants
+
+# Changes the lines a pull request changes, one mutation at a time, and lists those its unit tests do not
+# catch. Not a required check: a miss is for the author to weigh.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutants-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+      - name: Install cargo-nextest and cargo-mutants
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest,cargo-mutants
+      - name: Diff against the base branch
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: git diff "$BASE...HEAD" > "$RUNNER_TEMP/pr.diff"
+      - name: Mutate the changed lines
+        run: cargo mutants --profile mutants --test-tool nextest --in-diff "$RUNNER_TEMP/pr.diff" -- --lib
+      - name: Upload what the tests missed
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutants
+          path: mutants.out

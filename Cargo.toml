@@ -219,6 +219,11 @@ strip = true
 [profile.dist]
 inherits = "release"
 
+# cargo mutants builds once per mutant: debug info only slows each build and link.
+[profile.mutants]
+inherits = "test"
+debug = "none"
+
 [workspace.metadata.dist]
 cargo-dist-version = "0.33.0"
 precise-builds = true
