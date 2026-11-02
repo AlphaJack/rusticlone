@@ -15,6 +15,8 @@ pub(in crate::server) enum Route<'a> {
     SetupNotifications,
     /// The free space of the local disk the first collection is saved to.
     SetupFree,
+    /// The size of a folder the first collection backs up.
+    SetupSize,
     /// Opens the folder of the saved profiles on this computer's desktop.
     ProfileFolder,
     /// The runs of every collection.
@@ -65,6 +67,7 @@ impl Route<'_> {
             Self::Setup => vec![Word("setup")],
             Self::SetupNotifications => vec![Word("setup"), Word("notifications")],
             Self::SetupFree => vec![Word("setup"), Word("free")],
+            Self::SetupSize => vec![Word("setup"), Word("size")],
             Self::ProfileFolder => vec![Word("setup"), Word("folder")],
             Self::Runs => vec![Word("runs")],
             Self::Refresh => vec![Word("refresh")],
