@@ -87,4 +87,14 @@ mod tests {
         let found = [solid_state_in(&sys, 8, 1), solid_state_in(&sys, 253, 1), solid_state_in(&sys, 0, 26)];
         assert_eq!(found, [Some(false), Some(true), None]);
     }
+
+    /// As `/usr/bin` of a package. Root writes there anyway.
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    #[test]
+    fn a_folder_only_root_writes_is_not_writable() {
+        if crate::sys::is_root() {
+            return;
+        }
+        assert!(!crate::sys::writable(std::path::Path::new("/usr/bin")));
+    }
 }

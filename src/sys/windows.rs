@@ -271,4 +271,11 @@ mod tests {
         assert!(device(&root).is_some());
         assert_eq!(device(&root.join("not yet").join("created")), device(&root));
     }
+
+    /// Windows is not asked: its own folders are writable by whom they belong to.
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    #[test]
+    fn any_folder_is_writable() {
+        assert!(crate::sys::writable(Path::new(r"C:\Windows")));
+    }
 }

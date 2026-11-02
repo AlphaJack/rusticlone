@@ -9,11 +9,7 @@ use anyhow::Result;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 
-#[cfg(not(windows))]
-use super::download::untar as unpack;
-#[cfg(windows)]
-use super::download::unzip as unpack;
-use super::download::{fetch, install};
+use super::download::{fetch, install, unpack};
 
 use crate::log::{Level, Message};
 
@@ -230,7 +226,7 @@ fn replace(dry_run: bool) -> Result<Logged> {
     std::fs::remove_file(&new)?;
     replaced?;
     // Else the app shows the old version, and its signature no longer covers its executable.
-    #[cfg(all(target_os = "macos", feature = "desktop"))]
+    #[cfg(feature = "desktop")]
     crate::install::autostart::rewrite_app(&to)?;
     Ok(Logged::Updated { from, to })
 }
