@@ -456,6 +456,7 @@ button-open-folder = { $os ->
 button-copy-folder-path = Copia il percorso della cartella
 button-see-how = Vedi come
 button-cron-syntax = Sintassi cron
+button-new-collection = Nuova raccolta
 
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 
@@ -534,6 +535,7 @@ hint-cross-site = rifiutato: l'ha inviato un altro sito. Apri { -name } direttam
 hint-name-or-path = parte di un nome o di un percorso
 hint-where-it-was = dov'era, o una cartella come /tmp/restored
 hint-now = adesso, o un momento come 2026-10-01 12:00
+hint-measuring = Calcolo della dimensione…
 hint-notify = URL di notifica, o niente
 notice-started = { $collection }: { $what }
 notice-refreshing = { $collection }: aggiornamento in corso
@@ -561,7 +563,10 @@ missing-run = esecuzione non trovata
 missing-repository = archivio non trovato
 missing-snapshot = snapshot non trovato
 free-missing = cartella o disco non trovato
+free-short = meno delle cartelle da salvare
 free-bytes = { $size } liberi
+measured-missing = { free-missing }
+measured-bytes = { $size } in { $files } file
 
 ## L'aiuto delle metriche
 
@@ -615,6 +620,7 @@ keep-year = Un anno
 keep-month = Un mese
 keep-all = Per sempre
 setup-key-repository = archivio
+setup-key-immutable = immutable
 field-repository-password = Password dell'archivio
 field-server-key = Chiave del server
 field-choice-accept = Qualsiasi chiave
@@ -636,6 +642,8 @@ field-secret-key = Chiave segreta
 field-password = Password
 field-email = Email
 field-url = URL
+field-object-lock = Questo bucket ha Object Lock
+field-append-only = Questo server accetta solo aggiunte
 setup-guide = guida completa alla configurazione: { $url }
 setup-no-choice = nessuna scelta { $choice }
 setup-error-name = il nome deve iniziare con una lettera o una cifra; gli altri caratteri possono essere lettere, cifre, `-`, `_` o `.`
