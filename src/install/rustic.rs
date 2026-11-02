@@ -89,7 +89,7 @@ pub(crate) fn download(ask: bool) -> Result<()> {
     key.verify(&data, &signature, false).map_err(|source| Error::Unsigned { archive: archive.clone(), source })?;
     install(&untar(&archive, &data, &name())?, &path)?;
     crate::log::did(&t!("release-downloaded", version = version.to_string(), path = path.display().to_string()));
-    super::on_path::put(path.parent().unwrap_or(&path))
+    super::path::put(path.parent().unwrap_or(&path))
 }
 
 #[cfg(test)]

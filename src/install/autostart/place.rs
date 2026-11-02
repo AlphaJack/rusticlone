@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::Serialize;
 
-use crate::{install::on_path, log, sys};
+use crate::{install::path, log, sys};
 
 #[derive(Debug, Serialize, crate::i18n::Fluent)]
 #[fluent(prefix = "place")]
@@ -74,7 +74,7 @@ pub(super) fn place(placed: &Path) -> Result<()> {
     if crate::install::managed(placed) {
         return Ok(());
     }
-    on_path::put(dir)
+    path::put(dir)
 }
 
 /// Moves `from` over `to`. Windows keeps an executable locked a moment after its process exits, while the

@@ -430,7 +430,7 @@ fn attributes(text: &str) -> bool {
 
 #[test]
 fn notification_toggles_follow_the_urls() {
-    let setup = crate::first_run::Setup { notify: "tgram://token/chat mailtos://me".into(), ..Default::default() };
+    let setup = crate::setup::Setup { notify: "tgram://token/chat mailtos://me".into(), ..Default::default() };
     let page = Page::of(&SetupFormView::new(setup));
     assert_eq!(page.attrs("[data-schemes][checked]", "data-schemes"), ["mailto mailtos", "tgram"]);
     // Generic endpoints are typed, not toggled.

@@ -154,7 +154,7 @@ pub(super) fn log_tail(engine: &Engine, collection: &str, run: i64, from: Option
 
 /// Log lines, which the page appends as they come.
 #[derive(Template, Default)]
-#[template(path = "log_lines.html")]
+#[template(path = "lines.html")]
 pub(super) struct LogLines(pub(super) Vec<LogLineView>);
 
 /// A log line in local time: `11:03:42 rustic backup` in Berlin.

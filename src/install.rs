@@ -7,7 +7,7 @@ mod attest;
 pub(crate) mod autostart;
 #[cfg(feature = "self-update")]
 mod download;
-pub(crate) mod on_path;
+pub(crate) mod path;
 #[cfg(feature = "self-update")]
 pub(crate) mod rustic;
 #[cfg(feature = "self-update")]

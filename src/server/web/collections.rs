@@ -20,13 +20,14 @@ use crate::{
     engine::{
         Blocked, Collection, CollectionOverview, Engine, Issue, RepoOverview, RepoStatus, Schedule, Unconfigured,
     },
-    first_run, fmt,
+    fmt,
     log::{Level, Message},
     profile,
     profile::{RusticProfile, Sources},
     result::{Detail, StepResult},
     rustic::{self, Snapshot},
     server::listing::Listing,
+    setup,
 };
 
 /// Runs on the overview.
@@ -349,7 +350,7 @@ pub(super) fn index_main(app: &App) -> IndexMain {
         .collect();
     let empty = inputs.is_empty().then(|| Empty {
         dir: profile::own_dir().map(|d| d.display().to_string()).unwrap_or_default(),
-        writable: first_run::dir().is_some(),
+        writable: setup::dir().is_some(),
     });
     #[cfg(feature = "desktop")]
     let blocked = crate::install::autostart::blocked().map(|b| b.to_string());

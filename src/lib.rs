@@ -19,8 +19,6 @@ mod args;
 pub mod cli;
 mod clock;
 mod engine;
-#[cfg(feature = "server")]
-mod first_run;
 mod fmt;
 #[cfg(feature = "server")]
 mod health;
@@ -37,6 +35,8 @@ mod rustic;
 #[cfg(feature = "server")]
 mod server;
 mod settings;
+#[cfg(feature = "server")]
+mod setup;
 mod shape;
 mod state;
 mod sys;

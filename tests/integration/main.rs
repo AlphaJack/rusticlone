@@ -8,7 +8,7 @@ mod backup;
 #[cfg(feature = "server")]
 mod client;
 mod copy;
-mod dry_run;
+mod dryrun;
 mod forget;
 mod isolation;
 mod maintenance;
