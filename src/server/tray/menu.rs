@@ -12,7 +12,7 @@ pub(super) fn tooltip(level: Level) -> String {
 }
 
 pub(super) fn open_label() -> String {
-    format!("Open {APP_NAME}")
+    crate::i18n::t!("tray-open")
 }
 
 pub(super) fn version_label() -> String {

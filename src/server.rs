@@ -136,7 +136,11 @@ pub(crate) struct Changed(pub(super) Vec<String>);
 
 impl std::fmt::Display for Changed {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.0.is_empty() { Ok(()) } else { write!(f, ": {} changed", self.0.join(", ")) }
+        if self.0.is_empty() {
+            Ok(())
+        } else {
+            write!(f, ": {}", crate::i18n::t!("server-changed", files = self.0.join(", ")))
+        }
     }
 }
 

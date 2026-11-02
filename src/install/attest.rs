@@ -125,7 +125,7 @@ impl CryptoProvider for Ring {
     /// Only a timestamp authority's signature is checked over a digest, and GitHub's attestations of public
     /// repositories have none: ring cannot.
     fn verify_prehashed(&self, scheme: SigningScheme, _: &[u8], _: &[u8], _: &[u8]) -> crypto::Result<()> {
-        Err(crypto::Error::UnsupportedAlgorithm(format!("{scheme:?} over a digest")))
+        Err(crypto::Error::UnsupportedAlgorithm(crate::i18n::t!("attest-over-digest", scheme = format!("{scheme:?}"))))
     }
 }
 
