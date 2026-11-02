@@ -5,6 +5,8 @@
 mod common;
 
 mod backup;
+#[cfg(all(feature = "server", target_os = "linux"))]
+mod bus;
 #[cfg(feature = "server")]
 mod client;
 mod copy;

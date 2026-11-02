@@ -29,11 +29,39 @@ pub(crate) fn needs_disk_access(path: &str) -> bool {
     protected && std::fs::File::open("/Library/Application Support/com.apple.TCC/TCC.db").is_err()
 }
 
-/// From `diskutil`, for the device the file system is mounted from.
-#[expect(unsafe_code, reason = "statfs fills a zeroed struct for a NUL-terminated path")]
-#[expect(clippy::disallowed_methods, reason = "runs diskutil for the disk of `path`")]
+/// Asks `IOKit` whether the disk under `path` is an SSD. The answer sits on the storage device above the
+/// partition or APFS volume, where `diskutil` reads it too.
+#[expect(unsafe_code, reason = "statfs, IOKit and CoreFoundation are C functions")]
+#[expect(clippy::disallowed_methods, reason = "finds the folder of `path` that exists")]
 pub(super) fn solid_state(path: &Path) -> Option<bool> {
-    use std::os::unix::ffi::OsStrExt;
+    use std::{
+        ffi::{c_char, c_void},
+        os::unix::ffi::OsStrExt,
+    };
+    #[link(name = "IOKit", kind = "framework")]
+    unsafe extern "C" {
+        fn IOBSDNameMatching(main: u32, options: u32, name: *const c_char) -> *mut c_void;
+        fn IOServiceGetMatchingService(main: u32, matching: *mut c_void) -> u32;
+        fn IORegistryEntrySearchCFProperty(
+            entry: u32,
+            plane: *const c_char,
+            key: *const c_void,
+            allocator: *const c_void,
+            options: u32,
+        ) -> *const c_void;
+        fn IOObjectRelease(object: u32) -> i32;
+    }
+    #[link(name = "CoreFoundation", kind = "framework")]
+    unsafe extern "C" {
+        fn CFStringCreateWithCString(allocator: *const c_void, text: *const c_char, encoding: u32) -> *const c_void;
+        fn CFDictionaryGetValue(dict: *const c_void, key: *const c_void) -> *const c_void;
+        fn CFEqual(a: *const c_void, b: *const c_void) -> bool;
+        fn CFRelease(object: *const c_void);
+    }
+    /// `kCFStringEncodingUTF8`.
+    const UTF8: u32 = 0x0800_0100;
+    /// `kIORegistryIterateRecursively | kIORegistryIterateParents`: up from the volume to its device.
+    const UP: u32 = 1 | 2;
     let existing = path.ancestors().find(|p| p.exists())?;
     let path = std::ffi::CString::new(existing.as_os_str().as_bytes()).ok()?;
     // SAFETY: a valid C string and a struct statfs fills.
@@ -41,12 +69,35 @@ pub(super) fn solid_state(path: &Path) -> Option<bool> {
     if unsafe { libc::statfs(path.as_ptr(), &raw mut stat) } != 0 {
         return None;
     }
-    // SAFETY: statfs NUL-terminates the name.
-    let from = unsafe { std::ffi::CStr::from_ptr(stat.f_mntfromname.as_ptr()) }.to_str().ok()?.to_owned();
-    let info = std::process::Command::new("diskutil").args(["info", "-plist", &from]).output().ok()?;
-    let plist = String::from_utf8(info.stdout).ok()?;
-    let value = plist.split_once("<key>SolidState</key>")?.1.trim_start();
-    [("<true/>", true), ("<false/>", false)].into_iter().find_map(|(tag, v)| value.starts_with(tag).then_some(v))
+    // SAFETY: statfs NUL-terminates the device name, such as `/dev/disk3s1`.
+    let from = unsafe { std::ffi::CStr::from_ptr(stat.f_mntfromname.as_ptr()) };
+    let name = std::ffi::CString::new(from.to_bytes().strip_prefix(b"/dev/")?).ok()?;
+    // SAFETY: every string, service and property is released once, the lookup consumes the matching
+    // dictionary, and the dictionary is read while held.
+    unsafe {
+        let string = |text: &std::ffi::CStr| CFStringCreateWithCString(std::ptr::null(), text.as_ptr(), UTF8);
+        let (characteristics, medium, solid) =
+            (string(c"Device Characteristics"), string(c"Medium Type"), string(c"Solid State"));
+        let service = IOServiceGetMatchingService(0, IOBSDNameMatching(0, 0, name.as_ptr()));
+        let found = (service != 0)
+            .then(|| {
+                IORegistryEntrySearchCFProperty(service, c"IOService".as_ptr(), characteristics, std::ptr::null(), UP)
+            })
+            .filter(|dict| !dict.is_null());
+        let answer = found.map(|dict| {
+            let value = CFDictionaryGetValue(dict, medium);
+            let answer = (!value.is_null()).then(|| CFEqual(value, solid));
+            CFRelease(dict);
+            answer
+        });
+        if service != 0 {
+            IOObjectRelease(service);
+        }
+        for s in [characteristics, medium, solid] {
+            CFRelease(s);
+        }
+        answer.flatten()
+    }
 }
 
 #[expect(unsafe_code, reason = "statfs fills a zeroed struct for a NUL-terminated path")]
@@ -92,6 +143,16 @@ mod tests {
     fn a_local_disk_says_whether_it_seeks() {
         let root = Path::new("/");
         assert_eq!(solid_state(&root.join("not yet").join("created")), solid_state(root));
+    }
+
+    /// `IOKit` and `diskutil` agree about the disk of `/`.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "compares with diskutil")]
+    fn iokit_agrees_with_diskutil() {
+        let info = std::process::Command::new("diskutil").args(["info", "-plist", "/"]).output().unwrap();
+        let plist = String::from_utf8(info.stdout).unwrap();
+        let said = plist.split_once("<key>SolidState</key>").map(|(_, v)| v.trim_start().starts_with("<true/>"));
+        assert_eq!(solid_state(Path::new("/")), said, "{plist}");
     }
 
     /// Folders that macOS asks about at the first read need no Full Disk Access.

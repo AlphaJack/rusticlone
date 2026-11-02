@@ -600,27 +600,49 @@ fn healthcheck_tells_whether_the_server_answers() {
     healthcheck().assert_exit(1).assert_result("error", json!({}));
 }
 
-/// A `PATH` whose `program` only records its arguments in `log`, so that the tests reach no real service
-/// manager. A call with `cat` fails, as for a unit that is not installed yet. `loginctl`, which a headless
-/// install runs, does nothing, so that lingering stays off for the user who runs the tests. None for root,
-/// whose install is the system's, in folders that no sandbox holds.
+/// The service manager that `install` reaches, which only records what it is asked in `log`, so that the
+/// tests touch no real one. On macOS, a `launchctl` first on `PATH`. On Linux, a D-Bus of its own with
+/// systemd and logind. None for root, whose install writes to the system's folders, which no sandbox holds.
 #[cfg(unix)]
 #[expect(clippy::disallowed_methods, reason = "asks the system who runs the tests")]
-fn fake_service_manager(sb: &Sandbox, program: &str, log: &std::path::Path) -> Option<String> {
-    use std::os::unix::fs::PermissionsExt;
+fn fake_service_manager(sb: &Sandbox, log: &std::path::Path) -> Option<Fake> {
     if std::process::Command::new("id").arg("-u").output().is_ok_and(|o| o.stdout == b"0\n") {
         eprintln!("skipped: as root, install writes to the system's folders");
         return None;
     }
-    let bin = sb.path("bin");
-    fs::create_dir_all(&bin).unwrap();
-    let script = format!("#!/bin/sh\necho \"$*\" >> {}\ncase \" $* \" in *\" cat \"*) exit 1;; esac\n", log.display());
-    for (program, script) in [(program, script.as_str()), ("loginctl", "#!/bin/sh\n")] {
-        fs::write(bin.join(program), script).unwrap();
-        fs::set_permissions(bin.join(program), fs::Permissions::from_mode(0o755)).unwrap();
+    let path = std::env::var("PATH").unwrap();
+    #[cfg(target_os = "linux")]
+    return Some(Fake { path, bus: crate::bus::FakeBus::start(sb, log) });
+    #[cfg(not(target_os = "linux"))]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let bin = sb.path("bin");
+        fs::create_dir_all(&bin).unwrap();
+        fs::write(bin.join("launchctl"), format!("#!/bin/sh\necho \"$*\" >> {}\n", log.display())).unwrap();
+        fs::set_permissions(bin.join("launchctl"), fs::Permissions::from_mode(0o755)).unwrap();
+        let path = std::env::join_paths([bin].into_iter().chain(std::env::split_paths(&path)));
+        Some(Fake { path: path.unwrap().into_string().unwrap() })
     }
-    let path = std::env::join_paths([bin].into_iter().chain(std::env::split_paths(&std::env::var("PATH").unwrap())));
-    Some(path.unwrap().into_string().unwrap())
+}
+
+/// What `fake_service_manager` sets up, kept for as long as the test runs.
+#[cfg(unix)]
+struct Fake {
+    path: String,
+    #[cfg(target_os = "linux")]
+    bus: crate::bus::FakeBus,
+}
+
+#[cfg(unix)]
+impl Fake {
+    /// The variables that send `install` to the fake.
+    fn env(&self) -> Vec<(&str, &str)> {
+        #[cfg(target_os = "linux")]
+        let bus = self.bus.env();
+        #[cfg(not(target_os = "linux"))]
+        let bus: [(&str, &str); 0] = [];
+        [("PATH", self.path.as_str())].into_iter().chain(bus).collect()
+    }
 }
 
 /// `install --auto-update` turns auto-update on in the env file, in place of the line that set it and
@@ -631,12 +653,11 @@ fn fake_service_manager(sb: &Sandbox, program: &str, log: &std::path::Path) -> O
 fn install_turns_auto_update_on_in_the_env_file() {
     use std::os::unix::fs::PermissionsExt;
     let sb = docs_with_remote("");
-    let manager = if cfg!(target_vendor = "apple") { "launchctl" } else { "systemctl" };
-    let Some(path) = fake_service_manager(&sb, manager, &sb.path("manager.log")) else { return };
+    let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
     let config = if cfg!(target_vendor = "apple") { "home/Library/Application Support" } else { "config" };
     let file = sb.path(&format!("{config}/{NAME}/{NAME}.env"));
     let install = |args: &[&str]| {
-        sb.run_with(args, &[("PATH", &path)]).assert_exit(0);
+        sb.run_with(args, &fake.env()).assert_exit(0);
     };
     install(&["install", "--auto-update"]);
     assert_eq!(fs::read_to_string(&file).unwrap(), "RUSTICLONE_AUTO_UPDATE=true\n");
@@ -670,9 +691,9 @@ fn install_enables_a_user_service() {
         return; // As root, it would write in /etc/systemd/system.
     }
     let sb = docs_with_remote("");
-    let log = sb.path("systemctl.log");
-    let Some(path) = fake_service_manager(&sb, "systemctl", &log) else { return };
-    sb.run_with(&["install"], &[("PATH", &path)]).assert_exit(0);
+    let log = sb.path("systemd.log");
+    let Some(fake) = fake_service_manager(&sb, &log) else { return };
+    sb.run_with(&["install"], &fake.env()).assert_exit(0);
     let dir = sb.path("config/systemd/user");
     let (unit, drop_in) =
         (dir.join(format!("{NAME}.service")), dir.join(format!("{NAME}.service.d")).join("install.conf"));
@@ -680,15 +701,19 @@ fn install_enables_a_user_service() {
     let packaged = include_str!("../../packaging/linux/rusticlone.service").split_once('\n').map(|(_, unit)| unit);
     assert_eq!(Some(fs::read_to_string(&unit).unwrap().as_str()), packaged);
     let conf = fs::read_to_string(&drop_in).unwrap();
-    assert!(conf.contains(&format!("{NAME}\" serve\n")) && conf.contains(&format!("PATH={path}\"")), "{conf}");
+    assert!(conf.contains(&format!("{NAME}\" serve\n")) && conf.contains(&format!("PATH={}\"", fake.path)), "{conf}");
     let calls = fs::read_to_string(&log).unwrap();
-    let started = format!("--user daemon-reload\n--user enable {NAME}.service\n--user restart {NAME}.service\n");
+    let started = format!("Reload\nEnableUnitFiles {NAME}.service\nRestartUnit {NAME}.service\n");
     assert!(calls.ends_with(&started), "{calls}");
-    sb.run_with(&["uninstall"], &[("PATH", &path)]).assert_exit(0);
+    sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
     assert_eq!(leftovers(&dir), Vec::<String>::new());
-    assert!(fs::read_to_string(&log).unwrap().contains(&format!("--user disable --now {NAME}.service\n")));
+    assert!(
+        fs::read_to_string(&log)
+            .unwrap()
+            .contains(&format!("DisableUnitFiles {NAME}.service\nStopUnit {NAME}.service\n"))
+    );
     // Again: nothing to undo.
-    sb.run_with(&["uninstall"], &[("PATH", &path)]).assert_exit(0).assert_result("not-installed", json!({}));
+    sb.run_with(&["uninstall"], &fake.env()).assert_exit(0).assert_result("not-installed", json!({}));
 }
 
 /// `install` writes a login agent that runs the app it writes, signed, and loads it; `uninstall` unloads it
@@ -699,23 +724,23 @@ fn install_loads_a_login_agent() {
     use rusticlone::APP_NAME;
     let sb = docs_with_remote("");
     let log = sb.path("launchctl.log");
-    let Some(path) = fake_service_manager(&sb, "launchctl", &log) else { return };
-    sb.run_with(&["install"], &[("PATH", &path)]).assert_exit(0);
+    let Some(fake) = fake_service_manager(&sb, &log) else { return };
+    sb.run_with(&["install"], &fake.env()).assert_exit(0);
     let (dir, apps) = (sb.path("home/Library/LaunchAgents"), sb.path("home/Applications"));
     let plist = fs::read_to_string(dir.join(format!("{NAME}.plist"))).unwrap();
     let exe = apps.join(format!("{APP_NAME}.app")).join("Contents").join("MacOS").join(APP_NAME);
-    assert!(plist.contains("<string>serve</string>") && plist.contains(&path), "{plist}");
+    assert!(plist.contains("<string>serve</string>") && plist.contains(&fake.path), "{plist}");
     assert!(plist.contains(&format!("<string>{}</string>", exe.display())), "{plist}");
     let app = exe.ancestors().nth(3).unwrap();
     let status = |program: &str, args: &[&str]| std::process::Command::new(program).args(args).arg(app).output();
     assert!(status("codesign", &["--verify"]).unwrap().status.success());
     assert!(status("xattr", &["-p", "com.apple.metadata:kMDItemKeywords"]).unwrap().status.success());
     assert!(fs::read_to_string(&log).unwrap().contains("bootstrap gui/"));
-    sb.run_with(&["uninstall"], &[("PATH", &path)]).assert_exit(0);
+    sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
     assert_eq!(leftovers(&dir), Vec::<String>::new());
     assert_eq!(leftovers(&apps), Vec::<String>::new());
     assert!(fs::read_to_string(&log).unwrap().contains("bootout gui/"));
-    sb.run_with(&["uninstall"], &[("PATH", &path)]).assert_exit(0).assert_result("not-installed", json!({}));
+    sb.run_with(&["uninstall"], &fake.env()).assert_exit(0).assert_result("not-installed", json!({}));
 }
 
 /// Run from a folder that is not on `PATH`, such as Downloads, `install` copies itself where the installer
@@ -724,9 +749,8 @@ fn install_loads_a_login_agent() {
 #[test]
 fn install_copies_itself_onto_path() {
     let sb = docs_with_remote("");
-    let manager = if cfg!(target_vendor = "apple") { "launchctl" } else { "systemctl" };
-    let Some(path) = fake_service_manager(&sb, manager, &sb.path("manager.log")) else { return };
-    let install = || sb.run_with(&["install"], &[("PATH", &path), ("SHELL", "/bin/zsh")]);
+    let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
+    let install = || sb.run_with(&["install"], &[fake.env(), vec![("SHELL", "/bin/zsh")]].concat());
     install().assert_exit(0).assert_result("copied", json!({})).assert_result("on-path", json!({}));
     install().assert_exit(0);
     assert!(sb.path("home/.cargo/bin").join(NAME).is_file());
@@ -736,7 +760,7 @@ fn install_copies_itself_onto_path() {
     }
     let sourced = std::process::Command::new("sh").arg("-c").arg(format!("{source}; echo $PATH")).output().unwrap();
     assert!(String::from_utf8_lossy(&sourced.stdout).starts_with(&sb.path("home/.cargo/bin").display().to_string()));
-    sb.run_with(&["uninstall"], &[("PATH", &path)]).assert_exit(0);
+    sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
 }
 
 /// `uninstall --delete` also deletes the state directory, never the profiles nor the repositories.
@@ -744,11 +768,10 @@ fn install_copies_itself_onto_path() {
 #[test]
 fn uninstall_deletes_the_state() {
     let sb = docs_with_remote("");
-    let manager = if cfg!(target_vendor = "apple") { "launchctl" } else { "systemctl" };
-    let Some(path) = fake_service_manager(&sb, manager, &sb.path("manager.log")) else { return };
+    let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
     sb.run(&["backup", "--all"]).assert_exit(0);
     assert!(sb.path("store/state.redb").is_file());
-    sb.run_with(&["uninstall", "--delete"], &[("PATH", &path)]).assert_exit(0).assert_result("deleted", json!({}));
+    sb.run_with(&["uninstall", "--delete"], &fake.env()).assert_exit(0).assert_result("deleted", json!({}));
     assert!(!sb.path("store").exists());
     assert!(sb.profile_path("Docs").is_file() && sb.path("local/Docs/config").is_file());
 }
