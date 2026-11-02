@@ -23,7 +23,6 @@ server = [
     "dep:sd-notify",
     "dep:socket2",
     "dep:tokio",
-    "dep:fluent-langneg",
     "dep:tokio-util",
 ]
 
@@ -112,10 +111,10 @@ self-replace = { version = "1.5.1", optional = true }
 ring = "0.17.14"
 # GitHub's build attestations of rusticlone's releases.
 sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
-i18n-embed = { version = "0.16.0", features = ["fluent-system"] }
 fluent = "0.17.0"
-# Picks a page's language from its Accept-Language header.
-fluent-langneg = { version = "0.13.1", optional = true }
+# Picks the catalog for the languages asked for, and a page's from its Accept-Language header.
+fluent-langneg = "0.13.1"
+unic-langid = "0.9.6"
 # The languages that macOS's and Windows's settings list, when no LANG or LC_* variable asks for one.
 sys-locale = "0.3.2"
 rusticlone-macros = { path = "macros", version = "2.0.4" }
@@ -129,6 +128,8 @@ winresource = { version = "0.1.34", optional = true }
 toml_edit = "0.25.17"
 
 [dev-dependencies]
+# Lists the English catalog's messages.
+fluent-syntax = "0.12.0"
 insta = { version = "1.49.0", features = ["json", "filters"] }
 scraper = "0.29.0"
 proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
