@@ -17,7 +17,7 @@ pub(crate) fn foreign_path(path: &str) -> bool {
 
 /// Where `install` places rusticlone for root.
 pub(crate) fn system_bin_dir() -> PathBuf {
-    PathBuf::from("/usr/local/bin")
+    PathBuf::from("/usr").join("local").join("bin")
 }
 
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.
@@ -124,4 +124,10 @@ mod tests {
         assert!(device(root).is_some());
         assert_eq!(device(&root.join("not yet").join("created")), device(root));
     }
+}
+
+/// The system packages' folders, which root can write too.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn system_bins() -> Vec<PathBuf> {
+    vec![Path::new("/usr").join("bin"), PathBuf::from("/bin"), Path::new("/usr").join("sbin")]
 }

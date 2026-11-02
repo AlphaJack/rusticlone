@@ -25,14 +25,15 @@ pub(crate) fn presence(path: &std::path::Path) -> Presence {
     if !empty {
         return Presence::Present;
     }
+    let Some([mounts, fstab]) = super::os::mount_tables() else { return Presence::Missing };
     // Both files write a space as `\040`.
-    let points = |file: &str| -> Vec<PathBuf> {
+    let points = |file: &std::path::Path| -> Vec<PathBuf> {
         let text = std::fs::read_to_string(file).unwrap_or_default();
         let lines = text.lines().filter(|l| !l.trim_start().starts_with('#'));
         lines.filter_map(|l| l.split_whitespace().nth(1)).map(|p| p.replace("\\040", " ").into()).collect()
     };
-    let mounted = points("/proc/self/mounts");
-    let expected = points("/etc/fstab").into_iter().filter(|m| m != std::path::Path::new("/") && path.starts_with(m));
+    let mounted = points(&mounts);
+    let expected = points(&fstab).into_iter().filter(|m| m != std::path::Path::new("/") && path.starts_with(m));
     match expected.max_by_key(|m| m.components().count()) {
         Some(mount) if !mounted.contains(&mount) => Presence::Unmounted,
         _ => Presence::Missing,
