@@ -13,6 +13,9 @@ mod process;
 mod snapshot;
 
 pub(crate) use cli::Cli;
+use cli::shell_word;
+use commands::ok;
+pub(crate) use commands::tree_path;
 pub(crate) use commands::{Reading, RestorePlan};
 #[cfg(feature = "server")]
 pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
@@ -75,15 +78,6 @@ impl Call {
             Some(dir) => format!("cd {} && {command}", shell_word(OsStr::new(dir))),
             None => command,
         }
-    }
-}
-
-fn shell_word(word: &OsStr) -> String {
-    let word = word.to_string_lossy();
-    if !word.is_empty() && word.chars().all(|c| c.is_ascii_alphanumeric() || "_-./:=,@%+".contains(c)) {
-        word.into_owned()
-    } else {
-        format!("'{}'", word.replace('\'', "'\\''"))
     }
 }
 
@@ -245,10 +239,6 @@ impl Rustic {
     }
 }
 
-fn ok(out: Output) -> Result<Output> {
-    if out.success { Ok(out) } else { Err(Error::Failed(out.failure()).into()) }
-}
-
 /// The fixture `name` recorded with each rustic release in `tests/fixtures/rustic-*/`, with the
 /// release. Parsers are tested with every release supported.
 #[cfg(test)]
@@ -280,15 +270,6 @@ mod tests {
         ] {
             assert_eq!(shell_word(OsStr::new(word)), expected);
         }
-    }
-}
-
-/// `path` as rustic names it in a snapshot's tree from any system. rustic on Windows records `C:\Users\me`
-/// as `C/Users/me` in the tree. Elsewhere it finds it only as `/C/Users/me`.
-pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
-    match crate::sys::windows_drive(path).filter(|_| !cfg!(windows)) {
-        Some((letter, rest)) => format!("/{letter}{}", rest.replace('\\', "/")).into(),
-        None => path.into(),
     }
 }
 

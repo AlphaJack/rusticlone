@@ -8,7 +8,11 @@ use tray_icon::{
     menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
 };
 
-use super::{Rgb, Row, SIDE, Switch, level, open_label, pixels, quit, quit_label, tooltip, version_label};
+use super::{
+    Row, Switch,
+    logo::{Rgb, SIDE, pixels},
+    menu::{level, open_label, quit, quit_label, tooltip, version_label},
+};
 use crate::log::Level;
 
 thread_local! {
