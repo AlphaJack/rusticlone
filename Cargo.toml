@@ -131,7 +131,7 @@ toml_edit = "0.25.17"
 [dev-dependencies]
 insta = { version = "1.49.0", features = ["json", "filters"] }
 scraper = "0.29.0"
-proc-macro2 = "1.0.107"
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 syn = { version = "2.0.119", features = ["full", "visit"] }
 
 [target."cfg(unix)".dependencies]

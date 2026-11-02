@@ -71,7 +71,8 @@ $R backup --all
 - Lookups go through the `Store` and `Ledger` helpers, not keys rebuilt by hand.
 - Unused code goes, and so does code that only an earlier version needed.
 - No hacks: data structures, algorithms and interactions are built for the long run. A kernel notification and SSE, not polling and a page that reloads itself.
-- What should be refactored is refactored first, not built upon.
+- What should be refactored is refactored first, in a PR of its own, not built upon.
+- A system's calls go in a file per system, picked by a `cfg` over its `mod` declaration and a `use ... as imp;`. Each such file defines the same functions, so no other code needs a system's `cfg`. `tests/systems.rs` checks it.
 
 ## DRY principle
 
