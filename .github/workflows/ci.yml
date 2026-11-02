@@ -92,6 +92,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # Before anything is installed, built or written, so that no scanner reads it.
+      - name: Turn off Defender's scanners
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: >
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true
+          -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true
+          -DisableBlockAtFirstSeen $true
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
@@ -115,12 +123,10 @@ jobs:
           env-mapping: |
             TEMP,{{ DEV_DRIVE }}/tmp
             TMP,{{ DEV_DRIVE }}/tmp
-      - name: Turn off Defender's real-time scanning
+      - name: Create the tests' temporary folder
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          Set-MpPreference -DisableRealtimeMonitoring $true
-          New-Item -ItemType Directory -Force "$env:TEMP" | Out-Null
+        run: New-Item -ItemType Directory -Force "$env:TEMP" | Out-Null
       - name: Install cargo-nextest
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
@@ -162,6 +168,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Turn off Defender's scanners
+        shell: pwsh
+        run: >
+          Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true
+          -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true
+          -DisableBlockAtFirstSeen $true
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
