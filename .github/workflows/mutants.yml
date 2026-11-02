@@ -1,8 +1,6 @@
 name: Mutants
 
-# Changes the library one mutation at a time and lists those that no test catches, unit or integration.
-# Once a week overnight, from Friday evening, 20 shards at a time: all the runners there are. Everything it
-# needs is in this file.
+# Lists the mutations of the library that no test catches.
 on:
   schedule:
     - cron: "0 19 * * 5"
