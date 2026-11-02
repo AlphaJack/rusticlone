@@ -1,11 +1,12 @@
 //! `collections`: each collection's status, with what its profiles configure, as a tree.
 
+use super::board;
+use crate::{clock, engine::Collection, result::RunResults};
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 
 use super::{
-    each_collection,
     text::{Kind, Text, Warning},
     tree::{Tree, tree},
 };
@@ -282,4 +283,23 @@ fn profile_info(engine: &Engine, p: &profile::RusticProfile, inherited: &BTreeSe
         warnings,
         error: (kind == Kind::Broken).then(|| Text::NoSources.to_string()),
     }
+}
+
+/// Each collection, without reporting broken profiles first: as [`super::for_each_collection`], for `collections`,
+/// which lists them.
+pub(super) fn each_collection(
+    engine: &Engine,
+    collections: &[Collection<'_>],
+    heading: &str,
+    f: impl Fn(&Collection<'_>) -> RunResults,
+) -> Level {
+    let mut level = Level::Success;
+    for collection in collections.iter().take_while(|_| !clock::interrupted()) {
+        let mut report = f(collection);
+        board::leave_out(&mut report);
+        board::print(&report, heading);
+        level = level.max(report.level());
+        engine.notify(collection);
+    }
+    level
 }

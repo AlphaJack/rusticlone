@@ -5,9 +5,9 @@ use std::iter;
 
 use parking_lot::Mutex;
 
-use super::{SPIN, branch};
+use super::SPIN;
 use crate::{
-    cli::tree::{Tree, tree},
+    cli::tree::{Tree, branch, tree},
     clock,
     log::{self, Hooks, Level, Shown, Tone},
 };

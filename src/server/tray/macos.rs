@@ -14,7 +14,10 @@ use objc2_app_kit::{
 use objc2_foundation::{NSPoint, NSRect, NSSize};
 use parking_lot::Mutex;
 
-use super::{DOT, Rgb, Row, SIDE, Switch, dot, icon, ink};
+use super::{
+    Row, Switch, icon,
+    logo::{DOT, Rgb, SIDE, dot, ink},
+};
 
 /// The page that logs in to the web UI, once the server serves it.
 static LOGIN: Mutex<Option<String>> = Mutex::new(None);
@@ -56,11 +59,8 @@ pub(in crate::server) struct Tray(());
 
 /// Runs `serve` beside the menu bar icon when its user runs it in their desktop session; elsewhere, as
 /// over SSH, runs it alone.
-pub(in crate::server) fn beside(
-    open: bool,
-    serve: impl FnOnce(Option<Tray>) -> Result<()> + Send + 'static,
-) -> Result<()> {
-    let desktop = super::attended(open) && objc2_core_graphics::CGSessionCopyCurrentDictionary().is_some();
+pub(super) fn beside(attended: bool, serve: impl FnOnce(Option<Tray>) -> Result<()> + Send + 'static) -> Result<()> {
+    let desktop = attended && objc2_core_graphics::CGSessionCopyCurrentDictionary().is_some();
     let Some(mtm) = MainThreadMarker::new().filter(|_| desktop) else { return serve(None) };
     let app = NSApplication::sharedApplication(mtm);
     // No Dock icon nor menu of its own.

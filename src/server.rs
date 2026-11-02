@@ -1,5 +1,6 @@
 //! The server: the scheduler, a thread per run, and the web UI.
 
+mod desktop;
 mod listing;
 mod notice;
 mod service;
@@ -10,6 +11,7 @@ mod watcher;
 mod web;
 mod workers;
 
+use desktop::open_on_desktop;
 use listing::Listings;
 use notice::Notice;
 use service::{Hangups, Phase, interrupted, report, serve_web};
@@ -359,11 +361,6 @@ fn announce(url: String, tokens: &Tokens, open: bool) {
 
 fn login_url(url: &str, tokens: &Tokens) -> String {
     format!("{url}login#{}", tokens.admin.reveal())
-}
-
-/// Whether the desktop opened `target`: a page in the browser, or a folder in the file manager.
-fn open_on_desktop(target: String) -> bool {
-    open::that_detached(target).map_err(|e| log::event(None, &Logged::NotOpened { error: e.to_string() })).is_ok()
 }
 
 /// With a server already on `listen`, as after `install`, opens it logged in, with the token it keeps

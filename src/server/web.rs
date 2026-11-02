@@ -18,6 +18,7 @@ mod forms;
 mod free;
 mod label;
 mod metrics;
+mod page;
 mod repo;
 mod route;
 mod runs;
@@ -25,36 +26,35 @@ mod runs;
 mod tests;
 
 use crate::i18n::Language;
-use assets::{asset_url, theme_colors};
-use auth::Access;
 pub(super) use auth::{Tokens, login_tokens};
 pub(super) use browse::Browsed;
 use label::{Button, Heading, Hint, Label};
+use page::{Base, Flash, Layout, LiveQuery, blocking, flash, layout, live, now, render, render_str};
 pub(super) use route::Route;
 
-use std::{any::Any, convert::Infallible, sync::Arc};
+use std::sync::Arc;
 
 use askama::Template;
 use axum::{
     Json, Router,
-    extract::{FromRequestParts, State},
-    http::{HeaderName, HeaderValue, StatusCode, header, request::Parts},
+    extract::State,
+    http::{HeaderName, HeaderValue, StatusCode, header},
     middleware,
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{delete, get, post},
 };
 use jiff::Timestamp;
 
 use super::{App, Changes, Notice};
-use crate::{APP_NAME, engine::Last, fmt, log::Level, shape, sys};
+use crate::{APP_NAME, engine::Last, fmt, log::Level, shape};
 
 /// Every page links to the source code, as the AGPL requires for network use.
-const SOURCE: &str = env!("CARGO_PKG_REPOSITORY");
+pub(super) const SOURCE: &str = env!("CARGO_PKG_REPOSITORY");
 pub(super) const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Pages load only resources from this server, and cannot be framed.
 const CSP: &str = "default-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 /// Inlined in every page: an external sprite would draw the icons after the page.
-const ICONS: &str = include_str!("../../assets/images/sprite.svg");
+pub(super) const ICONS: &str = include_str!("../../assets/images/sprite.svg");
 
 pub(super) fn router(app: Arc<App>) -> Router {
     let status = async |State(app): State<Arc<App>>| {
@@ -179,56 +179,17 @@ impl From<super::Fault> for Error {
     }
 }
 
-/// Runs `f` outside the async runtime, so that other requests are served meanwhile, in the request's language.
-async fn blocking(f: impl FnOnce() -> Result + Send + 'static) -> Response {
-    let language = Language::current();
-    tokio::task::spawn_blocking(move || language.scope(f))
-        .await
-        .unwrap_or_else(|e| Err(Error::Internal(e.to_string())))
-        .into_response()
-}
-
-/// The path where the reverse proxy serves the web UI (`X-Forwarded-Prefix`), which starts every link.
-/// Templates read it as `base`.
-#[derive(Clone, Default)]
-struct Base(String);
-
-impl<S: Sync> FromRequestParts<S> for Base {
-    type Rejection = Infallible;
-
-    async fn from_request_parts(parts: &mut Parts, _: &S) -> Result<Self, Infallible> {
-        let prefix = parts.headers.get("x-forwarded-prefix").and_then(|v| v.to_str().ok());
-        Ok(Self::new(prefix.unwrap_or_default()))
-    }
-}
-
-impl Base {
-    /// Empty unless it is a plain path on this host, so that no link can lead elsewhere.
-    fn new(prefix: &str) -> Self {
-        let prefix = prefix.trim_end_matches('/');
-        let valid = prefix.starts_with('/')
-            && !prefix.starts_with("//")
-            && prefix.bytes().all(|b| b.is_ascii_alphanumeric() || b"/-._~".contains(&b));
-        Self(if valid { prefix.to_owned() } else { String::new() })
-    }
-
-    fn to(&self, route: Route<'_>) -> String {
-        format!("{}{route}", self.0)
-    }
-}
-
-fn render_with(t: &impl Template, base: &Base) -> askama::Result<String> {
-    let base: &dyn Any = &base.0;
-    t.render_with_values(&("base", base))
-}
-
-fn render_str(t: &impl Template, base: &Base) -> String {
-    render_with(t, base).unwrap_or_else(|e| format!("<p>{e}</p>"))
-}
-
-fn render(t: &impl Template, base: &Base) -> Response {
-    render_with(t, base)
-        .map_or_else(|e| Error::Internal(e.to_string()).into_response(), |html| Html(html).into_response())
+/// What a request may do as the server's account.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::server) enum Access {
+    /// The admin token: a script, or a reverse proxy that adds it.
+    Token,
+    /// A session from the login page, which can log out.
+    Session,
+    /// The metrics token: `/metrics` and `/status` only.
+    Metrics,
+    /// Only the login page, assets and `/health`.
+    Anonymous,
 }
 
 /// A collection, and one of its runs: the one its page shows (unset: the newest), or the one to stop
@@ -239,71 +200,11 @@ struct RunPath {
     id: Option<i64>,
 }
 
-/// The query string of a page's event stream: an `events::View`.
-struct LiveQuery {
-    v: u64,
-    h: u64,
-    collection: Option<String>,
-    repo: Option<String>,
-    run: Option<i64>,
-    log: Option<(i64, u64)>,
-}
-
-/// Read before the page is rendered, so that a change during rendering is sent.
-fn live(app: &App, collection: Option<&str>, repo: Option<&str>, run: Option<i64>) -> LiveQuery {
-    let (collection, repo) = (collection.map(Into::into), repo.map(Into::into));
-    LiveQuery { v: app.pages.changes.borrow().count, h: 0, collection, repo, run, log: None }
-}
-
-/// A whole page. `live`: the events that update its `<main>`.
-#[derive(Template)]
-#[template(path = "layout.html")]
-struct Layout {
-    title: String,
-    live: Option<LiveQuery>,
-    /// Logged in with a session, which can log out.
-    logout: bool,
-    main: String,
-}
-
-fn layout(title: &str, live: Option<LiveQuery>, access: Access, base: &Base, main: String) -> Response {
-    let title = format!("{title} | {APP_NAME}");
-    let live = live.map(|l| LiveQuery { h: sys::fnv1a(main.as_bytes()), ..l });
-    render(&Layout { title, live, logout: access == Access::Session, main }, base)
-}
-
-/// The response to a request: a message in the page's flash area. The page itself is updated by its
-/// event stream.
-fn flash(notice: &Notice) -> Response {
-    let html = render_str(&Flash::of(notice), &Base::default());
-    ([("hx-retarget", "#flash"), ("hx-reswap", "innerHTML")], Html(html)).into_response()
-}
-
-#[derive(Template)]
-#[template(path = "flash.html")]
-struct Flash {
-    level: &'static str,
-    message: String,
-}
-
-impl Flash {
-    fn of(notice: &Notice) -> Self {
-        Self { level: notice.level().into(), message: notice.to_string() }
-    }
-}
-
 #[derive(Template)]
 #[template(path = "404.html")]
 struct NotFound {
     /// What was not found, if the handler said.
     what: String,
-}
-
-/// The time pages are rendered at. Open pages are rendered again when what they show changes with it, so that
-/// their ages stay current.
-#[expect(clippy::disallowed_methods, reason = "pages show ages as of now")]
-fn now() -> Timestamp {
-    Timestamp::now()
 }
 
 /// A time shown as an age, or a word.

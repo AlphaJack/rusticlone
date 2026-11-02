@@ -1,5 +1,6 @@
 //! The command line.
 
+use collections::each_collection;
 use std::{cell::RefCell, iter, process::ExitCode, time::Duration};
 
 use anyhow::Result;
@@ -416,23 +417,4 @@ fn for_each_collection(engine: &Engine, heading: &str, f: impl Fn(&Collection<'_
     let collections = engine.collections();
     let Some(level) = found(engine, &collections) else { return Level::Warning };
     level.max(each_collection(engine, &collections, heading, f))
-}
-
-/// Each collection, without reporting broken profiles first: as [`for_each_collection`], for `collections`,
-/// which lists them.
-fn each_collection(
-    engine: &Engine,
-    collections: &[Collection<'_>],
-    heading: &str,
-    f: impl Fn(&Collection<'_>) -> RunResults,
-) -> Level {
-    let mut level = Level::Success;
-    for collection in collections.iter().take_while(|_| !clock::interrupted()) {
-        let mut report = f(collection);
-        board::leave_out(&mut report);
-        board::print(&report, heading);
-        level = level.max(report.level());
-        engine.notify(collection);
-    }
-    level
 }

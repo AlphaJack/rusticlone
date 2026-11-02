@@ -1,6 +1,7 @@
 //! In a terminal, each run of this process as its plan of steps, redrawn as it goes. A run that ends
 //! stays printed, and its results are left out of the report that follows.
 
+use super::tree::branch;
 use std::{
     collections::BTreeMap,
     iter,
@@ -16,7 +17,7 @@ use crate::{
     clock,
     engine::Engine,
     live::{Live, Runs},
-    log::{self, Level, Message, Tone},
+    log::{self, Message, Tone},
     result::{RunResults, Status},
     rustic::Progress,
     state::{ResultRecord, RunRecord, StepRecord},
@@ -185,34 +186,6 @@ fn section_lines(collection: &str, heading: &str, messages: &[&dyn Message]) -> 
     iter::once(head).chain(tree(&branches.collect::<Vec<_>>()).lines().map(ToOwned::to_owned)).collect()
 }
 
-/// A message at `level`: its first line with its dot, then the others below it.
-fn branch(level: Level, text: &str) -> Tree {
-    let mut text = text.lines();
-    let first = log::paint(level, text.next().unwrap_or_default());
-    Tree { line: format!("{} {first}", Tone::from(level).dot()), below: below(text) }
-}
-
-/// A message's lines after its first. A line that starts with a level's emoji, as a notification's issues,
-/// goes below the line before it that does not, with that level's dot instead.
-fn below(lines: std::str::Lines<'_>) -> Vec<Tree> {
-    let mut branches: Vec<Tree> = Vec::new();
-    for line in lines {
-        let dotted = [Level::Success, Level::Warning, Level::Failure]
-            .into_iter()
-            .find_map(|level| Some((level, line.strip_prefix(level.emoji())?.trim_start())));
-        let Some((level, text)) = dotted else {
-            branches.push(Tree::leaf(line.to_owned()));
-            continue;
-        };
-        let leaf = Tree::leaf(format!("{} {}", level.dot(), log::paint(level, text)));
-        match branches.last_mut() {
-            Some(parent) => parent.below.push(leaf),
-            None => branches.push(leaf),
-        }
-    }
-    branches
-}
-
 fn draw() {
     let Some(runs) = BOARD.runs.get().and_then(Weak::upgrade) else { return };
     let live: BTreeMap<_, _> = runs.all().into_iter().map(|l| ((l.collection.clone(), l.id), l)).collect();
@@ -279,6 +252,8 @@ fn painted(step: &StepRecord) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cli::tree::below;
+    use crate::log::Level;
 
     struct Said(Level, &'static str);
 
