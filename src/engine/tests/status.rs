@@ -157,6 +157,8 @@ fn issue_kinds_match_their_json() {
         crate::engine::Issue::NeverBackedUp,
         crate::engine::Issue::Missing { repo: "Docs".into(), primary: true },
         crate::engine::Issue::Unreadable { error: String::new() },
+        crate::engine::Issue::RestorePending,
+        crate::engine::Issue::RestoreFailed { files: String::new() },
     ];
     for issue in issues {
         assert_eq!(serde_json::to_value(&issue).unwrap()["kind"], <&str>::from(&issue));
@@ -237,4 +239,33 @@ fn a_refresh_reports_no_target_not_created_yet() {
     let kinds: Vec<String> =
         report.results.iter().map(|r| serde_json::to_value(r).unwrap()["kind"].as_str().unwrap().to_owned()).collect();
     assert_eq!(kinds, ["primary-unavailable"], "{:?}", report.results);
+}
+
+/// A kit's collection says what it waits for: its restore, and once that failed, the profiles to adapt. A
+/// restore that succeeds ends it.
+#[test]
+fn a_kits_collection_says_it_waits_for_its_restore() {
+    use crate::engine::report::Issue;
+    use crate::state::Event;
+    let engine = engine("restore-first", &Replay::new());
+    let status = || engine.status_of(&engine.collections()[0]);
+    let held = |status: &CollectionOverview| {
+        status.issues.iter().filter(|i| matches!(i, Issue::RestorePending | Issue::RestoreFailed { .. })).count()
+    };
+    assert_eq!(held(&status()), 0);
+    engine.store.apply(&[Event::RestoreFirst { collections: vec!["Docs".into()], asked: None }]).unwrap();
+    let pending = status();
+    assert!(pending.issues.iter().any(|i| matches!(i, Issue::RestorePending)), "{:?}", pending.issues);
+    assert!(!pending.issues.iter().any(|i| matches!(i, Issue::NeverBackedUp)));
+    assert_eq!(held(&pending), 1);
+    let at = engine.store.now();
+    engine.store.apply(&[Event::Restored { collection: "Docs".into(), at, ok: false }]).unwrap();
+    let failed = status();
+    let files =
+        failed.issues.iter().find_map(|i| if let Issue::RestoreFailed { files } = i { Some(files) } else { None });
+    assert!(files.is_some_and(|f| f.contains("Docs.toml") && f.contains("Docs-usb.toml")), "{:?}", failed.issues);
+    assert_eq!((held(&failed), failed.level), (1, Level::Failure));
+    assert!(failed.issues.iter().any(|i| i.to_string().contains("Docs.toml")), "the text names the files");
+    engine.store.apply(&[Event::Restored { collection: "Docs".into(), at, ok: true }]).unwrap();
+    assert_eq!(held(&status()), 0);
 }

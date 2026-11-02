@@ -12,8 +12,8 @@ use serde_json::{Value, json};
 
 use rusticlone::{ENV_PREFIX, Event, StepKey, Store};
 
-/// Whether the tests run as root on Unix. Root's web UI saves profiles in the system's folder `/etc/rustic` where
-/// rustic reads them too. No sandbox redirects it: tests of saving them would write there.
+/// Whether the tests run as root on Unix. Root's web UI and `--kit` save profiles in the system's folder
+/// `/etc/rustic` where rustic reads them too. No sandbox redirects it: tests of saving them would write there.
 #[cfg(feature = "server")]
 pub(crate) fn as_root() -> bool {
     cfg!(unix) && Command::new("id").arg("-u").output().is_ok_and(|o| o.stdout.trim_ascii() == b"0")

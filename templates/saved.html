@@ -10,6 +10,7 @@
   <p><button type="button" class="btn" data-copy="{{ dir }}" title="{{ dir }}">{{ m::icon("folder") }}{{ Button::CopyFolderPath }}</button></p>
   {% endif %}
   <p>{{ Hint::KeepACopy }}</p>
+  <p><a class="btn" href="{{ base }}{{ Route::Kit }}" download>{{ m::icon("download") }}{{ Button::EmergencyKit }}</a></p>
   <p>{{ Hint::NowVisible { app: crate::APP_NAME } }}</p>
   <div>
     <h2>{{ Heading::RestoreOnNewComputer }}</h2>

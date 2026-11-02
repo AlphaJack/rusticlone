@@ -484,7 +484,7 @@ fn the_overview_says_what_needs_attention() {
     let main = IndexMain::build(vec![healthy()]).with(None, Some(untested), Some("off at login".into()), None);
     let notices = Page::of(&main).texts(".notice.warning");
     assert!(notices.len() == 2 && notices[0].contains("0.99.0") && notices[1] == "off at login", "{notices:?}");
-    let empty = Empty { dir: "/profiles".into(), writable: true };
+    let empty = Empty { dir: "/profiles".into(), writable: true, here: false };
     let page = Page::of(&IndexMain::build(vec![]).with(Some(empty), None, None, Some(Unconfigured::Gone)));
     assert_eq!(page.texts(".notice").len(), 1);
     assert!(page.texts("p").iter().any(|p| p.contains("/profiles")));

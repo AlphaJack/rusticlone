@@ -147,11 +147,6 @@ fn attempted(engine: &Engine, key: crate::request::StepKey, result: &crate::resu
     engine.store.apply(&[Event::Attempted { key, started: at, at, result: result.into(), by }]).unwrap();
 }
 
-/// How many failures the run reported.
-fn failures(run: &super::Run<'_>) -> usize {
-    run.shared.results.lock().iter().filter(|(_, r)| r.level() == Level::Failure).count()
-}
-
 fn backed_up() -> crate::result::StepResult {
     crate::result::StepResult::BackedUp { repo: "Docs".into(), snapshots: vec![], new_repository: false }
 }

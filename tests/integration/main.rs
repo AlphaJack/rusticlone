@@ -13,6 +13,8 @@ mod copy;
 mod dryrun;
 mod forget;
 mod isolation;
+#[cfg(feature = "server")]
+mod kit;
 mod maintenance;
 mod quirks;
 mod restore;

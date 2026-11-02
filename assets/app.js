@@ -204,6 +204,31 @@ document.addEventListener("htmx:sse:after:connection", () => {
   show("live");
 });
 
+// `data-upload` posts the chosen file as the body to its URL, then opens the run it started, or shows the answer in
+// the flash area.
+document.addEventListener("change", async (event) => {
+  const input = event.target;
+  const [file] = input.dataset?.upload ? input.files : [];
+  if (!file) return;
+  const button = input.closest(".btn");
+  button.classList.add("htmx-request");
+  try {
+    const response = await fetch(input.dataset.upload, { method: "POST", body: file, headers: { "Content-Type": "application/zip" } });
+    // The run it started, to open as htmx opens `HX-Location`.
+    const run = response.headers.get("hx-location");
+    if (run) return location.assign(run);
+    const text = await response.text();
+    // A notice comes as the flash area's HTML; anything else, as a too large body, as plain text.
+    if (response.headers.has("hx-retarget")) document.getElementById("flash").innerHTML = text;
+    else toast("failure", text.trim());
+  } catch {
+    toast("failure", input.dataset.notSent);
+  } finally {
+    button.classList.remove("htmx-request");
+    input.value = "";
+  }
+});
+
 // why a run started from this page failed, on whichever page is open
 document.addEventListener("flash", (event) => {
   document.getElementById("flash").innerHTML = event.detail.data;
