@@ -1,8 +1,27 @@
 //! The desktop, over the session's D-Bus: the desktop portal opens a page, the file manager a folder.
+//! `xdg-open` steps in on desktops that offer neither, such as a bare window manager.
 
-/// Opens a page in the default browser, through the desktop portal, or a folder in the file manager, through
-/// the `FileManager1` service.
+/// Opens a page in the default browser, or a folder in the file manager.
 pub(super) fn open(target: &str, page: bool) -> std::io::Result<()> {
+    over_dbus(target, page).or_else(|_| xdg_open(target))
+}
+
+/// Starts `xdg-open`, which finds a browser or a file manager on its own. It may wait for what it opens, so a
+/// thread of its own collects it.
+#[expect(clippy::disallowed_methods, reason = "the desktop's last resort to open a page, not rustic")]
+fn xdg_open(target: &str) -> std::io::Result<()> {
+    use std::process::Stdio;
+    std::process::Command::new("xdg-open")
+        .arg(target)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|mut child| drop(std::thread::spawn(move || child.wait())))
+}
+
+/// The desktop portal's `OpenURI` for a page, and the `FileManager1` service for a folder.
+fn over_dbus(target: &str, page: bool) -> std::io::Result<()> {
     let call = async {
         let bus = zbus::Connection::session().await?;
         if page {
