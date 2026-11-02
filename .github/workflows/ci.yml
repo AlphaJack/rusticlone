@@ -17,6 +17,9 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
+  # Without debug info, test builds are a minute faster cold and 15 s warm on Windows. A panic still names its line.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
   SCCACHE_GHA_ENABLED: ${{ vars.CI_USE_SCCACHE == 'true' }}
   RUSTC_WRAPPER: ${{ vars.CI_USE_SCCACHE == 'true' && 'sccache' || '' }}
 
