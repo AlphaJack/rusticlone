@@ -135,7 +135,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           tests=$(cargo test --lib --no-run --locked --message-format=json | jq -r 'select(.profile.test and .target.kind == ["lib"]) | .executable')
-          test=sys::awake_tests::logind_lists_the_inhibitor_until_dropped
+          test=sys::awake::linux::tests::logind_lists_the_inhibitor_until_dropped
           sudo "$tests" --exact "$test"
           # A login on seat0's third console, as pam_systemd makes one.
           sudo systemd-run --uid="$USER" --property=PAMName=login --property=TTYPath=/dev/tty3 --property=StandardInput=tty \
