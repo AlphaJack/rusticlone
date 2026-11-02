@@ -7,7 +7,7 @@ use askama::Template;
 use axum::{extract::Query, response::Html};
 
 use super::{Base, render_str};
-use crate::{first_run, fmt, sys};
+use crate::{fmt, setup, sys};
 
 /// Where removable and network disks are mounted, and where each user's are: a folder whose nearest existing
 /// ancestor is one of them is on a disk that is not mounted. So is one whose nearest is the root, or mistyped:
@@ -50,7 +50,7 @@ struct FreeView {
 /// The free space where the folder of the field that asks is, whatever the field's name.
 pub(super) async fn free(base: Base, Query(field): Query<BTreeMap<String, String>>) -> Html<String> {
     let folder = field.into_values().next().unwrap_or_default();
-    let free = tokio::task::spawn_blocking(move || Free::of(&first_run::repository_folder(&folder)))
+    let free = tokio::task::spawn_blocking(move || Free::of(&setup::repository_folder(&folder)))
         .await
         .unwrap_or(Free::Missing);
     Html(render_str(&FreeView { free }, &base))

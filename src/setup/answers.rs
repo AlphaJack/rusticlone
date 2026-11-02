@@ -6,11 +6,23 @@ use serde::Deserialize;
 
 #[cfg(any(feature = "server", test))]
 use super::Error;
-use super::{Choice, Every, Field, Keep, Key, Kind, Question, Role};
+use super::{Choice, Every, Field, Keep, Key, Kind, Role};
 use crate::{settings, sys};
 
 /// What the fields of the folders to back up are named, numbered from 0: `source.0`, `source.1`…
 pub(crate) const SOURCE: &str = "source";
+
+/// The form's questions, which also say in the profiles what each part answers.
+#[derive(Clone, Copy, crate::i18n::Fluent)]
+pub(crate) enum Question {
+    WhatToBackUp,
+    WhereSaved,
+    WhereCopied,
+    WhenBackUp,
+    HowLongKeep,
+    HowOftenCheck,
+    WhereNotify,
+}
 
 /// The answers. The folders are named `source.<n>`, the repositories' values `<role>.<kind>.<key>`, and
 /// custom schedules `<step>.custom`: those not chosen are ignored.

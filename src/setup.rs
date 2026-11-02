@@ -1,12 +1,12 @@
 //! The first collection: profiles from a few answers, which the web UI asks and the CLI prints as an
 //! example.
 
+mod answers;
 mod choice;
 mod field;
 mod profiles;
 #[cfg(feature = "server")]
 mod save;
-mod setup;
 #[cfg(test)]
 mod tests;
 
@@ -15,13 +15,13 @@ use std::path::PathBuf;
 
 #[cfg(feature = "server")]
 pub(crate) use save::*;
-pub(crate) use {choice::*, field::*, profiles::*, setup::*};
+pub(crate) use {answers::*, choice::*, field::*};
 
 use crate::settings;
 
 #[cfg(any(feature = "server", test))]
 #[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
-#[fluent(prefix = "first-run-error")]
+#[fluent(prefix = "setup-error")]
 pub(crate) enum Error {
     Name,
     /// rustic reads it from wherever it runs, and backs up nothing if nothing is there, without failing.

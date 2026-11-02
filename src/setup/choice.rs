@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 /// What a repository is: the kinds a first backup most likely has, among rustic's.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, crate::i18n::Fluent, strum::EnumIter)]
-#[fluent(prefix = "first-run-kind")]
+#[fluent(prefix = "setup-kind")]
 #[serde(try_from = "String")]
 pub(crate) enum Kind {
     #[default]
@@ -103,7 +103,7 @@ impl Keep {
 }
 
 #[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
-#[fluent(prefix = "first-run-no-choice")]
+#[fluent(prefix = "setup-no-choice")]
 pub(crate) struct Unknown {
     choice: String,
 }
@@ -143,5 +143,46 @@ impl TryFrom<String> for Every {
     type Error = Unknown;
     fn try_from(sent: String) -> Result<Self, Unknown> {
         Self::chosen(&sent)
+    }
+}
+
+/// How to configure a remote.
+#[cfg(feature = "server")]
+const RCLONE_DOCS: &str = "https://rclone.org/docs/";
+
+/// How rustic reaches each kind.
+impl Kind {
+    /// What the repository starts with, followed by the [`super::Key::Repository`] field if it has one.
+    pub(super) fn scheme(self) -> &'static str {
+        match self {
+            Self::None | Self::Local | Self::Smb | Self::Nfs => "",
+            Self::Sftp => "opendal:sftp",
+            Self::S3 => "opendal:s3",
+            Self::Webdav => "opendal:webdav",
+            Self::Pcloud => "opendal:pcloud",
+            Self::Rest => "rest:",
+            Self::Gdrive | Self::Onedrive | Self::Dropbox | Self::Rclone => "rclone:",
+        }
+    }
+
+    #[cfg(feature = "server")]
+    pub(crate) fn group(self) -> Group {
+        match self.scheme() {
+            "" => Group::Mounted,
+            "rclone:" => Group::Rclone,
+            _ => Group::Direct,
+        }
+    }
+
+    /// Where [`Self::hint`] is explained.
+    #[cfg(feature = "server")]
+    pub(crate) fn docs(self) -> Option<&'static str> {
+        (self.group() == Group::Rclone).then_some(RCLONE_DOCS)
+    }
+
+    /// What to do before saving: rclone signs in to the drives that opendal would need an OAuth app for.
+    #[cfg(feature = "server")]
+    pub(crate) fn hint(self) -> Option<String> {
+        (self.group() == Group::Rclone).then(|| crate::i18n::t!("field-rclone-hint"))
     }
 }

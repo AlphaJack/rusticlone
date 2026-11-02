@@ -2,20 +2,8 @@
 
 use toml_edit::{Array, DocumentMut, Item, Table, value};
 
-use super::{Key, Kind, RUSTIC_CONFIG_DOCS, Role, Setup};
+use super::{Key, Kind, Question, RUSTIC_CONFIG_DOCS, Role, Setup};
 use crate::{profile, settings, sys};
-
-/// The form's questions, which also say in the profiles what each part answers.
-#[derive(Clone, Copy, crate::i18n::Fluent)]
-pub(crate) enum Question {
-    WhatToBackUp,
-    WhereSaved,
-    WhereCopied,
-    WhenBackUp,
-    HowLongKeep,
-    HowOftenCheck,
-    WhereNotify,
-}
 
 /// A table under the question it answers.
 fn section(answers: Question) -> Table {
@@ -123,7 +111,7 @@ impl Setup {
         // Rustic sets only the backup profile's variables for a copy, and the target's for its own commands.
         vars.extend(self.env(Role::Primary).chain(self.env(Role::Target)));
         primary["global"] = implicit([("env", Item::Table(vars))]);
-        let primary = format!("# {}\n{primary}", crate::i18n::t!("first-run-guide", url = RUSTIC_CONFIG_DOCS));
+        let primary = format!("# {}\n{primary}", crate::i18n::t!("setup-guide", url = RUSTIC_CONFIG_DOCS));
         std::iter::once((format!("{}.toml", self.profile_name(Role::Primary)), primary)).chain(target).collect()
     }
 }

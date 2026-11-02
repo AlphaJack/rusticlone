@@ -1,12 +1,10 @@
 //! The values each kind of repository needs.
 
-#[cfg(feature = "server")]
-use super::Group;
 use super::Kind;
 
 /// Where a field's value goes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, crate::i18n::Fluent)]
-#[fluent(prefix = "first-run-key")]
+#[fluent(prefix = "setup-key")]
 pub(crate) enum Key {
     /// The repository, after [`Kind::scheme`].
     Repository,
@@ -97,9 +95,6 @@ const fn rclone(example: &'static str) -> [Field; 3] {
     [field(Key::Repository, "remote", example), RCLONE_PASSWORD, RCLONE_PASSWORD_COMMAND]
 }
 
-/// How to configure a remote.
-#[cfg(feature = "server")]
-const RCLONE_DOCS: &str = "https://rclone.org/docs/";
 /// Everything a profile can set.
 pub(super) const RUSTIC_CONFIG_DOCS: &str = "https://rustic.cli.rs/docs/commands/init/configuration_file.html";
 
@@ -130,40 +125,6 @@ const ROOT: Field = Field { required: false, ..field(Key::Option("root"), "path"
 
 /// Each kind's fields go from where to who: server, bucket, path, user, then secrets.
 impl Kind {
-    /// What the repository starts with, followed by the [`Key::Repository`] field if it has one.
-    pub(super) fn scheme(self) -> &'static str {
-        match self {
-            Self::None | Self::Local | Self::Smb | Self::Nfs => "",
-            Self::Sftp => "opendal:sftp",
-            Self::S3 => "opendal:s3",
-            Self::Webdav => "opendal:webdav",
-            Self::Pcloud => "opendal:pcloud",
-            Self::Rest => "rest:",
-            Self::Gdrive | Self::Onedrive | Self::Dropbox | Self::Rclone => "rclone:",
-        }
-    }
-
-    #[cfg(feature = "server")]
-    pub(crate) fn group(self) -> Group {
-        match self.scheme() {
-            "" => Group::Mounted,
-            "rclone:" => Group::Rclone,
-            _ => Group::Direct,
-        }
-    }
-
-    /// Where [`Self::hint`] is explained.
-    #[cfg(feature = "server")]
-    pub(crate) fn docs(self) -> Option<&'static str> {
-        (self.group() == Group::Rclone).then_some(RCLONE_DOCS)
-    }
-
-    /// What to do before saving: rclone signs in to the drives that opendal would need an OAuth app for.
-    #[cfg(feature = "server")]
-    pub(crate) fn hint(self) -> Option<String> {
-        (self.group() == Group::Rclone).then(|| crate::i18n::t!("field-rclone-hint"))
-    }
-
     pub(crate) fn fields(self) -> &'static [Field] {
         match self {
             Self::None => &[],

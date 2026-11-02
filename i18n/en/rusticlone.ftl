@@ -587,19 +587,19 @@ question-when-back-up = How often do you want to back up?
 question-how-long-keep = How long do you want to keep backups?
 question-how-often-check = How often do you want to check the backup for damage?
 question-where-notify = Where do you want notifications about issues?
-first-run-kind-none = Nowhere
-first-run-kind-local = External drive
-first-run-kind-smb = SMB share
-first-run-kind-nfs = NFS share
-first-run-kind-s3 = S3-compatible
-first-run-kind-sftp = SFTP
-first-run-kind-webdav = WebDAV
-first-run-kind-rest = REST server
-first-run-kind-gdrive = Google Drive
-first-run-kind-onedrive = OneDrive
-first-run-kind-dropbox = Dropbox
-first-run-kind-pcloud = pCloud
-first-run-kind-rclone = Other
+setup-kind-none = Nowhere
+setup-kind-local = External drive
+setup-kind-smb = SMB share
+setup-kind-nfs = NFS share
+setup-kind-s3 = S3-compatible
+setup-kind-sftp = SFTP
+setup-kind-webdav = WebDAV
+setup-kind-rest = REST server
+setup-kind-gdrive = Google Drive
+setup-kind-onedrive = OneDrive
+setup-kind-dropbox = Dropbox
+setup-kind-pcloud = pCloud
+setup-kind-rclone = Other
 group-mounted = Local
 group-direct = OpenDAL services
 group-rclone = Rclone services
@@ -612,7 +612,7 @@ every-custom = Custom
 keep-year = One year
 keep-month = One month
 keep-all = Everything
-first-run-key-repository = repository
+setup-key-repository = repository
 field-repository-password = Repository password
 field-server-key = Server key
 field-choice-accept = Any key
@@ -634,25 +634,25 @@ field-secret-key = Secret key
 field-password = Password
 field-email = Email
 field-url = URL
-first-run-guide = full configuration guide: { $url }
-first-run-no-choice = no choice { $choice }
-first-run-error-name = the name must start with a letter or a digit; the other characters can be letters, digits, `-`, `_` or `.`
-first-run-error-relative = { $path } is not a full path: start it at the root of a disk, or at ~ for your home folder
-first-run-error-no-sources = no folder to back up
-first-run-error-no-primary = no primary location
-first-run-error-no-custom = no custom schedule
-first-run-error-incomplete = the { $role ->
+setup-guide = full configuration guide: { $url }
+setup-no-choice = no choice { $choice }
+setup-error-name = the name must start with a letter or a digit; the other characters can be letters, digits, `-`, `_` or `.`
+setup-error-relative = { $path } is not a full path: start it at the root of a disk, or at ~ for your home folder
+setup-error-no-sources = no folder to back up
+setup-error-no-primary = no primary location
+setup-error-no-custom = no custom schedule
+setup-error-incomplete = the { $role ->
     [primary] primary
    *[target] target
 } location needs its { $field }
-first-run-error-not-a-choice = the { $role ->
+setup-error-not-a-choice = the { $role ->
     [primary] primary
    *[target] target
 } location's { $field } must be one of: { $choices }
-first-run-error-no-dir = no profile folder that can be written in
-first-run-error-exists = { $path } already exists
-first-run-error-inside = the repository must be in a folder separate from the source
-first-run-error-not-empty = { $folder } holds other files: choose an empty or new folder, or the folder of an existing backup
+setup-error-no-dir = no profile folder that can be written in
+setup-error-exists = { $path } already exists
+setup-error-inside = the repository must be in a folder separate from the source
+setup-error-not-empty = { $folder } holds other files: choose an empty or new folder, or the folder of an existing backup
 
 ## The server, its installation and updates
 
