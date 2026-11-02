@@ -6,16 +6,16 @@
 
 mod event;
 mod locks;
+mod record;
 mod runs;
 mod step;
 
 pub use event::Event;
 pub(crate) use event::{Behind, Ledger, Read};
 pub(crate) use locks::{Mode, RepoLocks};
-pub(crate) use runs::LogLine;
-pub(crate) use runs::ResultRecord;
-pub use runs::RunRecord;
-pub(crate) use runs::{Holds, Queued, RunLog, StepRecord};
+pub use record::RunRecord;
+pub(crate) use record::{Holds, LogLine, Queued, ResultRecord, StepRecord};
+pub(crate) use runs::RunLog;
 use step::retry_at;
 pub(crate) use step::{Checks, Lag, LastStep, Outcome, RunStep};
 
