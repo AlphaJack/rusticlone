@@ -67,6 +67,7 @@ $R backup --all
 - The fewest lines that stay idiomatic and readable, ASCII only.
 - Comments are rustdoc, or say why. None restate the code.
 - Nothing is kept in sync by hand: editing one thing never means updating another file that hardcodes it.
+- A module may use its ancestors' types, but not call their free functions: a helper that a parent and its children share goes in a module of its own. `cargo xtask acyclic` checks it.
 - One type per concept. A match that maps one enum's variants one to one onto another's is a sign to merge the two, or to derive one from the other. A field that mirrors another is derived instead.
 - Lookups go through the `Store` and `Ledger` helpers, not keys rebuilt by hand.
 - Unused code goes, and so does code that only an earlier version needed.
@@ -98,7 +99,7 @@ cargo xtask generate     # rewrite the generated files: env file, Linux packages
 cargo xtask fixtures     # record the installed rustic's output into tests/fixtures/rustic-MAJOR.MINOR
 cargo insta review       # check changed snapshots and accept them
 cargo xtask vendor       # download htmx
-cargo xtask acyclic      # find dependency cycles between modules and between items
+cargo xtask acyclic      # find dependency cycles between modules and items, and calls up to an ancestor's free function
 cargo xtask translations # list the messages each translation lacks, shown in English
 cargo xtask screenshots  # take the README's screenshots anew, in Docker, in about 25 minutes
 cargo xtask screenshots --setup              # or keep the computer they show running,
