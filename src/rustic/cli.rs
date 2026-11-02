@@ -45,7 +45,7 @@ impl Cli {
     /// Windows would open one for each run, and below normal priority, as systemd's `Nice` and launchd's
     /// `Background` run it elsewhere, so that a backup does not slow down the user.
     pub(crate) fn rustic() -> Command {
-        let mut cmd = Command::new(super::install::bin());
+        let mut cmd = Command::new(super::bin::path());
         super::process::quiet(&mut cmd);
         cmd
     }
@@ -75,7 +75,7 @@ impl Cli {
     pub(super) fn version() -> Result<Version> {
         let out = Self::rustic().arg("--version").output().map_err(Error::CannotRun)?;
         let text = String::from_utf8_lossy(&out.stdout);
-        Ok(super::install::parse_version(&text).ok_or_else(|| Error::NoVersion { output: text.trim().to_owned() })?)
+        Ok(super::bin::parse_version(&text).ok_or_else(|| Error::NoVersion { output: text.trim().to_owned() })?)
     }
 
     #[expect(clippy::too_many_arguments, reason = "one call's context, command and outputs")]

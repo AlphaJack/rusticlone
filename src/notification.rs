@@ -2,15 +2,10 @@
 
 use mercurio::{Mercurio, Message, NotifyType};
 
-use jiff::Timestamp;
-
 use crate::{
-    engine::{Collection, CollectionOverview, Engine},
-    fmt,
     i18n::Fluent,
-    log::{self, Level, Message as _},
+    log::{self, Level},
     settings,
-    state::Notified,
 };
 
 /// What a notification did, as the server and the `notify` command log it. `error` fields hold the
@@ -36,31 +31,12 @@ impl log::Message for Logged {
     }
 }
 
-/// A notification's lines.
+/// A test before any collection exists.
+#[cfg(feature = "server")]
 #[derive(Fluent)]
 #[fluent(prefix = "notification")]
-enum Line<'a> {
-    Title {
-        host: &'static str,
-        collection: &'a str,
-        level: Level,
-    },
-    /// A test before any collection exists.
-    #[cfg(feature = "server")]
-    Test {
-        name: &'static str,
-        emoji: &'static str,
-    },
-    Lasted {
-        emoji: &'static str,
-        level: Level,
-        age: String,
-    },
-    Others {
-        emoji: &'static str,
-        count: u64,
-        level: Level,
-    },
+enum Line {
+    Test { name: &'static str, emoji: &'static str },
 }
 
 #[derive(Debug, thiserror::Error, Fluent)]
@@ -73,122 +49,6 @@ pub(crate) enum Error {
     /// Each failed target and why.
     #[fluent(transparent)]
     Failed(String),
-}
-
-impl Engine {
-    /// Sends the collection's status when its level changed since the last one notified. A failed send is
-    /// retried with backoff: returns when.
-    pub(crate) fn notify(&self, collection: &Collection<'_>) -> Option<Timestamp> {
-        let urls = settings::NOTIFY.get(&[collection.primary])?;
-        // Nothing changed, so nothing to say.
-        if self.store.is_dry_run() {
-            return None;
-        }
-        let (key, title, now) = (collection.name(), collection.title, self.store.now());
-        let status = self.status_of(collection);
-        let level = status.level;
-        // The attempt is recorded before sending, so that no other process sends it too, and a send that
-        // never ends counts as failed.
-        let update = self.store.update_notified(key, |n| match n {
-            n if n.level == level => Notified { level, since: n.since, ..Notified::default() },
-            n if n.retry_at().is_some_and(|at| now < at) => n.clone(),
-            n => Notified { failures: n.failures + 1, last_attempt: Some(now), ..n.clone() },
-        });
-        let notified = match update {
-            Ok(Some(attempt)) if attempt.level != level => {
-                let text = self.message(collection, &status, &attempt);
-                let sent = deliver(Mercurio::new(), &mut logged(Some(title)), &urls, level, &text);
-                self.record_sent(key, title, level, &sent).unwrap_or(attempt)
-            }
-            Ok(_) => self.store.notified(key),
-            Err(e) => {
-                log::event(Some(title), &Logged::NotRecorded { error: format!("{e:#}") });
-                return None;
-            }
-        };
-        notified.retry_at()
-    }
-
-    /// Sends the collection's status now, whatever was notified before, and returns its text. A dry run
-    /// sends nothing. `warned`: with each warning of a delivery that went on.
-    pub(crate) fn notify_now(
-        &self,
-        collection: &Collection<'_>,
-        warned: &mut dyn FnMut(String),
-    ) -> Result<String, Error> {
-        let status = self.status_of(collection);
-        let urls = settings::NOTIFY.get(&[collection.primary]).ok_or(Error::NoUrls)?;
-        let before = self.store.notified(collection.name());
-        let text = self.message(collection, &status, &before);
-        if self.store.is_dry_run() {
-            return Ok(text);
-        }
-        let sent = deliver(Mercurio::new(), warned, &urls, status.level, &text);
-        if sent.is_ok() {
-            self.record_sent(collection.name(), collection.title, status.level, &sent);
-        }
-        sent.map(|()| text)
-    }
-
-    /// The status as a notification's text: its level, and its issues except about notifications. A recovery
-    /// has none: it says how long the level notified `before` lasted.
-    pub(crate) fn message(
-        &self,
-        collection: &Collection<'_>,
-        status: &CollectionOverview,
-        before: &Notified,
-    ) -> String {
-        let now = self.store.now();
-        let title = Line::Title { host: crate::sys::hostname(), collection: collection.title, level: status.level };
-        let mut text = format!("{title}\n");
-        text.extend(
-            (status.issues.iter().filter(|p| p.counts()))
-                .map(|p| format!("{} {}\n", p.level().emoji(), fmt::capitalized(&p.text(now)))),
-        );
-        if let Some(since) = before.since.filter(|_| status.level == Level::Success && before.level != status.level) {
-            let age = fmt::human_age(since, now);
-            let lasted = Line::Lasted { emoji: status.level.emoji(), level: before.level, age };
-            text.push_str(&format!("{lasted}\n"));
-            text.push_str(&self.others(collection));
-        }
-        text
-    }
-
-    /// A line for each level but healthy, with how many other collections are at it. Only those notified
-    /// at the same URLs are counted, since these already hear about them.
-    fn others(&self, collection: &Collection<'_>) -> String {
-        let urls = settings::NOTIFY.get(&[collection.primary]);
-        let others: Vec<_> = self
-            .every_collection()
-            .filter(|c| c.name() != collection.name() && settings::NOTIFY.get(&[c.primary]) == urls)
-            .collect();
-        let levels = self.levels(&others);
-        [Level::Failure, Level::Warning]
-            .into_iter()
-            .filter_map(|level| {
-                let n = levels.iter().filter(|l| **l == level).count() as u64;
-                (n > 0).then(|| format!("{}\n", Line::Others { emoji: level.emoji(), count: n, level }))
-            })
-            .collect()
-    }
-
-    /// Records a send of `level` about `key`. Returns the record, if stored.
-    fn record_sent(&self, key: &str, title: &str, level: Level, sent: &Result<(), Error>) -> Option<Notified> {
-        if let Err(e) = sent {
-            log::event(Some(title), &Logged::Undelivered { error: e.to_string() });
-        }
-        let now = self.store.now();
-        let recorded = self.store.update_notified(key, |n| match sent {
-            Ok(()) => {
-                Notified { level, since: n.since.filter(|_| n.level == level).or(Some(now)), ..Notified::default() }
-            }
-            Err(e) => Notified { error: Some(e.to_string()), ..n.clone() },
-        });
-        recorded.unwrap_or_else(|e| {
-            log::event(Some(title), &Logged::NotRecorded { error: format!("{e:#}") });
-            None
-        })
-    }
 }
 
 /// Sends a test to `urls`, such as the ones a new collection would use.
@@ -228,6 +88,11 @@ const ICON_URL: &str = env!("LOGO_URL");
 /// Logs each warning as the collection's.
 pub(crate) fn logged(collection: Option<&str>) -> impl FnMut(String) + '_ {
     move |warning| log::event(collection, &Logged::Warned { warning })
+}
+
+/// Sends `text` at `urls`, its first line as the title. `warned`: with each warning of a delivery that went on.
+pub(crate) fn send(warned: &mut dyn FnMut(String), urls: &str, level: Level, text: &str) -> Result<(), Error> {
+    deliver(Mercurio::new(), warned, urls, level, text)
 }
 
 /// `warned`: with each warning of a delivery that went on.

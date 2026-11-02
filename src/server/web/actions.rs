@@ -108,7 +108,7 @@ pub(super) async fn run(
         .map(|id| id.parse())
         .transpose()
         .map_err(|e: NotASnapshotId| Error::Refused(Notice::InvalidSnapshot(e.to_string())))?;
-    let at = opt(form.at).map(|at| crate::engine::parse_at(&at)).transpose();
+    let at = opt(form.at).map(|at| crate::request::parse_at(&at)).transpose();
     let at = at.map_err(|e| Error::Refused(Notice::InvalidTime(format!("{e:#}"))))?;
     let options = RestoreOptions {
         snapshot,
