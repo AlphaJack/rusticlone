@@ -113,6 +113,7 @@ pub(super) enum Button<'a> {
     /// The file manager's name for it, as [`Button::OpenFolder`].
     #[fluent(os = std::env::consts::OS)]
     ShowProfile,
+    NewCollection,
 }
 
 /// A word or a state, in a table or a breadcrumb.
@@ -242,4 +243,6 @@ pub(super) enum Hint<'a> {
     Now,
     SubfolderExample,
     Notify,
+    /// While a folder to back up is measured.
+    Measuring,
 }

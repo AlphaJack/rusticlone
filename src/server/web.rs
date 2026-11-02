@@ -22,6 +22,7 @@ mod page;
 mod repo;
 mod route;
 mod runs;
+mod size;
 #[cfg(test)]
 mod tests;
 
@@ -83,6 +84,7 @@ pub(super) fn router(app: Arc<App>) -> Router {
         .route(&at(Route::Refresh), post(actions::refresh))
         .route(&at(Route::Setup), get(forms::setup).post(actions::save_setup))
         .route(&at(Route::SetupFree), get(free::free))
+        .route(&at(Route::SetupSize), get(size::size))
         .route(&at(Route::ProfileFolder), post(actions::open_profile_folder))
         .route(&at(Route::CollectionRuns("")), post(actions::run).delete(actions::cancel))
         .route(&at(Route::NewRun("")), get(forms::form))
