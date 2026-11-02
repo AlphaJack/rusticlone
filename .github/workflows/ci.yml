@@ -64,8 +64,13 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - name: Clippy without default features
-        run: cargo clippy -p rusticlone --all-targets --no-default-features --locked -- -D warnings
+      - name: Install cargo-hack
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-hack
+      # Without features, then with each alone: code that only another feature uses is dead there.
+      - name: Clippy with each feature alone
+        run: cargo hack clippy -p rusticlone --each-feature --all-targets --locked -- -D warnings
       - name: Rustdoc
         run: cargo doc --workspace --no-deps --all-features --document-private-items --locked
       - name: Modules are acyclic

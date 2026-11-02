@@ -18,4 +18,6 @@ pub(crate) mod rustic;
 pub(crate) mod update;
 
 #[cfg(any(feature = "desktop", feature = "self-update"))]
-pub(crate) use keeper::{Keeper, keeper, managed};
+pub(crate) use keeper::managed;
+#[cfg(feature = "self-update")]
+pub(crate) use keeper::{Keeper, keeper};

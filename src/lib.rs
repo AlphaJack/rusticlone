@@ -79,7 +79,7 @@ mod tests {
     /// Writes each file at its path in the repository, as its content renders in English, under a line that says
     /// `source` generates it: a comment in the file's own syntax, after what has to come first. Fails when that
     /// changes one, as they are committed. The `generated_*` tests call it, and `cargo xtask generate` runs them.
-    #[cfg(feature = "server")]
+    #[cfg(feature = "desktop")]
     #[expect(clippy::disallowed_methods, reason = "writes the generated files")]
     pub(crate) fn generated(source: &str, files: &[(String, &dyn Fn() -> String)]) {
         // `file!()` separates with `\` on Windows.
@@ -109,7 +109,7 @@ mod tests {
     }
 
     /// The targets that dist builds for `os`, such as `linux`, from Cargo.toml.
-    #[cfg(feature = "server")]
+    #[cfg(feature = "desktop")]
     #[expect(clippy::disallowed_methods, reason = "reads Cargo.toml")]
     pub(crate) fn dist_targets(os: &str) -> Vec<String> {
         let manifest = std::fs::read_to_string(root().join("Cargo.toml")).unwrap_or_default();

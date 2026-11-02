@@ -35,6 +35,7 @@ pub(super) fn report(phase: Phase) {
 }
 
 /// Whether the service manager started this process.
+#[cfg(feature = "self-update")]
 pub(super) fn running() -> bool {
     #[cfg(feature = "desktop")]
     return manager::running();
