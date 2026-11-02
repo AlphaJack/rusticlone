@@ -2,7 +2,18 @@
 
 use std::path::{Path, PathBuf};
 
-use super::HOSTNAME_BUFFER;
+use super::{HOSTNAME_BUFFER, windows_drive};
+
+/// `app`'s configuration directory for the system.
+#[expect(clippy::unnecessary_wraps, reason = "Windows's may be unknown")]
+pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
+    Some(PathBuf::from("/etc").join(app))
+}
+
+/// Whether `path` is an absolute path of another system: a Windows drive's. Its folder has no place here.
+pub(crate) fn foreign_path(path: &str) -> bool {
+    windows_drive(path).is_some()
+}
 
 /// Where `install` places rusticlone for root.
 pub(crate) fn system_bin_dir() -> PathBuf {
@@ -64,11 +75,13 @@ pub(crate) fn free_space(path: &Path) -> Option<(&Path, u64)> {
     let mut stats: libc::statvfs = unsafe { std::mem::zeroed() };
     // SAFETY: a NUL-terminated path, and a structure to fill.
     let read = unsafe { libc::statvfs(path.as_ptr(), &raw mut stats) } == 0;
-    #[cfg_attr(
-        any(target_vendor = "apple", target_os = "linux"),
-        expect(clippy::useless_conversion, reason = "narrower on other systems")
-    )]
-    read.then(|| (existing, u64::from(stats.f_bavail) * u64::from(stats.f_frsize)))
+    read.then(|| (existing, to_u64(stats.f_bavail) * to_u64(stats.f_frsize)))
+}
+
+/// `statvfs` counts in integers narrower than `u64` on some systems.
+#[cfg(feature = "server")]
+fn to_u64(n: impl Into<u64>) -> u64 {
+    n.into()
 }
 
 /// Whether stdout interprets ANSI escape codes: every terminal outside Windows does.
@@ -81,6 +94,14 @@ mod tests {
     use std::{fs, os::unix::fs::PermissionsExt};
 
     use crate::sys::{device, is_root, test_dir, writable};
+
+    /// Another system's absolute folders, which have no place here.
+    #[test]
+    fn a_windows_drive_is_foreign() {
+        assert!(
+            super::foreign_path(r"C:\Users\me") && super::foreign_path("d:/data") && !super::foreign_path("/home/me")
+        );
+    }
 
     /// A folder is writable, and so is one not created yet below it, until it is read-only.
     #[test]
