@@ -5,6 +5,7 @@
 #![expect(clippy::disallowed_methods, reason = "opens the state database")]
 
 mod event;
+mod kept;
 mod locks;
 mod record;
 mod runs;
@@ -12,6 +13,7 @@ mod step;
 
 pub use event::Event;
 pub(crate) use event::{Behind, Ledger, Read};
+use kept::{Kept, reparse};
 pub(crate) use locks::{Mode, RepoLocks};
 pub use record::RunRecord;
 pub(crate) use record::{Holds, LogLine, Queued, ResultRecord, StepRecord};
@@ -208,23 +210,12 @@ pub(crate) struct Changes {
     pub unfinished: BTreeSet<(String, i64)>,
 }
 
-/// A value and the stored text it was parsed from.
-type Kept<V> = Option<(Box<str>, V)>;
-
 /// What was last read of the ledger and of each collection's runs. The server reads them on every render,
 /// mostly unchanged.
 #[derive(Default)]
 struct Parsed {
     ledger: Mutex<Kept<Ledger>>,
     runs: Mutex<BTreeMap<String, BTreeMap<i64, Kept<RunRecord>>>>,
-}
-
-/// `kept` if it was parsed from `text`, else `text` parsed.
-fn reparse<V>(kept: Kept<V>, text: &str, parse: impl FnOnce(&str) -> Option<V>) -> Kept<V> {
-    match kept {
-        Some((was, value)) if *was == *text => Some((was, value)),
-        _ => Some((text.into(), parse(text)?)),
-    }
 }
 
 struct Scratch(PathBuf);

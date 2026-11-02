@@ -18,7 +18,7 @@ use axum::{
 use jiff::SignedDuration;
 use serde::Deserialize;
 
-use super::{App, Base, Button, Error, Heading, Hint, Layout, NotFound, Route, layout, render, render_str};
+use super::{Access, App, Base, Button, Error, Heading, Hint, Layout, NotFound, Route, layout, render, render_str};
 use crate::{
     server::Fault,
     settings,
@@ -48,19 +48,6 @@ fn cross_site(headers: &HeaderMap) -> bool {
         (None, Some(origin), Some(host)) => origin.split_once("://").is_none_or(|(_, origin)| origin != host),
         (None, ..) => false,
     }
-}
-
-/// What a request may do as the server's account.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub(in crate::server) enum Access {
-    /// The admin token: a script, or a reverse proxy that adds it.
-    Token,
-    /// A session from the login page, which can log out.
-    Session,
-    /// The metrics token: `/metrics` and `/status` only.
-    Metrics,
-    /// Only the login page, assets and `/health`.
-    Anonymous,
 }
 
 fn session_hash(id: &str) -> String {

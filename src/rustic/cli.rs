@@ -2,6 +2,7 @@
 
 #![expect(clippy::disallowed_methods, reason = "runs rustic")]
 
+use std::ffi::OsStr;
 use std::{
     io::{self, BufRead, BufReader, Read},
     path::Path,
@@ -19,7 +20,6 @@ use super::{
     Call, Error, Invocation, Output, PROGRESS, Progress, Runner, Stdout, Version,
     output::{Log, Message},
     process::{kill, work},
-    shell_word,
 };
 use crate::fmt;
 
@@ -265,5 +265,14 @@ impl Runner for Cli {
     #[cfg(feature = "server")]
     fn command(&self, profile: &str, dir: &Path) -> Command {
         Cli::command(profile, dir)
+    }
+}
+
+pub(super) fn shell_word(word: &OsStr) -> String {
+    let word = word.to_string_lossy();
+    if !word.is_empty() && word.chars().all(|c| c.is_ascii_alphanumeric() || "_-./:=,@%+".contains(c)) {
+        word.into_owned()
+    } else {
+        format!("'{}'", word.replace('\'', "'\\''"))
     }
 }

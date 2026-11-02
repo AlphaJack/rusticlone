@@ -1,6 +1,7 @@
 //! The rustic commands that are run. Their arguments are defined only here, and their output
 //! is parsed into values. A failed command returns rustic's explanation as the error.
 
+use super::Output;
 use std::path::Path;
 
 use anyhow::Result;
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Ctx, Error, Failure, ForgetGroup, Progress, Pruned, RepoStats, Rustic, Snapshot, SnapshotGroup, SnapshotId, Stdout,
-    ok, path_filters,
+    path_filters,
 };
 use crate::profile::RusticProfile;
 
@@ -304,7 +305,7 @@ impl Rustic {
         dest: &Path,
         progress: &mut dyn FnMut(&Progress),
     ) -> Result<()> {
-        let (spec, dest) = (format!("{id}:{}", super::tree_path(path)), dest.to_string_lossy());
+        let (spec, dest) = (format!("{id}:{}", tree_path(path)), dest.to_string_lossy());
         let args = ["restore", "--verify-existing", &spec, &dest];
         self.run(cx, p, &args, Some(progress)).map(drop)
     }
@@ -319,7 +320,7 @@ impl Rustic {
         path: &str,
         progress: &mut dyn FnMut(&Progress),
     ) -> Result<Option<RestorePlan>> {
-        let spec = format!("{id}:{}", super::tree_path(path));
+        let spec = format!("{id}:{}", tree_path(path));
         let args = ["restore", "--dry-run", "--verify-existing", &spec, path];
         let out = self.run(cx, p, &args, Some(progress))?;
         Ok(restore_plan(&out.stdout))
@@ -394,6 +395,19 @@ fn restore_plan(stdout: &str) -> Option<RestorePlan> {
         keep: count("unchanged") + count("verified"),
         additional: count("additional"),
     })
+}
+
+pub(super) fn ok(out: Output) -> Result<Output> {
+    if out.success { Ok(out) } else { Err(Error::Failed(out.failure()).into()) }
+}
+
+/// `path` as rustic names it in a snapshot's tree from any system. rustic on Windows records `C:\Users\me`
+/// as `C/Users/me` in the tree. Elsewhere it finds it only as `/C/Users/me`.
+pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
+    match crate::sys::windows_drive(path).filter(|_| !cfg!(windows)) {
+        Some((letter, rest)) => format!("/{letter}{}", rest.replace('\\', "/")).into(),
+        None => path.into(),
+    }
 }
 
 #[cfg(test)]
