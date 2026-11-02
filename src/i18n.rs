@@ -2,7 +2,7 @@
 //! message. The [`t!`] macro and `#[derive(Fluent)]` check at build time that each message is in the English
 //! one. The process's language is the user's; a page's is its visitor's ([`Language::accepted`]).
 
-#[cfg(all(feature = "server", any(target_os = "linux", test)))]
+#[cfg(all(feature = "desktop", any(target_os = "linux", test)))]
 pub(crate) mod packages;
 
 use std::{

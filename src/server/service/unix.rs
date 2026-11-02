@@ -49,6 +49,7 @@ pub(super) fn report(phase: Phase) {
 }
 
 /// Windows's alone.
+#[cfg(feature = "self-update")]
 pub(super) fn running() -> bool {
     false
 }

@@ -23,10 +23,10 @@ use crate::{
     state::{ResultRecord, RunRecord, StepRecord},
 };
 
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 mod command;
 
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 pub(super) use command::{command, step};
 
 /// A run as last drawn.
