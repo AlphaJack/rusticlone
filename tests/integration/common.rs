@@ -576,14 +576,12 @@ pub(crate) mod cmd {
         }
     }
 
-    /// Ends once `file` exists, which the test creates when it lets the command end.
+    /// Ends once `file` exists, which the test creates when it lets the command end. On Windows, a loop of `cmd`'s
+    /// over `ping`, as in [`sleep`]: PowerShell may take longer to start than the test waits.
     #[cfg(feature = "server")]
     pub(crate) fn until_exists(file: &Path) -> String {
         if cfg!(windows) {
-            format!(
-                "powershell -NoProfile -Command \"while (-not (Test-Path {})) {{ Start-Sleep -Milliseconds 100 }}\"",
-                quoted(file)
-            )
+            format!("cmd /c for /l %i in (0,0,1) do @if exist {} (exit 0) else ping -n 2 127.0.0.1 >nul", quoted(file))
         } else {
             format!("sh -c 'while [ ! -e {} ]; do sleep 0.1; done'", file.display())
         }
