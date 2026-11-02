@@ -2,6 +2,9 @@
 //! is parsed into values. A failed command returns rustic's explanation as the error.
 
 use super::Output;
+pub(crate) use super::os::tree_path;
+#[cfg(feature = "server")]
+use super::os::with_slashes;
 use std::path::Path;
 
 use anyhow::Result;
@@ -372,13 +375,6 @@ impl Rustic {
     }
 }
 
-/// Rustic's paths in a snapshot's tree, which it prints in `{:?}` form, with `/` between their parts: on Windows,
-/// it prints `\\`, escaped, which is in no file name there.
-#[cfg(feature = "server")]
-fn with_slashes(stdout: &str) -> std::borrow::Cow<'_, str> {
-    if cfg!(windows) { stdout.replace(r"\\", "/").into() } else { stdout.into() }
-}
-
 /// Rustic's counts of files that a restore writes.
 const TO_RESTORE: &str = "to restore";
 const TO_MODIFY: &str = "to modify";
@@ -399,15 +395,6 @@ fn restore_plan(stdout: &str) -> Option<RestorePlan> {
 
 pub(super) fn ok(out: Output) -> Result<Output> {
     if out.success { Ok(out) } else { Err(Error::Failed(out.failure()).into()) }
-}
-
-/// `path` as rustic names it in a snapshot's tree from any system. rustic on Windows records `C:\Users\me`
-/// as `C/Users/me` in the tree. Elsewhere it finds it only as `/C/Users/me`.
-pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
-    match crate::sys::windows_drive(path).filter(|_| !cfg!(windows)) {
-        Some((letter, rest)) => format!("/{letter}{}", rest.replace('\\', "/")).into(),
-        None => path.into(),
-    }
 }
 
 #[cfg(test)]
