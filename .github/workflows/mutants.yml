@@ -1,11 +1,11 @@
 name: Mutants
 
 # Changes the library one mutation at a time and lists those that no test catches, unit or integration.
-# On Saturday at 01:00 in Berlin's winter time, when nothing else runs, 8 shards at a time so that other
-# workflows still find runners. Everything it needs is in this file.
+# Once a week overnight, from Friday evening to Saturday morning, 12 shards at a time so that other workflows
+# still find runners. Everything it needs is in this file.
 on:
   schedule:
-    - cron: "0 0 * * 6"
+    - cron: "0 19 * * 5"
   workflow_dispatch:
 
 permissions:
@@ -24,14 +24,14 @@ env:
 
 jobs:
   mutants:
-    name: mutants (${{ matrix.shard }}/32)
+    name: mutants (${{ matrix.shard }}/36)
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 12
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -53,7 +53,7 @@ jobs:
       - name: Mutate the library
         env:
           SHARD: ${{ matrix.shard }}
-        run: cargo mutants --test-tool nextest --shard "$SHARD/32" --no-shuffle
+        run: cargo mutants --test-tool nextest --shard "$SHARD/36" --no-shuffle
       - name: Upload what the tests missed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
