@@ -17,6 +17,7 @@ use windows as imp;
 pub(super) use imp::Hangups;
 
 /// Whether the Windows service manager started this process.
+#[cfg(feature = "self-update")]
 pub(super) fn running() -> bool {
     imp::running()
 }

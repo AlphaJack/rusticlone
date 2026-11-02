@@ -2,7 +2,8 @@
 
 #[cfg(all(test, target_os = "linux"))]
 mod linux;
-#[cfg(all(test, target_os = "macos"))]
+/// It reads the app, which only the desktop installs.
+#[cfg(all(test, feature = "desktop", target_os = "macos"))]
 mod macos;
 #[cfg(all(test, unix))]
 mod unix;

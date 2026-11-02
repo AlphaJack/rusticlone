@@ -192,7 +192,7 @@ static BLOCK: Mutex<Block> = Mutex::new(Block { runs: Vec::new(), status: None, 
 static HELD: AtomicBool = AtomicBool::new(false);
 
 /// What a command draws in a terminal instead of lines above the runs.
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 #[derive(Clone, Copy)]
 pub(crate) struct Hooks {
     /// Takes what this process logs.
@@ -204,16 +204,17 @@ pub(crate) struct Hooks {
 }
 
 /// What a command's step that runs shows as its line.
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 #[derive(Clone, Copy)]
 pub(crate) enum Shown<'a> {
     /// What it does now.
+    #[cfg_attr(not(feature = "self-update"), expect(dead_code, reason = "only a download says what it does now"))]
     Now(&'a str),
     /// What it did, once it ends.
     Did(&'a str),
 }
 
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 static HOOKS: Mutex<Option<Hooks>> = Mutex::new(None);
 
 impl Block {
@@ -257,13 +258,13 @@ pub(crate) fn hold<T>(f: impl FnOnce() -> T) -> T {
 
 /// Draws what this process logs in a terminal with `hooks`, as a command does in its tree, or, without, above the
 /// runs again.
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 pub(crate) fn capture(hooks: Option<Hooks>) {
     *HOOKS.lock() = hooks;
 }
 
 /// What the step of a command that runs does now. Nothing outside one.
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(feature = "self-update")]
 pub(crate) fn now(text: &str) {
     let hooks = *HOOKS.lock();
     if let Some(hooks) = hooks {
@@ -272,7 +273,7 @@ pub(crate) fn now(text: &str) {
 }
 
 /// What the step of a command that runs did, its line once it ends. Nothing outside one.
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 pub(crate) fn did(text: &str) {
     let hooks = *HOOKS.lock();
     if let Some(hooks) = hooks {
@@ -290,11 +291,11 @@ pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
     if !std::io::stdin().is_terminal() || !stderr().is_terminal() {
         return Ok(false);
     }
-    #[cfg(any(feature = "server", feature = "self-update"))]
+    #[cfg(any(feature = "desktop", feature = "self-update"))]
     if let Some(hooks) = *HOOKS.lock() {
         return (hooks.ask)(short);
     }
-    #[cfg(not(any(feature = "server", feature = "self-update")))]
+    #[cfg(not(any(feature = "desktop", feature = "self-update")))]
     let _ = short;
     hold(|| {
         eprint!("{question} [y/N] ");
@@ -305,7 +306,7 @@ pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
 }
 
 /// Shows `rows` as the runs, the last one open for the answer, and reads it. Nothing is redrawn meanwhile.
-#[cfg(any(feature = "server", feature = "self-update"))]
+#[cfg(any(feature = "desktop", feature = "self-update"))]
 pub(crate) fn prompt(rows: Vec<String>) -> std::io::Result<String> {
     let mut block = BLOCK.lock();
     let erase = if block.drawn > 0 { format!("\x1b[{}A\x1b[J", block.drawn) } else { String::new() };
@@ -377,7 +378,7 @@ fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: V
     if (target == "rustic" && mode.quiet) || (target == "progress" && !mode.json && !mode.live) {
         return;
     }
-    #[cfg(any(feature = "server", feature = "self-update"))]
+    #[cfg(any(feature = "desktop", feature = "self-update"))]
     if mode.live
         && target == crate::NAME
         && let Some(hooks) = *HOOKS.lock()
