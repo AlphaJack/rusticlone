@@ -1,0 +1,10 @@
+/* Two themes: light and coal. The first visit follows the system's. */
+#mdbook-theme-list li:has(#mdbook-theme-default_theme, #mdbook-theme-rust, #mdbook-theme-navy, #mdbook-theme-ayu) {
+    display: none;
+}
+
+/* Each screenshot in the theme's colors. */
+html.coal .light-only,
+html:not(.coal) .dark-only {
+    display: none;
+}

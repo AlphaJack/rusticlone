@@ -11,6 +11,14 @@ pub(crate) fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::rename(from, to)
 }
 
+/// How the book writes `path`: under `$HOME`, where it is.
+#[cfg(test)]
+#[expect(clippy::disallowed_methods, reason = "the book names folders by the variables that hold them")]
+pub(crate) fn as_documented(path: &Path) -> String {
+    let home = std::env::var_os("HOME").and_then(|h| Some(path.strip_prefix(h).ok()?.display().to_string()));
+    home.map_or_else(|| path.display().to_string(), |rest| format!("$HOME/{rest}"))
+}
+
 /// `app`'s configuration directory for the system.
 #[expect(clippy::unnecessary_wraps, reason = "Windows's may be unknown")]
 pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {

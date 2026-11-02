@@ -4,6 +4,12 @@ use std::path::Path;
 
 use etcetera::BaseStrategy;
 
+/// Whether a variable moved one of the XDG folders: only Linux reads them.
+#[cfg(test)]
+pub(crate) fn xdg_moved() -> bool {
+    false
+}
+
 pub(super) use super::unix::read_hostname;
 pub(crate) use super::unix::*;
 
