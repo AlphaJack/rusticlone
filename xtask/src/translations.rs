@@ -15,7 +15,7 @@ use fluent_syntax::ast::Entry;
 const FALLBACK: &str = "en";
 
 pub(crate) fn report() -> Result<()> {
-    let i18n = Path::new(env!("CARGO_MANIFEST_DIR")).join("../i18n");
+    let i18n = crate::root().join("i18n");
     let languages: Vec<PathBuf> =
         entries(&i18n)?.into_iter().filter(|p| p.is_dir() && p.file_name() != Some(OsStr::new(FALLBACK))).collect();
     for catalog in entries(&i18n.join(FALLBACK))?.iter().filter(|p| p.extension() == Some(OsStr::new("ftl"))) {

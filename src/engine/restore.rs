@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::Result;
-use jiff::{Timestamp, tz::TimeZone};
+use jiff::Timestamp;
 
 use super::{Engine, Error, Run, Use, newest, pick};
 use crate::request::{RestoreOptions, StepKey, Tested};
@@ -343,23 +343,6 @@ impl Engine {
         }
         Ok(complete)
     }
-}
-
-pub(crate) fn parse_at(s: &str) -> Result<Timestamp, Error> {
-    if let Ok(ts) = s.parse::<Timestamp>() {
-        return Ok(ts);
-    }
-    let dt = match s.trim().parse::<jiff::civil::Date>() {
-        // A bare date means the end of that day.
-        Ok(date) => date.to_datetime(jiff::civil::Time::MAX),
-        Err(_) => s
-            .replace(' ', "T")
-            .parse::<jiff::civil::DateTime>()
-            .map_err(|source| Error::NoTime { time: s.to_owned(), source })?,
-    };
-    (TimeZone::system().to_ambiguous_zoned(dt).compatible())
-        .map(|z| z.timestamp())
-        .map_err(|source| Error::NoTime { time: s.to_owned(), source })
 }
 
 /// `/home/me/docs` becomes `home/me/docs`, `C:\Users\me` becomes `C/Users/me`, on any system.

@@ -6,8 +6,8 @@ use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use clap_complete::{ArgValueCompleter, CompletionCandidate};
 
 use crate::{
-    engine::{self, Named},
     i18n::{self, t},
+    request::{self, Named},
     rustic,
 };
 
@@ -99,7 +99,7 @@ pub(crate) enum Command {
         #[command(flatten)]
         select: SelectRepos,
         /// The newest snapshots not after TIME (2026-10-01, "2026-10-01 12:00").
-        #[arg(long, value_name = "TIME", value_parser = engine::parse_at)]
+        #[arg(long, value_name = "TIME", value_parser = request::parse_at)]
         at_time: Option<jiff::Timestamp>,
         /// This snapshot, of the repository that --repo names (default: the primary).
         #[arg(long, value_name = "ID", conflicts_with = "at_time")]

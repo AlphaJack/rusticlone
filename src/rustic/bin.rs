@@ -22,7 +22,7 @@ pub(crate) fn downloaded() -> Result<PathBuf> {
 /// [`settings::RUSTIC`], else the rustic in `PATH`, else the downloaded one, which a service started
 /// without the user's `PATH` does not find there. Found at each call, because it may have been installed
 /// since.
-pub(crate) fn bin() -> PathBuf {
+pub(crate) fn path() -> PathBuf {
     if let Some(path) = settings::RUSTIC.get(&[]) {
         return path.into();
     }

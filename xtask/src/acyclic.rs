@@ -37,7 +37,7 @@ struct Occurrence {
 }
 
 pub(crate) fn check(mermaid: bool) -> Result<()> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = crate::root();
     let manifest: toml_edit::DocumentMut = fs::read_to_string(root.join("Cargo.toml"))?.parse()?;
     let name = manifest["package"]["name"].as_str().context("no package name in Cargo.toml")?;
     let (modules, items, upcalls) = graphs(name, &index(&root, name)?);
