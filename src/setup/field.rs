@@ -105,13 +105,7 @@ const fn folder(example: &'static str) -> Field {
 
 /// What a user types on this system, as an example: Windows, macOS, or another.
 const fn native(windows: &'static str, macos: &'static str, other: &'static str) -> &'static str {
-    if cfg!(windows) {
-        windows
-    } else if cfg!(target_os = "macos") {
-        macos
-    } else {
-        other
-    }
+    super::os::native(windows, macos, other)
 }
 
 /// What a repository's password is called.

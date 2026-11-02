@@ -256,8 +256,19 @@ pub(crate) fn mount_tables() -> Option<[PathBuf; 2]> {
 }
 
 /// A file in the user's profile is the user's alone already.
-#[cfg(feature = "server")]
+#[cfg(any(feature = "server", all(feature = "desktop", feature = "self-update")))]
 pub(crate) fn only_owner(_: &mut std::fs::OpenOptions) {}
+
+/// Where `app` keeps its state for the system.
+#[expect(clippy::disallowed_methods, reason = "the system's data folder is in the environment")]
+pub(crate) fn system_state_dir(app: &str) -> PathBuf {
+    PathBuf::from(std::env::var_os("PROGRAMDATA").unwrap_or_else(|| r"C:\ProgramData".into())).join(app).join("state")
+}
+
+/// Where `app` keeps its state for this user: machine-local, so not the roaming profile.
+pub(crate) fn user_state_dir(base: &impl BaseStrategy, app: &str) -> PathBuf {
+    base.state_dir().unwrap_or_else(|| base.cache_dir()).join(app)
+}
 
 #[cfg(test)]
 mod tests {
