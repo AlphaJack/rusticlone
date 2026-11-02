@@ -99,7 +99,7 @@ impl Setting {
     }
 
     /// `true` or `false`, in any case.
-    #[cfg(all(feature = "server", feature = "self-update"))]
+    #[cfg(feature = "server")]
     pub(crate) fn enabled(&self) -> Result<bool, Error> {
         self.get(&[]).unwrap_or_default().to_lowercase().parse().map_err(|e| self.invalid(e))
     }
