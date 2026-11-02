@@ -144,17 +144,6 @@ pub(crate) fn system_bins() -> Vec<PathBuf> {
 #[cfg(feature = "server")]
 pub(crate) fn release_own_console() {}
 
-/// The installer's command here, without `install`: on a new computer, the server would back up the folders
-/// before they are restored.
-#[cfg(feature = "server")]
-pub(crate) const INSTALLER: &str = concat!(
-    "curl -LsSf ",
-    env!("CARGO_PKG_REPOSITORY"),
-    "/releases/latest/download/",
-    env!("CARGO_PKG_NAME"),
-    "-installer.sh | sh"
-);
-
 /// Read and written by its owner alone.
 #[cfg(feature = "server")]
 const OWNER_ONLY: u32 = 0o600;

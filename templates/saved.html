@@ -15,7 +15,7 @@
     <h2>{{ Heading::RestoreOnNewComputer }}</h2>
     <ol>
       <li>{{ Hint::ProfilesStep { dir: dir } }}</li>
-      <li>{{ Hint::InstallStep { app: crate::APP_NAME } }}{% call command(INSTALLER) %}{% endcall %}</li>
+      <li>{{ Hint::InstallStep { app: crate::APP_NAME } }} <a href="{{ RESTORE_GUIDE }}" target="_blank" rel="noreferrer">{{ RESTORE_GUIDE }}</a></li>
       <li>{{ Hint::RestoreStep }}{% call command(restore) %}{% endcall %}</li>
       <li>{{ Hint::ResumeStep }}{% call command(resume) %}{% endcall %}</li>
     </ol>
