@@ -39,7 +39,7 @@ pub(super) async fn wall_timer(at: Timestamp) -> std::io::Result<()> {
 }
 
 /// Uses the clock that keeps running during sleep, unlike the one tokio uses.
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 #[expect(unsafe_code, reason = "create and configure an owned kqueue timer")]
 pub(super) async fn wall_timer(at: Timestamp) -> std::io::Result<()> {
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -64,7 +64,7 @@ pub(super) async fn wall_timer(at: Timestamp) -> std::io::Result<()> {
     readable(queue).await
 }
 
-#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[expect(unsafe_code, reason = "register an owned timer descriptor with the runtime")]
 pub(super) async fn readable(fd: std::os::fd::OwnedFd) -> std::io::Result<()> {
     // Readable only: macOS refuses to watch a kqueue for writing.
@@ -127,13 +127,7 @@ pub(super) async fn wall_timer(at: Timestamp) -> std::io::Result<()> {
     if waited == WAIT_OBJECT_0 { Ok(()) } else { Err(std::io::Error::last_os_error()) }
 }
 
-/// On other systems, a sleep may stop during a suspend.
-#[cfg(not(any(target_os = "linux", target_vendor = "apple", windows)))]
-pub(super) async fn wall_timer(_: Timestamp) -> std::io::Result<()> {
-    Err(std::io::ErrorKind::Unsupported.into())
-}
-
-#[cfg(all(test, any(target_os = "linux", target_vendor = "apple", windows)))]
+#[cfg(test)]
 mod tests {
     use super::*;
 

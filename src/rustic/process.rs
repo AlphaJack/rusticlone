@@ -11,7 +11,7 @@ pub(super) fn work(pid: u32) -> Option<u64> {
 }
 
 /// Bytes read from and written to disk so far. Unlike Linux, macOS does not count a remote's traffic.
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 #[expect(unsafe_code, reason = "fills a resource usage record of a process")]
 pub(super) fn work(pid: u32) -> Option<u64> {
     let mut usage = std::mem::MaybeUninit::<libc::rusage_info_v2>::zeroed();
@@ -43,12 +43,6 @@ pub(super) fn work(pid: u32) -> Option<u64> {
         read != 0
     };
     read.then(|| counters.ReadTransferCount + counters.WriteTransferCount + counters.OtherTransferCount)
-}
-
-/// Unknown on other systems: only output shows activity.
-#[cfg(not(any(target_os = "linux", target_vendor = "apple", windows)))]
-pub(super) fn work(_: u32) -> Option<u64> {
-    None
 }
 
 /// Ends `process`, and what it starts, with this process. Windows releases locks with the process that took
@@ -103,7 +97,7 @@ pub(crate) fn kill(pid: u32) {
     }
 }
 
-#[cfg(all(test, any(target_os = "linux", target_vendor = "apple", windows)))]
+#[cfg(all(test, any(target_os = "linux", target_os = "macos", windows)))]
 mod tests {
     use std::io::Write;
 

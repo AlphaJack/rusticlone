@@ -22,9 +22,9 @@ const TARGET: Option<&str> = if cfg!(all(target_os = "linux", target_arch = "x86
     Some("aarch64-unknown-linux-musl")
 } else if cfg!(all(target_os = "linux", target_arch = "arm")) {
     Some("armv7-unknown-linux-gnueabihf")
-} else if cfg!(all(target_vendor = "apple", target_arch = "aarch64")) {
+} else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
     Some("aarch64-apple-darwin")
-} else if cfg!(all(target_vendor = "apple", target_arch = "x86_64")) {
+} else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
     Some("x86_64-apple-darwin")
 } else if cfg!(all(windows, target_arch = "x86_64")) {
     Some("x86_64-pc-windows-msvc")

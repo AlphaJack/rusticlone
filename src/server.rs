@@ -255,7 +255,7 @@ pub(crate) fn serve(
     let listen = listen.to_owned();
     let serve = move |tray| {
         // Homebrew updated the executable that the app is a copy of.
-        #[cfg(all(target_vendor = "apple", feature = "desktop", feature = "self-update"))]
+        #[cfg(all(target_os = "macos", feature = "desktop", feature = "self-update"))]
         if crate::install::autostart::refresh_app()? {
             return restart(&std::env::current_exe()?);
         }

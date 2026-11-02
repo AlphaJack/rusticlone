@@ -163,3 +163,8 @@ impl Tray {
         }
     }
 }
+
+/// Started from the `Run` key, or by `install`.
+pub(in crate::server) fn managed() -> bool {
+    crate::sys::ALONE.load(std::sync::atomic::Ordering::Relaxed)
+}

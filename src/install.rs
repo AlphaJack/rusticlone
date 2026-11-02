@@ -69,7 +69,7 @@ pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
             return Some(keeper);
         }
     }
-    #[cfg(all(target_vendor = "apple", feature = "desktop"))]
+    #[cfg(all(target_os = "macos", feature = "desktop"))]
     if let Some(source) = autostart::app_source(exe) {
         return Some(keeper(&source).unwrap_or(Keeper::Homebrew));
     }
@@ -107,7 +107,7 @@ mod tests {
     use crate::sys::writable;
 
     /// The app copies Homebrew's executable, and names it in its resources.
-    #[cfg(all(target_vendor = "apple", feature = "desktop"))]
+    #[cfg(all(target_os = "macos", feature = "desktop"))]
     #[test]
     fn the_macos_apps_copy_of_homebrews_executable_is_managed() {
         let app = std::env::temp_dir().join(format!("{}-app-{}.app", crate::NAME, std::process::id()));
@@ -237,7 +237,7 @@ mod tests {
     }
 
     /// The system volume is read-only, even for root.
-    #[cfg(target_vendor = "apple")]
+    #[cfg(target_os = "macos")]
     #[test]
     fn the_system_volume_is_not_replaceable_on_macos() {
         assert!(!writable(Path::new("/usr/bin")));

@@ -44,7 +44,7 @@ pub(crate) enum Logged {
         dir: String,
     },
     /// The macOS app copied the executable that the package manager updated.
-    #[cfg(all(target_vendor = "apple", feature = "self-update"))]
+    #[cfg(all(target_os = "macos", feature = "self-update"))]
     AppRefreshed {
         version: String,
     },
@@ -59,10 +59,8 @@ pub(crate) enum Error {
     CannotRun { program: String, source: std::io::Error },
     #[cfg(unix)]
     Failed { command: String, error: String },
-    #[cfg(target_vendor = "apple")]
+    #[cfg(target_os = "macos")]
     NoProfileDir,
-    #[cfg(not(any(target_os = "linux", target_vendor = "apple", windows)))]
-    Unsupported,
 }
 
 /// The user switched the server off in macOS's Login Items, so launchd no longer starts it.
@@ -76,9 +74,9 @@ log::level!(Warning: Blocked);
 
 /// Whether the server is installed to start at login, and the user switched it off.
 pub(crate) fn blocked() -> Option<Blocked> {
-    #[cfg(target_vendor = "apple")]
+    #[cfg(target_os = "macos")]
     return imp::blocked().then_some(Blocked {});
-    #[cfg(not(target_vendor = "apple"))]
+    #[cfg(not(target_os = "macos"))]
     None
 }
 
@@ -97,7 +95,7 @@ fn run(program: &str, args: &[&str]) -> Result<()> {
 /// Starts the installed or packaged server, rather than one without its options, and waits until it answers on
 /// `listen`: false without one, or if it does not answer within a minute, which an update at its start can take.
 /// The service manager then supervises it, unlike a server that `serve --open` starts.
-#[cfg(any(target_os = "linux", target_vendor = "apple"))]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub(crate) fn start_installed(listen: &str) -> Result<bool> {
     Ok(imp::start()? && answers_soon(listen))
 }
@@ -117,14 +115,14 @@ pub(crate) fn answers_soon(listen: &str) -> bool {
 
 /// The package manager's executable that the macOS app holding `exe` is a copy of: the package manager
 /// updates that one.
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 pub(crate) fn app_source(exe: &Path) -> Option<PathBuf> {
     imp::app_source(exe)
 }
 
 /// Copies the package manager's executable into the macOS app again when it updated it, and says so.
 /// Whether it did: the app then starts again.
-#[cfg(all(target_vendor = "apple", feature = "self-update"))]
+#[cfg(all(target_os = "macos", feature = "self-update"))]
 pub(crate) fn refresh_app() -> Result<bool> {
     let Some(version) = imp::refresh_app()? else { return Ok(false) };
     log::event(None, &Logged::AppRefreshed { version });
@@ -133,13 +131,13 @@ pub(crate) fn refresh_app() -> Result<bool> {
 
 /// Writes the macOS app again around this executable, which an update replaced with `version`: its version,
 /// and a signature that covers the new executable. Nothing for an executable outside the app.
-#[cfg(all(target_vendor = "apple", feature = "self-update"))]
+#[cfg(all(target_os = "macos", feature = "self-update"))]
 pub(crate) fn rewrite_app(version: &str) -> Result<()> {
     imp::rewrite_app(version)
 }
 
 /// Whether this is the macOS app opened from Finder or Spotlight, which passes no arguments.
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 pub(crate) fn opened_as_app() -> bool {
     let inside = format!("Contents/MacOS/{}", crate::APP_NAME);
     std::env::args_os().len() == 1 && std::env::current_exe().is_ok_and(|exe| exe.ends_with(inside))
@@ -245,9 +243,9 @@ mod linux;
 #[cfg(target_os = "linux")]
 use linux as imp;
 
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 mod macos;
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 use macos as imp;
 
 /// From an elevated shell, a system service that starts with the computer, restarted after a failure; else
@@ -257,11 +255,6 @@ use macos as imp;
 mod windows;
 #[cfg(windows)]
 use windows as imp;
-
-#[cfg(not(any(target_os = "linux", target_vendor = "apple", windows)))]
-mod other;
-#[cfg(not(any(target_os = "linux", target_vendor = "apple", windows)))]
-use other as imp;
 
 /// The arguments of the installed server: its settings are in the env file, so that a server started
 /// another way runs the same.
@@ -538,7 +531,7 @@ package(){{
     }
 }
 
-#[cfg(all(test, target_vendor = "apple"))]
+#[cfg(all(test, target_os = "macos"))]
 mod apple_tests {
     #[test]
     fn the_keywords_fit_a_short_property_list() {

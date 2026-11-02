@@ -136,3 +136,9 @@ impl ksni::Tray for Shown {
             .collect()
     }
 }
+
+/// systemd tells its services where to report readiness.
+#[expect(clippy::disallowed_methods, reason = "systemd's variable, not a setting")]
+pub(in crate::server) fn managed() -> bool {
+    std::env::var_os("NOTIFY_SOCKET").is_some()
+}

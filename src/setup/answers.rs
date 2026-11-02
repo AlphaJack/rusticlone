@@ -73,7 +73,7 @@ impl Default for Setup {
     fn default() -> Self {
         let home = etcetera::home_dir().unwrap_or_else(|_| "/home/me".into());
         let name = "Documents";
-        let source = match (sys::is_root(), cfg!(windows), cfg!(target_vendor = "apple")) {
+        let source = match (sys::is_root(), cfg!(windows), cfg!(target_os = "macos")) {
             (false, ..) => home.join(name).display().to_string(),
             // Every account's files, which the system service reads.
             (true, true, _) => r"C:\Users".into(),
@@ -104,7 +104,7 @@ impl Default for Setup {
 
 /// The notification URL of this desktop. A system service has none to show it on.
 pub(crate) fn desktop() -> Option<&'static str> {
-    match (sys::is_root(), cfg!(windows), cfg!(target_vendor = "apple")) {
+    match (sys::is_root(), cfg!(windows), cfg!(target_os = "macos")) {
         (true, ..) => None,
         (false, true, _) => Some("windows://"),
         (false, _, true) => Some("macosx://"),

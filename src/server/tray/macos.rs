@@ -151,3 +151,8 @@ fn badge(tray: &tray_icon::TrayIcon, color: Option<Rgb>) {
         badge.setHidden(false);
     });
 }
+
+/// launchd starts its agents.
+pub(in crate::server) fn managed() -> bool {
+    std::os::unix::process::parent_id() == 1
+}

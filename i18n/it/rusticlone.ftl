@@ -699,7 +699,6 @@ autostart-deleted = eliminato { $dir }
 autostart-error-cannot-run = impossibile eseguire { $program }
 autostart-error-failed = { $command } è fallito: { $error }
 autostart-error-no-profile-dir = nessuna cartella dei profili conosciuta su questo computer
-autostart-error-unsupported = nessun gestore di servizi conosciuto su questo computer. Avvia `{ -name } serve` dal tuo servizio o da cron
 autostart-blocked = macOS blocca il server all'accesso. Apri Impostazioni di Sistema > Generali > Elementi di login ed estensioni e attiva { $app }
 autostart-unit-description = Server { -app }
 # Cosa dicono dell'app i desktop e il menu Start di Windows. Le traduzioni lo sostituiscono.
