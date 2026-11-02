@@ -9,6 +9,7 @@ mod locks;
 mod maintain;
 mod plan;
 mod record;
+mod report;
 mod restore;
 mod schedule;
 mod snapshots;
@@ -21,12 +22,12 @@ pub(crate) use load::Named;
 use locks::Use;
 use plan::{follows, plan};
 use record::behind;
+pub(crate) use report::{CollectionOverview, Last, RepoOverview, StatusReport};
+#[cfg(feature = "server")]
+pub(crate) use report::{Issue, RepoStatus, Unconfigured};
 pub(crate) use restore::parse_at;
 pub(crate) use schedule::Schedule;
 use snapshots::{each, newest, newest_by_source, pick, shrunk};
-pub(crate) use status::{CollectionOverview, Last, RepoOverview, StatusReport};
-#[cfg(feature = "server")]
-pub(crate) use status::{Issue, RepoStatus, Unconfigured};
 
 use std::{
     collections::{BTreeMap, BTreeSet},
