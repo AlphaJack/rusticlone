@@ -2,27 +2,13 @@
 
 use std::path::PathBuf;
 
-use etcetera::BaseStrategy;
-
-use super::is_root;
+use super::{is_root, os};
 
 /// `app`'s configuration directories, the user's then the system's, laid out as the `directories` crate
 /// that rustic uses lays them out.
-#[expect(clippy::disallowed_methods, reason = "the system's directory on Windows is in the environment")]
 pub(crate) fn config_dirs(app: &str) -> Result<Vec<PathBuf>, etcetera::HomeDirError> {
     let base = etcetera::base_strategy::choose_native_strategy()?;
-    let user = if cfg!(windows) {
-        base.config_dir().join(app).join("config")
-    } else if cfg!(target_vendor = "apple") {
-        base.data_dir().join(app)
-    } else {
-        base.config_dir().join(app)
-    };
-    let system = match std::env::var_os("PROGRAMDATA") {
-        Some(data) if cfg!(windows) => Some(PathBuf::from(data).join(app).join("config")),
-        _ => (!cfg!(windows)).then(|| PathBuf::from("/etc").join(app)),
-    };
-    Ok([user].into_iter().chain(system).collect())
+    Ok([os::user_config_dir(&base, app)].into_iter().chain(os::system_config_dir(app)).collect())
 }
 
 /// Where `install` places rusticlone, on `PATH`, unless it runs from [`installer_dir`] already: that folder,
@@ -30,7 +16,7 @@ pub(crate) fn config_dirs(app: &str) -> Result<Vec<PathBuf>, etcetera::HomeDirEr
 /// there too.
 pub(crate) fn bin_dir() -> Result<PathBuf, etcetera::HomeDirError> {
     if is_root() {
-        return Ok(super::os::system_bin_dir());
+        return Ok(os::system_bin_dir());
     }
     installer_dir()
 }
@@ -47,20 +33,6 @@ pub(crate) fn own_config_dir(app: &str) -> Option<PathBuf> {
     config_dirs(app).ok()?.into_iter().nth(usize::from(is_root()))
 }
 
-/// Whether `path` is an absolute path of a system other than this one: a Windows drive's elsewhere, or a Unix
-/// root's on Windows. Its folder has no place here.
-pub(crate) fn foreign_path(path: &str) -> bool {
-    if cfg!(windows) { path.starts_with('/') } else { windows_drive(path).is_some() }
-}
-
-/// The drive letter of a Windows path such as `C:\Users`, and what follows it.
-pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
-    let mut chars = path.chars();
-    let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
-    let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
-    windows.then(|| (letter, path.get(2..).unwrap_or_default()))
-}
-
 /// An empty directory for test `name`, below one directory per test process in the temporary
 /// directory. Directories of ended processes are removed.
 #[cfg(test)]
@@ -71,10 +43,7 @@ pub(crate) fn test_dir(name: &str) -> PathBuf {
     ENDED_GONE.call_once(|| {
         for run in std::fs::read_dir(&root).into_iter().flatten().flatten() {
             let pid = run.file_name().to_string_lossy().into_owned();
-            if pid.parse::<u32>().is_ok()
-                && !std::path::Path::new("/proc").join(&pid).exists()
-                && cfg!(target_os = "linux")
-            {
+            if pid.parse::<u32>().is_ok() && os::ended(&pid) {
                 _ = std::fs::remove_dir_all(run.path());
             }
         }
@@ -87,16 +56,11 @@ pub(crate) fn test_dir(name: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::foreign_path;
+    use crate::sys::foreign_path;
 
-    /// Another system's absolute folders, which have no place here. Relative ones are this system's.
+    /// A relative folder is this system's, on any system.
     #[test]
-    fn another_systems_folders_are_told_apart() {
-        if cfg!(windows) {
-            assert!(foreign_path("/home/me") && !foreign_path(r"C:\Users\me"));
-        } else {
-            assert!(foreign_path(r"C:\Users\me") && foreign_path("d:/data") && !foreign_path("/home/me"));
-        }
+    fn relative_folders_are_not_foreign() {
         assert!(!foreign_path("C:relative") && !foreign_path(""));
     }
 }

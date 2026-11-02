@@ -2,21 +2,24 @@
 //! colored dot when a collection needs attention, and a menu that opens the web UI. It shows only for a server
 //! that its user runs.
 
-#[cfg(any(target_vendor = "apple", windows))]
+#[cfg(any(target_os = "macos", windows))]
 mod icon;
 #[cfg(target_os = "linux")]
 mod linux;
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 mod macos;
 #[cfg(windows)]
 mod windows;
 
 #[cfg(target_os = "linux")]
-pub(super) use linux::{Tray, beside};
-#[cfg(target_vendor = "apple")]
-pub(super) use macos::{Tray, beside};
+use linux as imp;
+#[cfg(target_os = "macos")]
+use macos as imp;
 #[cfg(windows)]
-pub(super) use windows::{Tray, beside};
+use windows as imp;
+
+use imp::managed;
+pub(super) use imp::{Tray, beside};
 
 use std::{sync::Arc, time::Duration};
 
@@ -66,25 +69,6 @@ struct Row {
 fn attended(open: bool) -> bool {
     use std::io::IsTerminal;
     !sys::is_root() && (open || std::io::stdout().is_terminal() || managed())
-}
-
-/// launchd starts its agents.
-#[cfg(target_vendor = "apple")]
-fn managed() -> bool {
-    std::os::unix::process::parent_id() == 1
-}
-
-/// Started from the `Run` key, or by `install`.
-#[cfg(windows)]
-fn managed() -> bool {
-    sys::started_alone()
-}
-
-/// systemd tells its services where to report readiness.
-#[cfg(target_os = "linux")]
-#[expect(clippy::disallowed_methods, reason = "systemd's variable, not a setting")]
-fn managed() -> bool {
-    std::env::var_os("NOTIFY_SOCKET").is_some()
 }
 
 fn level(rows: &[Row]) -> Level {

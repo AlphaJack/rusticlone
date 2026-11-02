@@ -1,9 +1,24 @@
 //! Linux's answers, from sysfs and `statfs`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use etcetera::BaseStrategy;
 
 pub(super) use super::unix::read_hostname;
 pub(crate) use super::unix::*;
+
+/// `app`'s configuration directory for this user, laid out as the `directories` crate that rustic uses lays
+/// it out.
+pub(crate) fn user_config_dir(base: &impl BaseStrategy, app: &str) -> PathBuf {
+    base.config_dir().join(app)
+}
+
+/// Whether the process `pid` ended, for test directories to go.
+#[cfg(test)]
+#[expect(clippy::disallowed_methods, reason = "looks for the process in /proc")]
+pub(crate) fn ended(pid: &str) -> bool {
+    !Path::new("/proc").join(pid).exists()
+}
 
 /// macOS's alone.
 pub(crate) fn needs_disk_access(_: &str) -> bool {

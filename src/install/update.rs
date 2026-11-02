@@ -230,7 +230,7 @@ fn replace(dry_run: bool) -> Result<Logged> {
     std::fs::remove_file(&new)?;
     replaced?;
     // Else the app shows the old version, and its signature no longer covers its executable.
-    #[cfg(all(target_vendor = "apple", feature = "desktop"))]
+    #[cfg(all(target_os = "macos", feature = "desktop"))]
     crate::install::autostart::rewrite_app(&to)?;
     Ok(Logged::Updated { from, to })
 }

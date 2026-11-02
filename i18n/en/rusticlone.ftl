@@ -699,7 +699,6 @@ autostart-deleted = deleted { $dir }
 autostart-error-cannot-run = cannot run { $program }
 autostart-error-failed = { $command } failed: { $error }
 autostart-error-no-profile-dir = no profile folder known on this computer
-autostart-error-unsupported = no service manager known on this computer. Start `{ -name } serve` from your own service or cron
 autostart-blocked = macOS blocks the server at login. Open System Settings > General > Login Items & Extensions and switch { $app } on
 autostart-unit-description = { -app } server
 # What desktops and the Windows start menu say of the app. Translations replace it.

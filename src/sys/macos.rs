@@ -2,8 +2,21 @@
 
 use std::path::Path;
 
+use etcetera::BaseStrategy;
+
 pub(super) use super::unix::read_hostname;
 pub(crate) use super::unix::*;
+
+/// `app`'s configuration directory for this user, where the `directories` crate that rustic uses puts it.
+pub(crate) fn user_config_dir(base: &impl BaseStrategy, app: &str) -> std::path::PathBuf {
+    base.data_dir().join(app)
+}
+
+/// Whether the process `pid` ended, for test directories to go. Unknown but on Linux.
+#[cfg(test)]
+pub(crate) fn ended(_: &str) -> bool {
+    false
+}
 
 /// Whether macOS keeps this process out of folders in `path` until the process has Full Disk Access:
 /// users' `Library`, which holds mail, messages and browser data. Documents, Desktop, Downloads and

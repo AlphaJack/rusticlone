@@ -263,7 +263,7 @@ pub(crate) fn state_dir() -> Result<PathBuf> {
             PathBuf::from(env::var_os("PROGRAMDATA").unwrap_or_else(|| r"C:\ProgramData".into()))
                 .join(crate::NAME)
                 .join("state")
-        } else if cfg!(target_vendor = "apple") {
+        } else if cfg!(target_os = "macos") {
             PathBuf::from("/Library/Application Support").join(crate::NAME)
         } else {
             PathBuf::from("/var/lib").join(crate::NAME)
