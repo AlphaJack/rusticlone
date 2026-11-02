@@ -162,8 +162,9 @@ jobs:
         if: vars.CI_USE_SCCACHE != 'true'
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          # Temporary, to measure a warm build on this PR: revert before merging.
-          save-if: true
+          # The key the Windows test shards saved their builds under, so this job starts from that cache.
+          shared-key: test
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
