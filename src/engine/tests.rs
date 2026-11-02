@@ -234,7 +234,7 @@ fn a_failed_notification_is_sent_again_after_its_backoff() {
 fn no_profile_is_a_warning_at_first_and_a_failure_after_runs() {
     use crate::{log::Message, request::StepKey, result::StepResult, state::Event};
     let engine = engine_of("unconfigured", &Replay::new(), &[]);
-    assert_eq!(engine.unconfigured(), Some(super::status::Unconfigured::New));
+    assert_eq!(engine.unconfigured(), Some(super::report::Unconfigured::New));
     assert_eq!(engine.report().level, Level::Warning);
     let at = engine.store.now();
     let ran = Event::Attempted {
@@ -271,9 +271,9 @@ fn a_pending_failure_shows_the_last_success() {
         }])
         .unwrap();
     let checked = || engine.status_of(&engine.collections()[0]).primary.checked;
-    assert!(checked() == super::status::Last::Never);
+    assert!(checked() == super::report::Last::Never);
     engine.store.wait(std::time::Duration::from_mins(6), &|| false);
-    assert!(checked() == super::status::Last::Failing(1));
+    assert!(checked() == super::report::Last::Failing(1));
 }
 
 /// Of the groups rustic makes, one per source belongs to the collection: this host's, else the newest one.
