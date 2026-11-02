@@ -31,7 +31,7 @@ pub(super) fn report(phase: Phase) {
     #[cfg(feature = "desktop")]
     manager::report(phase);
     #[cfg(not(feature = "desktop"))]
-    _ = phase;
+    let _ = phase;
 }
 
 /// Whether the service manager started this process.
