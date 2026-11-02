@@ -285,7 +285,7 @@ fn profile_info(engine: &Engine, p: &profile::RusticProfile, inherited: &BTreeSe
     }
 }
 
-/// Each collection, without reporting broken profiles first: as [`for_each_collection`], for `collections`,
+/// Each collection, without reporting broken profiles first: as [`super::for_each_collection`], for `collections`,
 /// which lists them.
 pub(super) fn each_collection(
     engine: &Engine,
