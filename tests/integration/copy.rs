@@ -85,7 +85,7 @@ fn target_mounted_by_repository_hooks() {
     sb.target("Docs-usb", "usb/Docs", &hooks);
     sb.write("docs/a.txt", "version 1");
     sb.run(&["backup", "--all"]).assert_exit(0).assert_result("copied", json!({"target": "Docs-usb", "snapshots": 1}));
-    assert!(!mount.exists() && disk.join("Docs/config").is_file());
+    assert!(!mount.exists() && disk.join("Docs").join("config").is_file());
     assert_eq!(sb.snapshots("Docs-usb").len(), 1);
 }
 

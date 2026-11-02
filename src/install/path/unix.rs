@@ -35,7 +35,11 @@ esac
         (home.join(".bashrc"), &source, false),
         (home.join(".bash_profile"), &source, false),
         (home.join(".zshenv"), &source, shell.ends_with("zsh")),
-        (home.join(".config/fish/conf.d").join(format!("{}.fish", crate::NAME)), &fish, shell.ends_with("fish")),
+        (
+            home.join(".config").join("fish").join("conf.d").join(format!("{}.fish", crate::NAME)),
+            &fish,
+            shell.ends_with("fish"),
+        ),
     ];
     let mut changed = Vec::new();
     for (file, line, create) in files {

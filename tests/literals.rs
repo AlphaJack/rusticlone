@@ -192,7 +192,7 @@ fn sources(dir: &Path, found: &mut Literals) {
         if path.is_dir() {
             sources(&path, found);
         } else if path.extension().is_some_and(|e| e == "rs") && path.file_name().is_some_and(|f| f != "tests.rs") {
-            let rustic = path.starts_with(root().join("src/rustic"));
+            let rustic = path.starts_with(root().join("src").join("rustic"));
             let mut literals = Literals { rustic, ..Literals::default() };
             literals.visit_file(&syn::parse_file(&fs::read_to_string(&path).unwrap()).unwrap());
             let file = path.strip_prefix(root()).unwrap_or(&path).display().to_string();
@@ -267,7 +267,7 @@ fn templates_contain_no_text() {
 /// The sentences of `app.js`: its strings that start with a capital and have two words.
 #[test]
 fn scripts_contain_no_text() {
-    let script = fs::read_to_string(root().join("assets/app.js")).unwrap();
+    let script = fs::read_to_string(root().join("assets").join("app.js")).unwrap();
     let code: String =
         script.lines().filter(|l| !l.trim_start().starts_with(['/', '*'])).collect::<Vec<_>>().join("\n");
     let strings = code.split(['"', '`']).skip(1).step_by(2);

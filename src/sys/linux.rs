@@ -34,8 +34,9 @@ pub(super) fn solid_state(path: &Path) -> Option<bool> {
 /// `sys` is where sysfs is mounted. A partition has no queue of its own: its disk's applies.
 #[expect(clippy::disallowed_methods, reason = "reads disk properties from sysfs")]
 fn solid_state_in(sys: &Path, major: u32, minor: u32) -> Option<bool> {
-    let block = std::fs::canonicalize(sys.join(format!("dev/block/{major}:{minor}"))).ok()?;
-    let rotational = block.ancestors().take(2).find_map(|d| std::fs::read_to_string(d.join("queue/rotational")).ok());
+    let block = std::fs::canonicalize(sys.join("dev").join("block").join(format!("{major}:{minor}"))).ok()?;
+    let rotational =
+        block.ancestors().take(2).find_map(|d| std::fs::read_to_string(d.join("queue").join("rotational")).ok());
     rotational.map(|r| r.trim() == "0")
 }
 
@@ -74,15 +75,15 @@ mod tests {
     fn a_disk_is_solid_state_if_the_kernel_says_so() {
         let sys = crate::sys::test_dir("sys");
         let disk = |name: &str, rotational: &str| {
-            fs::create_dir_all(sys.join(format!("devices/{name}/queue"))).unwrap();
-            fs::write(sys.join(format!("devices/{name}/queue/rotational")), rotational).unwrap();
+            fs::create_dir_all(sys.join("devices").join(name).join("queue")).unwrap();
+            fs::write(sys.join("devices").join(name).join("queue").join("rotational"), rotational).unwrap();
         };
         disk("sda", "1\n");
         disk("dm-1", "0\n");
-        fs::create_dir_all(sys.join("devices/sda/sda1")).unwrap();
-        fs::create_dir_all(sys.join("dev/block")).unwrap();
-        symlink(sys.join("devices/sda/sda1"), sys.join("dev/block/8:1")).unwrap();
-        symlink(sys.join("devices/dm-1"), sys.join("dev/block/253:1")).unwrap();
+        fs::create_dir_all(sys.join("devices").join("sda").join("sda1")).unwrap();
+        fs::create_dir_all(sys.join("dev").join("block")).unwrap();
+        symlink(sys.join("devices").join("sda").join("sda1"), sys.join("dev").join("block").join("8:1")).unwrap();
+        symlink(sys.join("devices").join("dm-1"), sys.join("dev").join("block").join("253:1")).unwrap();
         // A partition, an LVM volume, and a device the kernel has no disk for (tmpfs, btrfs).
         let found = [solid_state_in(&sys, 8, 1), solid_state_in(&sys, 253, 1), solid_state_in(&sys, 0, 26)];
         assert_eq!(found, [Some(false), Some(true), None]);

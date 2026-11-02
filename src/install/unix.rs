@@ -23,7 +23,7 @@ fn nixs_store_is_managed() {
 #[test]
 fn homebrews_cellar_is_managed_through_its_link() {
     let root = std::env::temp_dir().join(format!("{}-brew-{}", crate::NAME, std::process::id()));
-    let (cellar, bin) = (root.join("Cellar/rusticlone/2.0.1/bin"), root.join("bin"));
+    let (cellar, bin) = (root.join("Cellar").join("rusticlone").join("2.0.1").join("bin"), root.join("bin"));
     std::fs::create_dir_all(&cellar).unwrap();
     std::fs::create_dir_all(&bin).unwrap();
     std::fs::write(cellar.join(crate::NAME), b"").unwrap();
@@ -36,7 +36,7 @@ fn homebrews_cellar_is_managed_through_its_link() {
 #[test]
 fn homebrews_cellar_is_managed() {
     for prefix in ["/opt/homebrew", "/usr/local", "/home/linuxbrew/.linuxbrew"] {
-        let exe = Path::new(prefix).join("Cellar/rusticlone/2.0.1/bin/rusticlone");
+        let exe = Path::new(prefix).join("Cellar").join("rusticlone").join("2.0.1").join("bin").join("rusticlone");
         assert_eq!(keeper(&exe), Some(Keeper::Homebrew), "{prefix}");
     }
 }

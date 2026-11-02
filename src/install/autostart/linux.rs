@@ -12,8 +12,8 @@ fn desktop_files() -> Result<Option<[PathBuf; 2]>> {
         return Ok(None);
     }
     let data = etcetera::choose_base_strategy().map(|b| etcetera::BaseStrategy::data_dir(&b))?;
-    let entry = data.join(format!("applications/{NAME}.desktop"));
-    Ok(Some([entry, data.join(format!("icons/hicolor/scalable/apps/{NAME}.svg"))]))
+    let entry = data.join("applications").join(format!("{NAME}.desktop"));
+    Ok(Some([entry, data.join("icons").join("hicolor").join("scalable").join("apps").join(format!("{NAME}.svg"))]))
 }
 
 fn systemctl(args: &[&str]) -> Result<()> {
@@ -25,7 +25,7 @@ fn dir() -> Result<PathBuf> {
     Ok(if sys::is_root() {
         "/etc/systemd/system".into()
     } else {
-        etcetera::choose_base_strategy().map(|b| etcetera::BaseStrategy::config_dir(&b))?.join("systemd/user")
+        etcetera::choose_base_strategy().map(|b| etcetera::BaseStrategy::config_dir(&b))?.join("systemd").join("user")
     })
 }
 
