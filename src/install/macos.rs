@@ -21,5 +21,5 @@ fn the_macos_apps_copy_of_homebrews_executable_is_managed() {
     let found = managed(&exe);
     std::fs::remove_dir_all(&app).unwrap();
     assert!(!mine && found);
-    assert_eq!(source, Some(Path::new("/opt/homebrew/bin/rusticlone").to_path_buf()));
+    assert_eq!(source, Some(Path::new("/opt").join("homebrew").join("bin").join("rusticlone")));
 }

@@ -511,12 +511,15 @@ mod tests {
 
     #[test]
     fn normalize_paths() {
-        assert_eq!(normalize(Path::new("/a/./b//c/../d/")), PathBuf::from("/a/b/d"));
+        assert_eq!(
+            normalize(&Path::new("/a").join(".").join("b").join("c").join("..").join("d")),
+            PathBuf::from("/a").join("b").join("d")
+        );
         assert_eq!(
             normalize(&Path::new("..").join("..").join("a").join("..").join("b")),
             PathBuf::from("..").join("..").join("b")
         );
-        assert_eq!(normalize(Path::new("/../a")), PathBuf::from("/a"));
+        assert_eq!(normalize(&Path::new("/..").join("a")), PathBuf::from("/a"));
     }
 
     /// Rustic reads `C:/b` as the backend `C`, and `C:\b` or `local:C:/b` as paths.

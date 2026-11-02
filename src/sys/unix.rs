@@ -17,7 +17,7 @@ pub(crate) fn foreign_path(path: &str) -> bool {
 
 /// Where `install` places rusticlone for root.
 pub(crate) fn system_bin_dir() -> PathBuf {
-    PathBuf::from("/usr/local/bin")
+    PathBuf::from("/usr").join("local").join("bin")
 }
 
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.

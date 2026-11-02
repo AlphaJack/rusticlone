@@ -44,7 +44,7 @@ pub(super) fn bplist(strings: &[&str]) -> Option<Vec<u8>> {
 
 fn plist() -> Result<PathBuf> {
     Ok(if sys::is_root() {
-        PathBuf::from("/Library/LaunchDaemons")
+        PathBuf::from("/Library").join("LaunchDaemons")
     } else {
         etcetera::home_dir()?.join("Library").join("LaunchAgents")
     }
@@ -353,7 +353,7 @@ mod tests {
             let verify = std::process::Command::new("codesign").args(["--verify", "--strict"]).arg(&app).output();
             verify.unwrap().status.success()
         };
-        let exe = super::bundle(&app, std::path::Path::new("/usr/bin/true"), "1.0.0").unwrap();
+        let exe = super::bundle(&app, &std::path::Path::new("/usr").join("bin").join("true"), "1.0.0").unwrap();
         assert!(signed());
         std::fs::copy("/usr/bin/false", &exe).unwrap();
         assert!(!signed());

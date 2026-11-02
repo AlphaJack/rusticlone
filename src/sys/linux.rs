@@ -96,6 +96,6 @@ mod tests {
         if crate::sys::is_root() {
             return;
         }
-        assert!(!crate::sys::writable(std::path::Path::new("/usr/bin")));
+        assert!(!crate::sys::writable(&std::path::Path::new("/usr").join("bin")));
     }
 }

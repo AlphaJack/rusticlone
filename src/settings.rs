@@ -264,9 +264,9 @@ pub(crate) fn state_dir() -> Result<PathBuf> {
                 .join(crate::NAME)
                 .join("state")
         } else if cfg!(target_os = "macos") {
-            PathBuf::from("/Library/Application Support").join(crate::NAME)
+            PathBuf::from("/Library").join("Application Support").join(crate::NAME)
         } else {
-            PathBuf::from("/var/lib").join(crate::NAME)
+            PathBuf::from("/var").join("lib").join(crate::NAME)
         });
     }
     let base = etcetera::base_strategy::choose_native_strategy()?;

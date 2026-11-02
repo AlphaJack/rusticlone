@@ -94,6 +94,6 @@ mod tests {
     #[cfg(any(feature = "server", feature = "self-update"))]
     #[test]
     fn the_system_volume_is_not_writable() {
-        assert!(!crate::sys::writable(Path::new("/usr/bin")));
+        assert!(!crate::sys::writable(&Path::new("/usr").join("bin")));
     }
 }

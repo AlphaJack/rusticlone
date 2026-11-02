@@ -16,7 +16,10 @@ fn the_system_packages_folders_are_managed_for_root_too() {
 
 #[test]
 fn nixs_store_is_managed() {
-    assert_eq!(keeper(Path::new("/nix/store/abc-rusticlone-2.0.1/bin/rusticlone")), Some(Keeper::Nix));
+    assert_eq!(
+        keeper(&Path::new("/nix").join("store").join("abc-rusticlone-2.0.1").join("bin").join("rusticlone")),
+        Some(Keeper::Nix)
+    );
 }
 
 /// Started through Homebrew's `bin`, macOS names the executable by the link.

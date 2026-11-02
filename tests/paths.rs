@@ -1,5 +1,5 @@
-//! Paths are joined a component at a time: `dir.join("a").join("b")`, not `dir.join("a").join("b")`, which Windows shows
-//! as `C:\dir\a/b`. An absolute Unix path, such as `/usr/bin`, stays whole, as only Unix has it.
+//! Paths are joined a component at a time: `dir.join("a").join("b")`, not `dir.join("a/b")`, which Windows shows
+//! as `C:\dir\a/b`. An absolute Unix path starts from its first component: `Path::new("/usr").join("bin")`.
 
 #![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
@@ -16,9 +16,9 @@ use syn::{
 #[derive(Default)]
 struct Slashed(Vec<usize>);
 
-/// Whether `text` is a relative path of more than one component, or a format of one.
+/// Whether `text` is a path of more than one component after its root, if it has one, or a format of one.
 fn slashed(text: &str) -> bool {
-    !text.starts_with('/') && text.trim_end_matches('/').contains('/')
+    text.trim_start_matches('/').trim_end_matches('/').contains('/')
 }
 
 impl Slashed {
@@ -111,5 +111,6 @@ fn paths_are_joined_a_component_at_a_time() {
 #[test]
 fn only_relative_paths_of_several_components_are_slashed() {
     assert!(slashed("a/b") && slashed("tests/fixtures/x.json") && slashed("devices/{name}/queue"));
-    assert!(!slashed("/usr/bin") && !slashed("a") && !slashed("a/") && !slashed("/proc"));
+    assert!(slashed("/usr/bin") && slashed("/proc/self/mounts"));
+    assert!(!slashed("a") && !slashed("a/") && !slashed("/proc") && !slashed("/"));
 }
