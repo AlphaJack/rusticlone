@@ -98,7 +98,7 @@ impl ksni::Tray for Shown {
 
     /// A click opens the web UI; the menu is on the other button.
     fn activate(&mut self, _: i32, _: i32) {
-        _ = crate::server::open_on_desktop(self.login.clone());
+        _ = crate::server::open_on_desktop(&self.login);
     }
 
     fn icon_pixmap(&self) -> Vec<Icon> {
@@ -116,7 +116,7 @@ impl ksni::Tray for Shown {
     }
 
     fn menu(&self) -> Vec<MenuItem<Self>> {
-        let open = |url: String| Box::new(move |_: &mut Self| _ = crate::server::open_on_desktop(url.clone()));
+        let open = |url: String| Box::new(move |_: &mut Self| _ = crate::server::open_on_desktop(&url));
         let item = |label: String, url: Option<&String>| {
             let mut item = StandardItem { label, enabled: url.is_some(), ..StandardItem::default() };
             if let Some(url) = url {
