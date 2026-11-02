@@ -2,12 +2,12 @@
 //! else: why a command failed, and what a backup skipped (`[WARN] ignoring
 //! error`). Copies are verified by listing the target, because rustic exits 0 when a target fails.
 
+pub(crate) mod bin;
 mod cli;
 mod commands;
 #[cfg(feature = "server")]
 mod contents;
 mod ctx;
-pub(crate) mod install;
 mod output;
 mod process;
 mod snapshot;
@@ -20,6 +20,10 @@ mod windows;
 #[cfg(windows)]
 use windows as os;
 
+use bin::minor;
+pub(crate) use bin::{TESTED, Untested};
+#[cfg(feature = "self-update")]
+pub(crate) use bin::{downloaded, name, parse_version, pinned};
 pub(crate) use cli::Cli;
 use cli::shell_word;
 use commands::ok;
@@ -30,10 +34,6 @@ pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
 #[cfg(feature = "server")]
 use contents::{diff, dirs, found};
 pub(crate) use ctx::{Ctx, Origin, RunHandle, Stop};
-use install::minor;
-pub(crate) use install::{TESTED, Untested};
-#[cfg(feature = "self-update")]
-pub(crate) use install::{downloaded, name, parse_version, pinned};
 #[cfg(feature = "server")]
 pub(crate) use output::Ended;
 pub(crate) use output::{Failure, Output, Progress, Pruned};
@@ -98,7 +98,7 @@ pub(crate) const PROGRESS: Duration = Duration::from_secs(1);
 #[fluent(prefix = "rustic-error")]
 pub(crate) enum Error {
     DryRunCreates,
-    #[fluent(key = crate::settings::RUSTIC.key, docs = install::DOCS)]
+    #[fluent(key = crate::settings::RUSTIC.key, docs = bin::DOCS)]
     CannotRun(#[source] std::io::Error),
     #[fluent(output = format!("{output:?}"))]
     NoVersion {

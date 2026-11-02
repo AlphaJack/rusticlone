@@ -13,7 +13,7 @@ use super::{
     Collection, Engine, Error,
     collection::{continues, title},
 };
-use crate::request::{Request, RestoreOptions, RunKind, Selection};
+use crate::request::{Named, Request, RestoreOptions, RunKind, Selection};
 use crate::result::Unusable;
 use crate::{
     live::Runs,
@@ -21,20 +21,6 @@ use crate::{
     rustic::Rustic,
     state::Store,
 };
-
-/// The collections and repositories a command names, by profile. Nothing named: every collection.
-#[derive(Clone, Default)]
-pub(crate) struct Named {
-    pub collections: Vec<String>,
-    /// A collection's primary, or a copy target.
-    pub repos: Vec<String>,
-}
-
-impl Named {
-    fn is_empty(&self) -> bool {
-        self.collections.is_empty() && self.repos.is_empty()
-    }
-}
 
 impl Engine {
     pub(crate) fn new(rustic: Rustic, store: Store, runs: Arc<Runs>, mut named: Named) -> Result<Self> {

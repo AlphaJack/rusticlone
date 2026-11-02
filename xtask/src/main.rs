@@ -19,7 +19,7 @@ mod fixtures;
 mod logo;
 mod translations;
 
-use std::{env, fs, io::Read, path::Path};
+use std::{env, fs, io::Read, path::PathBuf};
 
 use anyhow::{Context, Result, bail};
 use base64::Engine;
@@ -53,9 +53,16 @@ fn main() -> Result<()> {
     }
 }
 
+/// The repository's root. `cargo run` says where the checkout it runs from is, which a binary built in another
+/// worktree of the same target directory would not know.
+fn root() -> PathBuf {
+    let dir = env::var_os("CARGO_MANIFEST_DIR").map_or_else(|| env!("CARGO_MANIFEST_DIR").into(), PathBuf::from);
+    dir.join("..")
+}
+
 fn generate() -> Result<()> {
     logo::render()?;
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = root();
     let tests = || {
         let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
         let args = ["test", "--quiet", "--lib", "::generated_"];
@@ -69,7 +76,7 @@ fn generate() -> Result<()> {
 }
 
 fn screenshots(options: &[&str]) -> Result<()> {
-    let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../screenshots/scripts/run.sh");
+    let script = root().join("screenshots").join("scripts").join("run.sh");
     if !std::process::Command::new(script).args(options).status()?.success() {
         bail!("the screenshots were not taken");
     }
@@ -77,7 +84,7 @@ fn screenshots(options: &[&str]) -> Result<()> {
 }
 
 fn vendor(version: Option<&str>, check: bool) -> Result<()> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let root = root();
     let assets = root.join("assets");
     let manifest_path = root.join("Cargo.toml");
     let mut manifest: toml_edit::DocumentMut = fs::read_to_string(&manifest_path)?.parse()?;

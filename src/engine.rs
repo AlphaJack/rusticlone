@@ -4,11 +4,12 @@
 mod backup;
 mod collection;
 mod copy;
+mod holds;
 mod load;
-mod locks;
 mod maintain;
+mod notify;
 mod plan;
-mod record;
+mod progress;
 mod report;
 mod restore;
 mod schedule;
@@ -18,14 +19,12 @@ mod status;
 mod tests;
 
 pub(crate) use collection::{Blocked, Collection};
-pub(crate) use load::Named;
-use locks::Use;
+use holds::Use;
 use plan::{follows, plan};
-use record::behind;
+use progress::behind;
 pub(crate) use report::{CollectionOverview, Last, RepoOverview, StatusReport};
 #[cfg(feature = "server")]
 pub(crate) use report::{Issue, RepoStatus, Unconfigured};
-pub(crate) use restore::parse_at;
 pub(crate) use schedule::Schedule;
 use snapshots::{each, newest, newest_by_source, pick, shrunk};
 
@@ -41,7 +40,7 @@ use anyhow::Result;
 use jiff::{Timestamp, tz::TimeZone};
 use parking_lot::Mutex;
 
-use crate::request::{Request, Step, StepKey};
+use crate::request::{Named, Request, Step, StepKey};
 use crate::result::Doing;
 use crate::{
     clock,
@@ -162,10 +161,6 @@ pub(crate) enum Error {
     /// Some of its paths failed, which the run reported.
     PartlyRestored {
         repo: String,
-    },
-    NoTime {
-        time: String,
-        source: jiff::Error,
     },
 }
 

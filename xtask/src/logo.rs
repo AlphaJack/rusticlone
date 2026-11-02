@@ -2,7 +2,7 @@
 //! builds do not render them: the tray's opacity, a PNG for notifications, the Windows and macOS icons, and the
 //! web UI's icons for a phone's home screen, in the sizes and color of `assets/manifest.webmanifest`. It keeps the images that already match, so that it changes no bytes.
 
-use std::{fs, path::Path};
+use std::fs;
 
 use anyhow::{Context, Result};
 use resvg::{
@@ -41,7 +41,7 @@ fn web_icon(background: &str) -> [String; 2] {
 }
 
 pub(crate) fn render() -> Result<()> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../assets/images");
+    let dir = crate::root().join("assets").join("images");
     let logo = fs::read_to_string(dir.join("logo.svg"))?;
     let options = Options::default();
     let tree = Tree::from_data(logo.as_bytes(), &options)?;

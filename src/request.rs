@@ -147,6 +147,45 @@ pub(crate) struct NotAStep {
     step: String,
 }
 
+/// The collections and repositories a command names, by profile. Nothing named: every collection.
+#[derive(Clone, Default)]
+pub(crate) struct Named {
+    pub collections: Vec<String>,
+    /// A collection's primary, or a copy target.
+    pub repos: Vec<String>,
+}
+
+impl Named {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.collections.is_empty() && self.repos.is_empty()
+    }
+}
+
+/// A time typed by the user: RFC 3339, a date and time in the system's zone, or a date, meaning the end of that day.
+pub(crate) fn parse_at(s: &str) -> Result<Timestamp, NoTime> {
+    if let Ok(ts) = s.parse::<Timestamp>() {
+        return Ok(ts);
+    }
+    let dt = match s.trim().parse::<jiff::civil::Date>() {
+        // A bare date means the end of that day.
+        Ok(date) => date.to_datetime(jiff::civil::Time::MAX),
+        Err(_) => s
+            .replace(' ', "T")
+            .parse::<jiff::civil::DateTime>()
+            .map_err(|source| NoTime { time: s.to_owned(), source })?,
+    };
+    (jiff::tz::TimeZone::system().to_ambiguous_zoned(dt).compatible())
+        .map(|z| z.timestamp())
+        .map_err(|source| NoTime { time: s.to_owned(), source })
+}
+
+#[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
+#[fluent(prefix = "request-error-no-time")]
+pub(crate) struct NoTime {
+    time: String,
+    source: jiff::Error,
+}
+
 /// One run of a collection. Its [`RunKind`] is the variant alone.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, strum::EnumDiscriminants)]
 #[strum_discriminants(

@@ -8,7 +8,7 @@ use anyhow::Result;
 use super::download::{fetch, install, untar};
 use crate::{
     i18n::t,
-    rustic::{Cli, downloaded, install::bin, name, parse_version, pinned},
+    rustic::{Cli, bin, downloaded, name, parse_version, pinned},
 };
 
 /// The key that signs rustic's releases (`.sig`), from <https://rustic.cli.rs/docs/nightly_builds.html>.
@@ -60,8 +60,8 @@ pub(crate) fn download(ask: bool) -> Result<()> {
         Ok(out) => {
             let found = parse_version(&String::from_utf8_lossy(&out.stdout));
             let shown = found.as_ref().map(ToString::to_string).unwrap_or_default();
-            if !there(bin()) || found.as_ref().is_some_and(|f| *f >= version) {
-                crate::log::did(&t!("release-found", version = shown, path = bin().display().to_string()));
+            if !there(bin::path()) || found.as_ref().is_some_and(|f| *f >= version) {
+                crate::log::did(&t!("release-found", version = shown, path = bin::path().display().to_string()));
                 return Ok(());
             }
             Ask::Replace { found: shown, version: version.to_string(), dir }

@@ -5,7 +5,7 @@
 
 use std::{
     env, fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Output},
 };
 
@@ -99,7 +99,7 @@ pub(crate) fn record() -> Result<()> {
     _ = fs::remove_dir_all(&sb.dir);
     let files = recorded?;
 
-    let out = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!("../tests/fixtures/rustic-{minor}"));
+    let out = crate::root().join("tests").join("fixtures").join(format!("rustic-{minor}"));
     _ = fs::remove_dir_all(&out);
     fs::create_dir_all(&out)?;
     for (name, content) in &files {
