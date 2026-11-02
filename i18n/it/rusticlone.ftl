@@ -703,10 +703,12 @@ autostart-blocked = macOS blocca il server all'accesso. Apri Impostazioni di Sis
 autostart-unit-description = Server { -app }
 # Cosa dicono dell'app i desktop e il menu Start di Windows. Le traduzioni lo sostituiscono.
 app-description = Backup 3-2-1-1-0 pianificati per desktop e server, basati su profili rustic, con interfaccia e notifiche
+tray-open = Apri { -app }
 tray-quit = Esci (sospende i backup automatici)
 switch-at-boot = Avvia all'accensione
 switch-at-login = Avvia all'accesso
 switch-auto-update = Aggiorna automaticamente
+attest-over-digest = { $scheme } su un digest
 update-current = { -name } { $current } è aggiornato
 update-available = { -name } { $to } è disponibile, questo è { $from }
 update-updated = { -name } aggiornato da { $from } a { $to }

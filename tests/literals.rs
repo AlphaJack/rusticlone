@@ -19,10 +19,13 @@ fn root() -> std::path::PathBuf {
     std::env::var_os("CARGO_MANIFEST_DIR").map(std::path::PathBuf::from).unwrap_or_default()
 }
 
-/// Two words: English, not a key, a path or a format argument.
+/// Two words, or a word beside a value a format puts in: English, not a key, a path or a format argument.
 fn is_text(literal: &str) -> bool {
-    let word = |w: &&str| w.len() > 1 && w.chars().all(char::is_alphabetic);
-    literal.split(' ').collect::<Vec<_>>().windows(2).any(|pair| pair.iter().all(word))
+    // Not a protocol's keyword in capitals, such as Prometheus's `# HELP`.
+    let word = |w: &str| w.len() > 1 && w.chars().all(char::is_alphabetic) && w.chars().any(char::is_lowercase);
+    let filled = |w: &str| w.len() > 2 && w.starts_with('{') && w.ends_with('}');
+    let words: Vec<&str> = literal.split(' ').collect();
+    words.windows(2).any(|pair| pair.iter().all(|w| word(w) || filled(w)) && pair.iter().any(|w| word(w)))
 }
 
 /// `#[test]`, or `#[cfg(test)]`.

@@ -703,10 +703,12 @@ autostart-blocked = macOS blocks the server at login. Open System Settings > Gen
 autostart-unit-description = { -app } server
 # What desktops and the Windows start menu say of the app. Translations replace it.
 app-description = { -description }
+tray-open = Open { -app }
 tray-quit = Quit (pause automatic backups)
 switch-at-boot = Start at boot
 switch-at-login = Start at login
 switch-auto-update = Update automatically
+attest-over-digest = { $scheme } over a digest
 update-current = { -name } { $current } is up to date
 update-available = { -name } { $to } is available, this is { $from }
 update-updated = { -name } updated from { $from } to { $to }
