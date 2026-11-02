@@ -45,7 +45,7 @@ keep-last = 1
 "#;
 
 fn recorded(name: &str) -> String {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let dir = crate::tests::root();
     std::fs::read_to_string(dir.join(format!("tests/fixtures/rustic-{}.{}/{name}", TESTED.major, TESTED.minor)))
         .unwrap()
 }
@@ -401,7 +401,7 @@ fn status_keeps_its_shape() {
         ])
         .unwrap();
     let report = crate::shape::to_value(&engine.report()).unwrap();
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/status.json");
+    let path = crate::tests::root().join("tests/fixtures/status.json");
     if !path.exists() {
         std::fs::write(&path, serde_json::to_string_pretty(&report).unwrap()).unwrap();
     }

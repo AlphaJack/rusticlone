@@ -447,7 +447,7 @@ mod tests {
     #[test]
     #[expect(clippy::disallowed_methods, reason = "records and reads the fixture")]
     fn ledgers_stored_by_earlier_versions_are_still_read() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/ledger.json");
+        let path = crate::tests::root().join("tests/fixtures/ledger.json");
         if !path.exists() {
             std::fs::write(&path, a_day_of_events().to_stored().unwrap()).unwrap();
         }
@@ -460,7 +460,7 @@ mod tests {
     #[test]
     #[expect(clippy::disallowed_methods, reason = "records and reads the fixture")]
     fn events_stored_by_earlier_versions_are_still_read() {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/events.json");
+        let path = crate::tests::root().join("tests/fixtures/events.json");
         if !path.exists() {
             let events: Vec<Value> = a_day().iter().map(|e| shape::to_value(e).unwrap()).collect();
             std::fs::write(&path, serde_json::to_string(&events).unwrap()).unwrap();
