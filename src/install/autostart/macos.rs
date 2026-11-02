@@ -393,7 +393,7 @@ mod tests {
     #[expect(clippy::disallowed_methods, reason = "reads the attribute with xattr, which the code no longer runs")]
     fn the_app_has_its_keywords() {
         let app = std::env::temp_dir().join(format!("{}-keywords-{}.app", crate::NAME, std::process::id()));
-        super::bundle(&app, std::path::Path::new("/usr/bin/true"), "2.0.1").unwrap();
+        super::bundle(&app, &std::path::Path::new("/usr").join("bin").join("true"), "2.0.1").unwrap();
         let read =
             std::process::Command::new("xattr").args(["-px", "com.apple.metadata:kMDItemKeywords"]).arg(&app).output();
         let hex: String = String::from_utf8(read.unwrap().stdout).unwrap().split_whitespace().collect();
