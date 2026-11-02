@@ -70,6 +70,7 @@ $R backup --all
 - One type per concept. A match that maps one enum's variants one to one onto another's is a sign to merge the two, or to derive one from the other. A field that mirrors another is derived instead.
 - Lookups go through the `Store` and `Ledger` helpers, not keys rebuilt by hand.
 - Unused code goes, and so does code that only an earlier version needed.
+- Paths are joined a component at a time, `dir.join("a").join("b")`, as Windows shows `dir.join("a/b")` with both separators. An absolute Unix path such as `/usr/bin` stays whole. `tests/paths.rs` checks it.
 - No hacks: data structures, algorithms and interactions are built for the long run. A kernel notification and SSE, not polling and a page that reloads itself.
 - What should be refactored is refactored first, not built upon.
 

@@ -244,7 +244,7 @@ impl Rustic {
 #[cfg(test)]
 #[expect(clippy::disallowed_methods, reason = "tests read fixtures")]
 pub(crate) fn fixtures(name: &str) -> Vec<(String, String)> {
-    let dir = crate::tests::root().join("tests/fixtures");
+    let dir = crate::tests::root().join("tests").join("fixtures");
     // One directory per rustic release; files are other fixtures.
     let mut recorded: Vec<_> =
         std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();

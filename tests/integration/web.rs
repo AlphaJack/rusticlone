@@ -209,7 +209,7 @@ fn a_path_is_restored_from_a_copy_target() {
     let form = format!("kind=restore&repo=Docs-remote&snapshot={id}&path={docs}/sub&to={}", to.display());
     assert!(flash(&server.post_form("/collections/Docs/runs", &form).body, "success"));
     wait_for(30, "the restore", || sb.store().runs("Docs", 1).first().is_some_and(|r| r.finished.is_some()));
-    assert_eq!(std::fs::read_to_string(to.join("sub/b.txt")).unwrap(), "inside");
+    assert_eq!(std::fs::read_to_string(to.join("sub").join("b.txt")).unwrap(), "inside");
     assert_eq!(std::fs::read_dir(&to).unwrap().count(), 1, "only the path");
     let relative = server.post_form("/collections/Docs/runs", "kind=restore&to=relative");
     assert!(relative.code == 422 && flash(&relative.body, "failure"), "{}", relative.body);

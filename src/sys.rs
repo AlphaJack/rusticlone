@@ -38,3 +38,19 @@ pub(crate) fn hostname() -> &'static str {
     static NAME: LazyLock<String> = LazyLock::new(|| read_hostname().unwrap_or_default());
     &NAME
 }
+
+/// A container this process runs in, as the file its tool puts there says.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Container {
+    Docker,
+    Podman,
+}
+
+/// The container this process runs in: see [`Container`].
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+#[expect(clippy::disallowed_methods, reason = "looks for the containers' files")]
+pub(crate) fn container() -> Option<Container> {
+    let [docker, podman] = container_markers()?;
+    if docker.exists() { Some(Container::Docker) } else { podman.exists().then_some(Container::Podman) }
+}

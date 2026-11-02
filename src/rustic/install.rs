@@ -76,7 +76,7 @@ mod tests {
         assert_eq!(parse_version("rustic 0.11.4\n"), Some(Version::new(0, 11, 4)));
         assert!(parse_version("rustic v0.12.0-dev").is_some_and(|v| minor(&v) == (0, 12)));
         assert_eq!(parse_version("rustic"), None);
-        let fixtures = crate::tests::root().join("tests/fixtures");
+        let fixtures = crate::tests::root().join("tests").join("fixtures");
         assert!(fixtures.join(format!("rustic-{}.{}", TESTED.major, TESTED.minor)).is_dir(), "cargo xtask fixtures");
     }
 

@@ -674,7 +674,8 @@ fn install_enables_a_user_service() {
     let Some(path) = fake_service_manager(&sb, "systemctl", &log) else { return };
     sb.run_with(&["install"], &[("PATH", &path)]).assert_exit(0);
     let dir = sb.path("config/systemd/user");
-    let (unit, drop_in) = (dir.join(format!("{NAME}.service")), dir.join(format!("{NAME}.service.d/install.conf")));
+    let (unit, drop_in) =
+        (dir.join(format!("{NAME}.service")), dir.join(format!("{NAME}.service.d")).join("install.conf"));
     // The packaged unit, below the line that says what generates it.
     let packaged = include_str!("../../packaging/linux/rusticlone.service").split_once('\n').map(|(_, unit)| unit);
     assert_eq!(Some(fs::read_to_string(&unit).unwrap().as_str()), packaged);
@@ -702,7 +703,7 @@ fn install_loads_a_login_agent() {
     sb.run_with(&["install"], &[("PATH", &path)]).assert_exit(0);
     let (dir, apps) = (sb.path("home/Library/LaunchAgents"), sb.path("home/Applications"));
     let plist = fs::read_to_string(dir.join(format!("{NAME}.plist"))).unwrap();
-    let exe = apps.join(format!("{APP_NAME}.app/Contents/MacOS/{APP_NAME}"));
+    let exe = apps.join(format!("{APP_NAME}.app")).join("Contents").join("MacOS").join(APP_NAME);
     assert!(plist.contains("<string>serve</string>") && plist.contains(&path), "{plist}");
     assert!(plist.contains(&format!("<string>{}</string>", exe.display())), "{plist}");
     let app = exe.ancestors().nth(3).unwrap();

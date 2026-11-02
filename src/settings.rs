@@ -264,9 +264,9 @@ pub(crate) fn state_dir() -> Result<PathBuf> {
                 .join(crate::NAME)
                 .join("state")
         } else if cfg!(target_os = "macos") {
-            PathBuf::from("/Library/Application Support").join(crate::NAME)
+            PathBuf::from("/Library").join("Application Support").join(crate::NAME)
         } else {
-            PathBuf::from("/var/lib").join(crate::NAME)
+            PathBuf::from("/var").join("lib").join(crate::NAME)
         });
     }
     let base = etcetera::base_strategy::choose_native_strategy()?;
@@ -406,8 +406,8 @@ CMD ["serve"]
         }
         let root = crate::tests::root();
         let read = |path: &std::path::Path| std::fs::read_to_string(path).unwrap_or_default();
-        let tests: String = files(&root.join("tests/integration")).iter().map(|p| read(p)).collect();
-        for doc in [root.join("README.md")].into_iter().chain(files(&root.join("screenshots/scripts"))) {
+        let tests: String = files(&root.join("tests").join("integration")).iter().map(|p| read(p)).collect();
+        for doc in [root.join("README.md")].into_iter().chain(files(&root.join("screenshots").join("scripts"))) {
             let text = read(&doc);
             let names = text
                 .split(|c: char| !(c.is_ascii_uppercase() || c == '_'))

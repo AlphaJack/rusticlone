@@ -46,8 +46,10 @@ keep-last = 1
 
 fn recorded(name: &str) -> String {
     let dir = crate::tests::root();
-    std::fs::read_to_string(dir.join(format!("tests/fixtures/rustic-{}.{}/{name}", TESTED.major, TESTED.minor)))
-        .unwrap()
+    std::fs::read_to_string(
+        dir.join("tests").join("fixtures").join(format!("rustic-{}.{}", TESTED.major, TESTED.minor)).join(name),
+    )
+    .unwrap()
 }
 
 fn engine(test: &str, replay: &Arc<Replay>) -> Engine {
@@ -401,7 +403,7 @@ fn status_keeps_its_shape() {
         ])
         .unwrap();
     let report = crate::shape::to_value(&engine.report()).unwrap();
-    let path = crate::tests::root().join("tests/fixtures/status.json");
+    let path = crate::tests::root().join("tests").join("fixtures").join("status.json");
     if !path.exists() {
         std::fs::write(&path, serde_json::to_string_pretty(&report).unwrap()).unwrap();
     }

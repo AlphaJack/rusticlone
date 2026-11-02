@@ -96,8 +96,8 @@ fn hooks_mount_the_repository_and_link_the_sources() {
     let to = sb.path("restored");
     sb.run(&["restore", "--all", "--to", to.to_str().unwrap()]).assert_exit(0);
     let restored = to.join(below_root(&real));
-    assert_eq!(fs::read_to_string(restored.join("one/a.txt")).unwrap(), "a");
-    assert_eq!(fs::read_to_string(restored.join("two/b.txt")).unwrap(), "b");
+    assert_eq!(fs::read_to_string(restored.join("one").join("a.txt")).unwrap(), "a");
+    assert_eq!(fs::read_to_string(restored.join("two").join("b.txt")).unwrap(), "b");
 }
 
 /// Hooks that run before rustic, as one that mounts a disk, may print into the output that rustic writes its
