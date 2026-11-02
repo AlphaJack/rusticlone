@@ -10,9 +10,9 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
-use fluent::{FluentArgs, FluentResource, FluentValue};
-use i18n_embed::{LanguageLoader as _, fluent::FluentLanguageLoader, unic_langid::LanguageIdentifier};
+use fluent::{FluentArgs, FluentResource, FluentValue, concurrent::FluentBundle};
 pub(crate) use rusticlone_macros::{Fluent, t};
+use unic_langid::LanguageIdentifier;
 
 mod catalogs {
     rusticlone_macros::catalogs!();
@@ -24,46 +24,98 @@ fn fallback() -> LanguageIdentifier {
 }
 
 /// The process's text, in the language the user prefers.
-static LOADER: LazyLock<FluentLanguageLoader> = LazyLock::new(|| {
+static LOADER: LazyLock<Loader> = LazyLock::new(|| {
     #[expect(clippy::disallowed_methods, reason = "the language is the system's choice, not a setting")]
     let asked = requested(|key| std::env::var(key).ok());
     // macOS sets LANG only in a terminal, and Windows never: their settings list the languages instead.
-    loader(&asked.unwrap_or_else(|| sys_locale::get_locales().filter_map(|locale| locale.parse().ok()).collect()))
+    Loader::new(&asked.unwrap_or_else(|| sys_locale::get_locales().filter_map(|locale| locale.parse().ok()).collect()))
 });
 
 /// A loader for each catalog, for the pages.
 #[cfg(feature = "server")]
-static LOADERS: LazyLock<Vec<(LanguageIdentifier, FluentLanguageLoader)>> = LazyLock::new(|| {
-    let languages = LOADER.available_languages(&Catalogs).unwrap_or_default();
-    languages.into_iter().map(|language| (language.clone(), loader(&[language]))).collect()
-});
+static LOADERS: LazyLock<Vec<(LanguageIdentifier, Loader)>> =
+    LazyLock::new(|| available().into_iter().map(|language| (language.clone(), Loader::new(&[language]))).collect());
 
-/// The first of `languages` that has a catalog, with English for the messages it lacks.
-fn loader(languages: &[LanguageIdentifier]) -> FluentLanguageLoader {
-    let loader = FluentLanguageLoader::new(env!("CARGO_PKG_NAME"), fallback());
-    // English is embedded, so only a broken build fails to load it.
-    i18n_embed::select(&loader, &Catalogs, languages).ok();
-    // Fluent wraps each argument in Unicode isolation marks, which terminals and notifiers print. Set once
-    // the languages are loaded, as it applies to their bundles.
-    loader.set_use_isolating(false);
-    // The terms the code knows: `{ -name }`, the command's name, `{ -app }`, the app's, `{ -env }`, its
-    // variables' prefix, and `{ -description }`, Cargo's description of it.
-    if let Ok(terms) = FluentResource::try_new(format!(
-        "-name = {}\n-app = {}\n-env = {}\n-description = {}\n",
-        crate::NAME,
-        crate::APP_NAME,
-        crate::ENV_PREFIX,
-        env!("CARGO_PKG_DESCRIPTION")
-    )) {
-        let terms = Arc::new(terms);
-        loader.with_bundles_mut(|bundle| bundle.add_resource_overriding(Arc::clone(&terms)));
+/// The languages that have a catalog: the folders of `i18n`.
+fn available() -> Vec<LanguageIdentifier> {
+    let mut languages: Vec<LanguageIdentifier> =
+        Catalogs::iter().filter_map(|path| path.split('/').next()?.parse().ok()).collect();
+    languages.dedup();
+    languages
+}
+
+/// The catalog of `language`, if it has one.
+fn catalog(language: &LanguageIdentifier) -> Option<Arc<FluentResource>> {
+    let file = Catalogs::get(&format!("{language}/{}.ftl", env!("CARGO_PKG_NAME")))?;
+    let source = String::from_utf8(file.data.into_owned()).ok()?;
+    // The macros reject a catalog with mistakes at build time, so what parses is all there is.
+    Some(Arc::new(FluentResource::try_new(source).unwrap_or_else(|(resource, _)| resource)))
+}
+
+/// A language's messages, with English's behind them.
+struct Loader {
+    /// A bundle for each language: the chosen one first, English last.
+    bundles: Vec<FluentBundle<Arc<FluentResource>>>,
+}
+
+impl Loader {
+    /// The first of `languages` that has a catalog, with English for the messages it lacks.
+    fn new(languages: &[LanguageIdentifier]) -> Self {
+        let fallback = fallback();
+        let available = available();
+        let strategy = fluent_langneg::NegotiationStrategy::Filtering;
+        let chosen = fluent_langneg::negotiate_languages(languages, &available, Some(&fallback), strategy);
+        let mut chain = vec![chosen.first().map_or_else(|| fallback.clone(), |language| (*language).clone())];
+        if chain[0] != fallback {
+            chain.push(fallback);
+        }
+        // The terms the code knows: `{ -name }`, the command's name, `{ -app }`, the app's, `{ -env }`, its
+        // variables' prefix, and `{ -description }`, Cargo's description of it.
+        let terms = FluentResource::try_new(format!(
+            "-name = {}\n-app = {}\n-env = {}\n-description = {}\n",
+            crate::NAME,
+            crate::APP_NAME,
+            crate::ENV_PREFIX,
+            env!("CARGO_PKG_DESCRIPTION")
+        ))
+        .ok()
+        .map(Arc::new);
+        let bundles = chain.into_iter().filter_map(|language| {
+            let resource = catalog(&language)?;
+            let mut bundle = FluentBundle::new_concurrent(vec![language]);
+            // Fluent wraps each argument in Unicode isolation marks, which terminals and notifiers print.
+            bundle.set_use_isolating(false);
+            bundle.add_resource_overriding(Arc::clone(&resource));
+            if let Some(terms) = &terms {
+                bundle.add_resource_overriding(Arc::clone(terms));
+            }
+            Some(bundle)
+        });
+        Self { bundles: bundles.collect() }
     }
-    loader
+
+    /// The language that its messages are in.
+    fn language(&self) -> LanguageIdentifier {
+        (self.bundles.first()).and_then(|bundle| bundle.locales.first().cloned()).unwrap_or_else(fallback)
+    }
+
+    /// Message `id` with `args`, from the first catalog that has it, else `id`.
+    fn text(&self, id: &str, args: Option<&FluentArgs<'_>>) -> String {
+        let format = |bundle: &FluentBundle<Arc<FluentResource>>| {
+            let pattern = bundle.get_message(id)?.value()?;
+            Some(bundle.format_pattern(pattern, args, &mut Vec::new()).into_owned())
+        };
+        self.bundles.iter().find_map(format).unwrap_or_else(|| id.to_owned())
+    }
+
+    fn has(&self, id: &str) -> bool {
+        self.bundles.iter().any(|bundle| bundle.has_message(id))
+    }
 }
 
 /// The language that text is shown in.
 #[derive(Clone, Copy)]
-pub(crate) struct Language(&'static FluentLanguageLoader);
+pub(crate) struct Language(&'static Loader);
 
 thread_local! {
     /// Set while [`Language::scope`] runs.
@@ -118,7 +170,7 @@ impl Language {
 /// Its tag, `en`, for `<html lang>` and `Content-Language`.
 impl std::fmt::Display for Language {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.current_language().fmt(f)
+        self.0.language().fmt(f)
     }
 }
 
@@ -134,7 +186,7 @@ fn requested(var: impl Fn(&str) -> Option<String>) -> Option<Vec<LanguageIdentif
 
 /// Message `id` with `args`, which the macros check.
 pub(crate) fn text<const N: usize>(id: &str, args: [(&'static str, FluentValue<'static>); N]) -> String {
-    Language::current().0.get_args_fluent(id, (N > 0).then(|| args.into_iter().collect::<FluentArgs<'_>>()).as_ref())
+    Language::current().0.text(id, (N > 0).then(|| args.into_iter().collect::<FluentArgs<'_>>()).as_ref())
 }
 
 /// Message `id`, if the catalog has it: for ids made at run time, which tests check.
@@ -145,7 +197,10 @@ pub(crate) fn find<const N: usize>(id: &str, args: [(&'static str, FluentValue<'
 /// The English catalog's ids.
 #[cfg(test)]
 pub(crate) fn ids() -> Vec<String> {
-    LOADER.with_message_iter(&fallback(), |messages| messages.map(|m| m.id.name.to_owned()).collect())
+    let message = |entry: &fluent_syntax::ast::Entry<&str>| {
+        if let fluent_syntax::ast::Entry::Message(message) = entry { Some(message.id.name.to_owned()) } else { None }
+    };
+    catalog(&fallback()).map(|english| english.entries().filter_map(message).collect()).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -177,7 +232,7 @@ mod tests {
     #[test]
     fn every_term_resolves() {
         let unresolved: Vec<String> =
-            super::ids().into_iter().filter(|id| super::LOADER.get(id).contains("{-")).collect();
+            super::ids().into_iter().filter(|id| super::LOADER.text(id, None).contains("{-")).collect();
         assert!(unresolved.is_empty(), "unknown terms in {unresolved:?}");
     }
 }
