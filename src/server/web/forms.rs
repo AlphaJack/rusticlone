@@ -16,8 +16,8 @@ use super::{
 };
 use crate::{
     engine::Collection,
-    first_run::{self, Choice, Every, Keep, Kind, Question, Role, Setup},
     request::RunKind,
+    setup::{self, Choice, Every, Keep, Kind, Question, Role, Setup},
 };
 
 /// The first collection's dialog, with a new password.
@@ -63,7 +63,7 @@ impl Notifier {
                 .any(|(s, _)| def.schemes.iter().any(|own| own.eq_ignore_ascii_case(s)));
             Self { name, schemes: def.schemes.join(" "), template, on }
         };
-        let desktop = first_run::desktop().and_then(|url| {
+        let desktop = setup::desktop().and_then(|url| {
             let def = mercurio::service_for_scheme(url.split_once("://")?.0)?;
             Some(toggle(Heading::Desktop.to_string(), def, url.to_owned()))
         });
@@ -86,7 +86,7 @@ const CRON_HELP: &str = "https://crontab.guru/";
 /// the collections page says where to write profiles instead.
 pub(super) async fn setup(access: Access, base: Base) -> Response {
     blocking(move || {
-        if first_run::dir().is_none() {
+        if setup::dir().is_none() {
             return Ok(axum::response::Redirect::to(&base.to(Route::Index)).into_response());
         }
         let view = SetupFormView::new(Setup::default());

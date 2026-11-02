@@ -587,19 +587,19 @@ question-when-back-up = Ogni quanto vuoi fare il backup?
 question-how-long-keep = Per quanto tempo vuoi conservare i backup?
 question-how-often-check = Ogni quanto vuoi verificare che il backup non sia danneggiato?
 question-where-notify = Dove vuoi ricevere le notifiche sui problemi?
-first-run-kind-none = Da nessuna parte
-first-run-kind-local = Disco esterno
-first-run-kind-smb = Condivisione SMB
-first-run-kind-nfs = Condivisione NFS
-first-run-kind-s3 = Compatibile con S3
-first-run-kind-sftp = SFTP
-first-run-kind-webdav = WebDAV
-first-run-kind-rest = Server REST
-first-run-kind-gdrive = Google Drive
-first-run-kind-onedrive = OneDrive
-first-run-kind-dropbox = Dropbox
-first-run-kind-pcloud = pCloud
-first-run-kind-rclone = Altro
+setup-kind-none = Da nessuna parte
+setup-kind-local = Disco esterno
+setup-kind-smb = Condivisione SMB
+setup-kind-nfs = Condivisione NFS
+setup-kind-s3 = Compatibile con S3
+setup-kind-sftp = SFTP
+setup-kind-webdav = WebDAV
+setup-kind-rest = Server REST
+setup-kind-gdrive = Google Drive
+setup-kind-onedrive = OneDrive
+setup-kind-dropbox = Dropbox
+setup-kind-pcloud = pCloud
+setup-kind-rclone = Altro
 group-mounted = Locale
 group-direct = Servizi OpenDAL
 group-rclone = Servizi Rclone
@@ -612,7 +612,7 @@ every-custom = Personalizzato
 keep-year = Un anno
 keep-month = Un mese
 keep-all = Per sempre
-first-run-key-repository = archivio
+setup-key-repository = archivio
 field-repository-password = Password dell'archivio
 field-server-key = Chiave del server
 field-choice-accept = Qualsiasi chiave
@@ -634,25 +634,25 @@ field-secret-key = Chiave segreta
 field-password = Password
 field-email = Email
 field-url = URL
-first-run-guide = guida completa alla configurazione: { $url }
-first-run-no-choice = nessuna scelta { $choice }
-first-run-error-name = il nome deve iniziare con una lettera o una cifra; gli altri caratteri possono essere lettere, cifre, `-`, `_` o `.`
-first-run-error-relative = { $path } non è un percorso completo: inizialo dalla radice di un disco, o da ~ per la tua cartella home
-first-run-error-no-sources = nessuna cartella di cui fare il backup
-first-run-error-no-primary = nessuna posizione principale
-first-run-error-no-custom = nessuna pianificazione personalizzata
-first-run-error-incomplete = alla posizione { $role ->
+setup-guide = guida completa alla configurazione: { $url }
+setup-no-choice = nessuna scelta { $choice }
+setup-error-name = il nome deve iniziare con una lettera o una cifra; gli altri caratteri possono essere lettere, cifre, `-`, `_` o `.`
+setup-error-relative = { $path } non è un percorso completo: inizialo dalla radice di un disco, o da ~ per la tua cartella home
+setup-error-no-sources = nessuna cartella di cui fare il backup
+setup-error-no-primary = nessuna posizione principale
+setup-error-no-custom = nessuna pianificazione personalizzata
+setup-error-incomplete = alla posizione { $role ->
     [primary] principale
    *[target] di destinazione
 } manca { $field }
-first-run-error-not-a-choice = { $field } della posizione { $role ->
+setup-error-not-a-choice = { $field } della posizione { $role ->
     [primary] principale
    *[target] di destinazione
 } deve essere uno tra: { $choices }
-first-run-error-no-dir = nessuna cartella dei profili in cui si possa scrivere
-first-run-error-exists = { $path } esiste già
-first-run-error-inside = il repository deve stare in una cartella separata dalla sorgente
-first-run-error-not-empty = { $folder } contiene altri file: scegli una cartella vuota o nuova, oppure la cartella di un backup esistente
+setup-error-no-dir = nessuna cartella dei profili in cui si possa scrivere
+setup-error-exists = { $path } esiste già
+setup-error-inside = il repository deve stare in una cartella separata dalla sorgente
+setup-error-not-empty = { $folder } contiene altri file: scegli una cartella vuota o nuova, oppure la cartella di un backup esistente
 
 ## Il server, la sua installazione e gli aggiornamenti
 

@@ -17,9 +17,9 @@ use super::{
     flash, render_str,
 };
 use crate::{
-    first_run,
     request::{RestoreOptions, RunKind, Selection},
     rustic::NotASnapshotId,
+    setup,
 };
 
 /// The selection that the path names, if it exists: `/runs`, `/collections/{collection}/runs`,
@@ -68,7 +68,7 @@ const INSTALLER: &str = concat!(
 
 /// Where the profiles were saved, and how to restore from them on a new computer.
 #[derive(Template)]
-#[template(path = "setup_saved.html")]
+#[template(path = "saved.html")]
 pub(super) struct SetupSaved {
     pub(super) dir: String,
     /// A browser on this computer, which can open their folder.
@@ -187,8 +187,8 @@ pub(super) async fn refresh(State(app): State<Arc<App>>, selection: Selection) -
 }
 
 /// Saves the first collection, which the watcher then reads, and shows its profiles to keep a copy of.
-pub(super) async fn save_setup(base: Base, Here(here): Here, Form(setup): Form<first_run::Setup>) -> Response {
-    blocking(move || match first_run::save(&setup) {
+pub(super) async fn save_setup(base: Base, Here(here): Here, Form(setup): Form<setup::Setup>) -> Response {
+    blocking(move || match setup::save(&setup) {
         Ok(dir) => {
             let saved = SetupSaved {
                 dir: dir.display().to_string(),
