@@ -17,7 +17,7 @@ fn the_macos_apps_copy_of_homebrews_executable_is_managed() {
     let mine = managed(&exe);
     std::fs::write(app.join("Contents").join("Resources").join("source"), "/opt/homebrew/bin/rusticlone\nabc123\n")
         .unwrap();
-    let source = crate::install::autostart::app_source(&exe);
+    let source = crate::install::app::app_source(&exe);
     let found = managed(&exe);
     std::fs::remove_dir_all(&app).unwrap();
     assert!(!mine && found);
