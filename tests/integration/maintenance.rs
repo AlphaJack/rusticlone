@@ -172,9 +172,12 @@ fn a_stopped_prune_leaves_the_repository_whole() {
     assert!(whole.wait().unwrap().success());
     let total = changed();
     assert!(total > 2, "the prune changed {total} files");
-    let mut stopped = 0;
-    for sixth in 1..6 {
-        // After a sixth of its changes in the first half, so that each stop is at another step of the prune.
+    // A prune can end between two listings, slow on Windows, so it is tried until three were stopped.
+    let (mut stopped, mut tried) = (0, 0);
+    while stopped < 3 && tried < 15 {
+        // After a sixth of its changes in the first half, so that the stops are at other steps of the prune.
+        let sixth = tried % 5 + 1;
+        tried += 1;
         copy(&kept, &repo);
         let mut pruning = prune();
         let changes = (total * sixth / 12).max(1);
@@ -190,5 +193,5 @@ fn a_stopped_prune_leaves_the_repository_whole() {
         assert!(ok(&["check"]), "killed at {sixth}/6: the repository is damaged");
         assert!(ok(&["prune"]) && ok(&["check"]), "killed at {sixth}/6: the next prune failed");
     }
-    assert!(stopped >= 3, "only {stopped} of 5 prunes were stopped before they ended");
+    assert!(stopped >= 3, "only {stopped} of {tried} prunes were stopped before they ended");
 }
