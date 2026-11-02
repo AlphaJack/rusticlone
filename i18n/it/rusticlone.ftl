@@ -69,6 +69,9 @@ cli-step-delete = eliminando lo stato
 cli-step-update = aggiornando rusticlone
 cli-step-check-update = cercando una versione più recente
 cli-refresh = aggiornamento
+# The answers a question in a terminal takes, and the one that says yes.
+cli-yes-no = [s/N]
+cli-yes = s
 cli-ask-keep = Copiare { $files } in { $dir } così che { -name } li trovi da qualsiasi cartella?
 collections-directories = Cartelle dei profili
 collections-here = { $dir } ({ profile-here })
@@ -663,6 +666,7 @@ server-serving-opened = interfaccia web su { $url }, aperta nel browser
 server-serving-saved-token = interfaccia web su { $url }. Accedi con il token in { $file } o avvia con --open
 server-healthy = { $listen } ok
 server-not-opened = impossibile aprirla sul desktop: { $error }
+server-changed = modifiche in { $files }
 server-reloaded = profili ricaricati{ $changed }
 server-not-reloaded = impossibile ricaricare i profili: { $error }
 server-not-watching = impossibile osservare i file ({ $error }): ricarica il server dopo aver modificato i profili

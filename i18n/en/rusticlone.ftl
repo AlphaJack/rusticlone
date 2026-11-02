@@ -69,6 +69,9 @@ cli-step-delete = deleting the state
 cli-step-update = updating rusticlone
 cli-step-check-update = checking for a newer release
 cli-refresh = refresh
+# The answers a question in a terminal takes, and the one that says yes.
+cli-yes-no = [y/N]
+cli-yes = y
 cli-ask-keep = Copy { $files } to { $dir } so { -name } finds them from any folder?
 collections-directories = Profile folders
 collections-here = { $dir } ({ profile-here })
@@ -663,6 +666,7 @@ server-serving-opened = web UI on { $url }, opened in the browser
 server-serving-saved-token = web UI on { $url }. Log in with the token in { $file } or start with --open
 server-healthy = { $listen } ok
 server-not-opened = cannot open it on the desktop: { $error }
+server-changed = { $files } changed
 server-reloaded = profiles reloaded{ $changed }
 server-not-reloaded = cannot reload profiles: { $error }
 server-not-watching = cannot watch files ({ $error }): reload the server after you edit profiles
