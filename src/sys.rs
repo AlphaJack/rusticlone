@@ -17,20 +17,15 @@ mod linux;
 #[cfg(target_os = "linux")]
 use linux as os;
 
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 mod macos;
-#[cfg(target_vendor = "apple")]
+#[cfg(target_os = "macos")]
 use macos as os;
 
 #[cfg(windows)]
 mod windows;
 #[cfg(windows)]
 use windows as os;
-
-#[cfg(all(unix, not(any(target_os = "linux", target_vendor = "apple"))))]
-mod other;
-#[cfg(all(unix, not(any(target_os = "linux", target_vendor = "apple"))))]
-use other as os;
 
 pub(crate) use {disk::*, hash::*, os::*, paths::*};
 
@@ -41,4 +36,12 @@ const HOSTNAME_BUFFER: usize = 256;
 pub(crate) fn hostname() -> &'static str {
     static NAME: LazyLock<String> = LazyLock::new(|| read_hostname().unwrap_or_default());
     &NAME
+}
+
+/// The drive letter of a Windows path such as `C:\Users`, and what follows it.
+pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
+    let mut chars = path.chars();
+    let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
+    let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
+    windows.then(|| (letter, path.get(2..).unwrap_or_default()))
 }

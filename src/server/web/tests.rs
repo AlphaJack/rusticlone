@@ -393,7 +393,7 @@ fn log_lines_are_timed_in_the_local_time_zone_and_tell_where_they_come_from() {
 #[test]
 #[expect(clippy::disallowed_methods, reason = "reads the template files")]
 fn templates_contain_no_literal_text() {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
+    let dir = crate::tests::root().join("templates");
     for file in std::fs::read_dir(dir).unwrap() {
         let path = file.unwrap().path();
         let mut html = std::fs::read_to_string(&path).unwrap();

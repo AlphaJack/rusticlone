@@ -254,7 +254,7 @@ fn ok(out: Output) -> Result<Output> {
 #[cfg(test)]
 #[expect(clippy::disallowed_methods, reason = "tests read fixtures")]
 pub(crate) fn fixtures(name: &str) -> Vec<(String, String)> {
-    let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures");
+    let dir = crate::tests::root().join("tests/fixtures");
     // One directory per rustic release; files are other fixtures.
     let mut recorded: Vec<_> =
         std::fs::read_dir(dir).unwrap().map(|e| e.unwrap().path()).filter(|p| p.is_dir()).collect();

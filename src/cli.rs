@@ -31,7 +31,7 @@ const INTERRUPTED: u8 = 130;
 pub fn main() -> ExitCode {
     clap_complete::CompleteEnv::with_factory(args::command).complete();
     let args = std::env::args_os();
-    #[cfg(all(target_vendor = "apple", feature = "desktop"))]
+    #[cfg(feature = "desktop")]
     let args = args.chain(
         crate::install::autostart::opened_as_app().then(|| ["serve".into(), "--open".into()]).into_iter().flatten(),
     );
@@ -145,7 +145,7 @@ fn without_state(command: &Command) -> Result<Option<Level>> {
         .map(Some);
     }
     if let Command::Serve { open: true, .. } = command {
-        #[cfg(all(any(target_os = "linux", target_vendor = "apple"), feature = "desktop"))]
+        #[cfg(feature = "desktop")]
         if health::check(listen).is_err() {
             crate::install::autostart::start_installed(listen)?;
         }

@@ -1,9 +1,24 @@
 //! Linux's answers, from sysfs and `statfs`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use etcetera::BaseStrategy;
 
 pub(super) use super::unix::read_hostname;
 pub(crate) use super::unix::*;
+
+/// `app`'s configuration directory for this user, laid out as the `directories` crate that rustic uses lays
+/// it out.
+pub(crate) fn user_config_dir(base: &impl BaseStrategy, app: &str) -> PathBuf {
+    base.config_dir().join(app)
+}
+
+/// Whether the process `pid` ended, for test directories to go.
+#[cfg(test)]
+#[expect(clippy::disallowed_methods, reason = "looks for the process in /proc")]
+pub(crate) fn ended(pid: &str) -> bool {
+    !Path::new("/proc").join(pid).exists()
+}
 
 /// macOS's alone.
 pub(crate) fn needs_disk_access(_: &str) -> bool {
@@ -71,5 +86,15 @@ mod tests {
         // A partition, an LVM volume, and a device the kernel has no disk for (tmpfs, btrfs).
         let found = [solid_state_in(&sys, 8, 1), solid_state_in(&sys, 253, 1), solid_state_in(&sys, 0, 26)];
         assert_eq!(found, [Some(false), Some(true), None]);
+    }
+
+    /// As `/usr/bin` of a package. Root writes there anyway.
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    #[test]
+    fn a_folder_only_root_writes_is_not_writable() {
+        if crate::sys::is_root() {
+            return;
+        }
+        assert!(!crate::sys::writable(std::path::Path::new("/usr/bin")));
     }
 }

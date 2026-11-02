@@ -263,7 +263,7 @@ pub(crate) fn state_dir() -> Result<PathBuf> {
             PathBuf::from(env::var_os("PROGRAMDATA").unwrap_or_else(|| r"C:\ProgramData".into()))
                 .join(crate::NAME)
                 .join("state")
-        } else if cfg!(target_vendor = "apple") {
+        } else if cfg!(target_os = "macos") {
             PathBuf::from("/Library/Application Support").join(crate::NAME)
         } else {
             PathBuf::from("/var/lib").join(crate::NAME)
@@ -378,7 +378,7 @@ CMD ["serve"]
     #[expect(clippy::disallowed_methods, reason = "reads the examples")]
     fn examples_use_the_default_address() {
         let listen = super::LISTEN.default.unwrap_or_default();
-        let read = |file: &str| std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(file));
+        let read = |file: &str| std::fs::read_to_string(crate::tests::root().join(file));
         let nginx = read("packaging/nginx.conf").unwrap();
         assert!(nginx.contains(&format!("proxy_pass http://{listen}")), "nginx.conf proxies elsewhere than {listen}");
         let port = listen.rsplit_once(':').map_or(listen, |(_, port)| port);
@@ -404,7 +404,7 @@ CMD ["serve"]
                 Err(_) => vec![path.to_owned()],
             }
         }
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let root = crate::tests::root();
         let read = |path: &std::path::Path| std::fs::read_to_string(path).unwrap_or_default();
         let tests: String = files(&root.join("tests/integration")).iter().map(|p| read(p)).collect();
         for doc in [root.join("README.md")].into_iter().chain(files(&root.join("screenshots/scripts"))) {

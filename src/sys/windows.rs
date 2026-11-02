@@ -2,7 +2,32 @@
 
 use std::path::{Path, PathBuf};
 
+use etcetera::BaseStrategy;
+
 use super::{HOSTNAME_BUFFER, fnv1a};
+
+/// `app`'s configuration directory for this user, laid out as the `directories` crate that rustic uses lays
+/// it out.
+pub(crate) fn user_config_dir(base: &impl BaseStrategy, app: &str) -> PathBuf {
+    base.config_dir().join(app).join("config")
+}
+
+/// `app`'s configuration directory for the system, in `ProgramData`.
+#[expect(clippy::disallowed_methods, reason = "the system's directory on Windows is in the environment")]
+pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
+    std::env::var_os("PROGRAMDATA").map(|data| PathBuf::from(data).join(app).join("config"))
+}
+
+/// Whether `path` is an absolute path of another system: a Unix root's. Its folder has no place here.
+pub(crate) fn foreign_path(path: &str) -> bool {
+    path.starts_with('/')
+}
+
+/// Whether the process `pid` ended, for test directories to go. Unknown here.
+#[cfg(test)]
+pub(crate) fn ended(_: &str) -> bool {
+    false
+}
 
 /// Where `install` places rusticlone for an administrator.
 #[expect(clippy::disallowed_methods, reason = "the system's program folder on Windows is in the environment")]
@@ -192,8 +217,10 @@ pub(crate) fn windows_build() -> u32 {
     info.dwBuildNumber
 }
 
+/// Whether this process started with no console or one of its own, from the `Run` key at login, a double
+/// click or `install`, rather than from a terminal or another program, whose console it shares.
 #[cfg(feature = "server")]
-static ALONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+pub(crate) static ALONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
 /// Releases a console opened for this process alone, as at login from the `Run` key, so that its window
 /// closes. A terminal's console is shared with the shell, and stays.
@@ -211,18 +238,17 @@ pub(crate) fn release_own_console() {
     }
 }
 
-/// Whether this process started with no console or one of its own, from the `Run` key at login, a double
-/// click or `install`, rather than from a terminal or another program, whose console it shares.
-#[cfg(tray)]
-pub(crate) fn started_alone() -> bool {
-    ALONE.load(std::sync::atomic::Ordering::Relaxed)
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
-    use super::{device, network_fs, solid_state};
+    use super::{device, foreign_path, network_fs, solid_state};
+
+    /// Another system's absolute folders, which have no place here.
+    #[test]
+    fn a_unix_root_is_foreign() {
+        assert!(foreign_path("/home/me") && !foreign_path(r"C:\Users\me"));
+    }
 
     /// A local volume says whether its disk seeks, if its disk answers, as a virtual one may not; the same below
     /// a folder not created yet. A share has no volume.
@@ -244,5 +270,12 @@ mod tests {
         let root = std::path::PathBuf::from(format!(r"{system}\"));
         assert!(device(&root).is_some());
         assert_eq!(device(&root.join("not yet").join("created")), device(&root));
+    }
+
+    /// Windows is not asked: its own folders are writable by whom they belong to.
+    #[cfg(any(feature = "server", feature = "self-update"))]
+    #[test]
+    fn any_folder_is_writable() {
+        assert!(crate::sys::writable(Path::new(r"C:\Windows")));
     }
 }

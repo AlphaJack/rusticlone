@@ -9,11 +9,19 @@ use std::{
 
 use anyhow::Result;
 
+#[cfg(unix)]
+mod unix;
+#[cfg(unix)]
+use unix as os;
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as os;
+
+pub(crate) use os::unpack;
+
 /// A larger download is refused.
 const MAX_SIZE: u64 = 1 << 26;
-/// The downloaded executable's mode.
-#[cfg(unix)]
-const EXECUTABLE: u32 = 0o755;
 
 #[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
 #[fluent(prefix = "download-error")]
@@ -46,22 +54,6 @@ pub(crate) fn untar(archive: &str, data: &[u8], name: &str) -> Result<Vec<u8>> {
     Ok(file)
 }
 
-/// The file called `name` in the `.zip` `archive`, at any depth.
-#[cfg(windows)]
-pub(crate) fn unzip(archive: &str, data: &[u8], name: &str) -> Result<Vec<u8>> {
-    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(data))?;
-    let index = (0..zip.len())
-        .find(|&i| {
-            zip.name_for_index(i)
-                .and_then(Result::ok)
-                .is_some_and(|p| Path::new(&*p).file_name().is_some_and(|f| f == name))
-        })
-        .ok_or_else(|| Error::NoExecutable { archive: archive.to_owned(), name: name.to_owned() })?;
-    let mut file = Vec::new();
-    zip.by_index(index)?.read_to_end(&mut file)?;
-    Ok(file)
-}
-
 /// Writes an executable, renamed into place so that no half-written one runs.
 pub(crate) fn install(binary: &[u8], path: &Path) -> Result<()> {
     if let Some(dir) = path.parent() {
@@ -69,8 +61,7 @@ pub(crate) fn install(binary: &[u8], path: &Path) -> Result<()> {
     }
     let partial = path.with_extension("partial");
     let mut options = std::fs::OpenOptions::new();
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, EXECUTABLE);
+    os::executable(&mut options);
     options.write(true).create(true).truncate(true).open(&partial)?.write_all(binary)?;
     std::fs::rename(&partial, path)?;
     Ok(())
@@ -129,11 +120,7 @@ mod tests {
         install(&binary, &path).unwrap();
         assert_eq!(std::fs::read(&path).unwrap(), b"binary");
         assert!(!path.with_extension("partial").exists());
-        #[cfg(unix)]
-        assert_eq!(
-            std::os::unix::fs::PermissionsExt::mode(&std::fs::metadata(&path).unwrap().permissions()) & 0o777,
-            EXECUTABLE
-        );
+        assert!(os::is_executable(&path));
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
     }
 }

@@ -107,7 +107,7 @@ const fn folder(example: &'static str) -> Field {
 const fn native(windows: &'static str, macos: &'static str, other: &'static str) -> &'static str {
     if cfg!(windows) {
         windows
-    } else if cfg!(target_vendor = "apple") {
+    } else if cfg!(target_os = "macos") {
         macos
     } else {
         other
