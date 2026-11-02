@@ -197,3 +197,30 @@ fn one_source_is_restored() {
     assert!(sb.path("source/docs/a.txt").exists() && !sb.path("source/mail").exists());
     sb.run(&["restore", "--all", "--source", "/nowhere"]).assert_exit(1).assert_result("error", json!({}));
 }
+
+/// A restore from a chosen repository does not fall back to another one.
+#[test]
+fn a_restore_from_a_chosen_repository_does_not_fall_back() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("source");
+    for pack in walk(&sb.path("local/Docs/data")) {
+        fs::write(pack, b"damaged").unwrap();
+    }
+    sb.run(&["restore", "--all", "--from", "Docs"])
+        .assert_exit(1)
+        .assert_no_result("falling-back", json!({}))
+        .assert_no_result("restored", json!({"repo": "Docs-remote"}));
+}
+
+/// A source added since the last backup has no snapshot yet: a restore says it found the others only.
+#[test]
+fn a_restore_says_when_some_sources_have_no_snapshot() {
+    let sb = docs_and_mail_backed_up();
+    sb.backup_profile("Docs", &[&["docs"], &["mail"], &["photos"]], &[], "");
+    let some = json!({"found": 2, "of": 3});
+    sb.run(&["restore", "--all", "--dry-run"]).assert_exit(2).assert_result("some-sources", some.clone());
+    sb.remove("source/docs");
+    sb.run(&["restore", "--all"]).assert_exit(2).assert_result("some-sources", some);
+    assert!(sb.path("source/docs/a.txt").exists());
+}

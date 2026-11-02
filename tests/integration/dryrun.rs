@@ -64,6 +64,9 @@ fn dry_runs_change_no_file() {
     // The findings, not what was done.
     let backup = sb.run(&["backup", "--dry-run", "--all"]);
     backup.assert_result("would-back-up", serde_json::json!({})).assert_no_output("rustic backup --json");
+    backup.assert_result("would-forget", serde_json::json!({"repo": "Docs"}));
+    sb.run(&["prune", "--dry-run", "--all"]).assert_result("would-prune", serde_json::json!({"repo": "Docs"}));
+    sb.run(&["check", "--dry-run", "--all"]).assert_result("would-check", serde_json::json!({"repo": "Docs"}));
 }
 
 /// A dry run creates no repository, though rustic's own dry run would, and no state.
@@ -91,4 +94,24 @@ fn a_dry_run_restore_previews_or_reads() {
     let read = sb.run(&["restore", "--dry-run", "--all"]);
     read.assert_exit(0).assert_result("test-restored", serde_json::json!({}));
     assert!(!sb.path("source/docs").exists(), "a dry run created the source");
+}
+
+/// A dry run creates a target that was never seen, as the copy would. One seen before that cannot be listed now
+/// is unavailable: only a re-create brings it back, with every snapshot.
+#[test]
+fn a_dry_run_creates_only_targets_never_seen() {
+    let sb = Sandbox::new();
+    sb.backup_profile("Docs", &[&["docs"]], &[], "");
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.backup_profile("Docs", &[&["docs"]], &["Docs-remote"], "");
+    sb.target("Docs-remote", "Docs", "");
+    sb.run(&["copy", "--dry-run", "--all"])
+        .assert_exit(0)
+        .assert_result("would-copy", serde_json::json!({"target": "Docs-remote", "create": true}));
+    sb.run(&["copy", "--all"]).assert_exit(0);
+    sb.remove("remote");
+    sb.run(&["copy", "--dry-run", "--all"]).assert_exit(1).assert_no_result("would-copy", serde_json::json!({}));
+    sb.run(&["recreate", "--repo", "Docs-remote", "--dry-run"])
+        .assert_result("would-copy", serde_json::json!({"target": "Docs-remote", "create": true}));
 }
