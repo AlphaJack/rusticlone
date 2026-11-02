@@ -1,0 +1,12 @@
+---
+source: src/request.rs
+expression: texts
+---
+[
+    "backing up collection",
+    "copying to Docs-usb",
+    "checking Docs",
+    "a command",
+    "the schedule",
+    "the web UI",
+]

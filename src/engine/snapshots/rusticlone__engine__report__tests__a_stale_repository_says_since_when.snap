@@ -1,0 +1,9 @@
+---
+source: src/engine/report.rs
+expression: texts
+---
+[
+    "Docs-usb is overdue: 2 days behind. Check that the server runs",
+    "Docs is overdue: last backup 2 days ago. Check that the server runs",
+    "not yet",
+]

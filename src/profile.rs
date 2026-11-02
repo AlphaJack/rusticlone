@@ -509,6 +509,15 @@ fn resolve(path: &Path) -> PathBuf {
 mod tests {
     use super::*;
 
+    /// The folders searched, by name, and the current one as "here", last.
+    #[test]
+    fn the_current_folder_is_searched_as_here() {
+        let (here, a, b) = (env::current_dir().unwrap(), PathBuf::from("a"), PathBuf::from("b"));
+        assert_eq!(searched(&[a.clone(), b]), "a, b");
+        assert_eq!(searched(std::slice::from_ref(&here)), t!("profile-here"));
+        assert_eq!(searched(&[a, here]), t!("profile-dirs-or-here", dirs = "a"));
+    }
+
     #[test]
     fn normalize_paths() {
         assert_eq!(
