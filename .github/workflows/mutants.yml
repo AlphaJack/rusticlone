@@ -82,7 +82,7 @@ jobs:
       - name: Mutate the library
         env:
           SHARD: ${{ matrix.shard }}
-        run: cargo mutants --in-place --test-tool nextest --shard "$SHARD/40" --no-shuffle
+        run: cargo mutants -vV --in-place --test-tool nextest --shard "$SHARD/40" --no-shuffle
       - name: Upload what the tests missed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
