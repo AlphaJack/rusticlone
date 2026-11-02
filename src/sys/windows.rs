@@ -255,17 +255,6 @@ pub(crate) fn mount_tables() -> Option<[PathBuf; 2]> {
     None
 }
 
-/// The installer's command here, without `install`: on a new computer, the server would back up the folders
-/// before they are restored.
-#[cfg(feature = "server")]
-pub(crate) const INSTALLER: &str = concat!(
-    "irm ",
-    env!("CARGO_PKG_REPOSITORY"),
-    "/releases/latest/download/",
-    env!("CARGO_PKG_NAME"),
-    "-installer.ps1 | iex"
-);
-
 /// A file in the user's profile is the user's alone already.
 #[cfg(feature = "server")]
 pub(crate) fn only_owner(_: &mut std::fs::OpenOptions) {}
