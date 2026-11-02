@@ -110,11 +110,6 @@ pub(super) fn uninstall() -> Result<Option<Removed>> {
 }
 
 /// macOS's alone.
-pub(super) fn app_source(_: &Path) -> Option<PathBuf> {
-    None
-}
-
-/// macOS's alone.
 #[cfg(feature = "self-update")]
 #[expect(clippy::unnecessary_wraps, reason = "macOS's copies the executable, which may fail")]
 pub(super) fn refresh_app() -> Result<Option<String>> {
