@@ -706,7 +706,6 @@ autostart-unit-description = { -app } server
 app-description = { -description }
 tray-open = Open { -app }
 tray-quit = Quit (pause automatic backups)
-switch-at-boot = Start at boot
 switch-at-login = Start at login
 switch-auto-update = Update automatically
 attest-over-digest = { $scheme } over a digest

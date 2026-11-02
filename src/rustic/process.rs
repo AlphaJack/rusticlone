@@ -116,3 +116,14 @@ mod tests {
         assert!(work(std::process::id()).unwrap() > before);
     }
 }
+
+/// Ends `child`, and what it starts, with this process, as Windows needs: see `tie`.
+#[cfg(feature = "server")]
+pub(crate) fn tie_child(child: &tokio::process::Child) {
+    #[cfg(windows)]
+    if let Some(handle) = child.raw_handle() {
+        tie(handle);
+    }
+    #[cfg(not(windows))]
+    let _ = child;
+}

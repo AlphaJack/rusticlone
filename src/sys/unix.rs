@@ -131,3 +131,28 @@ mod tests {
 pub(crate) fn system_bins() -> Vec<PathBuf> {
     vec![Path::new("/usr").join("bin"), PathBuf::from("/bin"), Path::new("/usr").join("sbin")]
 }
+
+/// Windows's alone: a terminal's process here has no console of its own.
+#[cfg(feature = "server")]
+pub(crate) fn release_own_console() {}
+
+/// The installer's command here, without `install`: on a new computer, the server would back up the folders
+/// before they are restored.
+#[cfg(feature = "server")]
+pub(crate) const INSTALLER: &str = concat!(
+    "curl -LsSf ",
+    env!("CARGO_PKG_REPOSITORY"),
+    "/releases/latest/download/",
+    env!("CARGO_PKG_NAME"),
+    "-installer.sh | sh"
+);
+
+/// Read and written by its owner alone.
+#[cfg(feature = "server")]
+const OWNER_ONLY: u32 = 0o600;
+
+/// Lets only this user read and write the file `options` opens.
+#[cfg(feature = "server")]
+pub(crate) fn only_owner(options: &mut std::fs::OpenOptions) {
+    std::os::unix::fs::OpenOptionsExt::mode(options, OWNER_ONLY);
+}

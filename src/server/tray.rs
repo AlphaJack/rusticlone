@@ -80,7 +80,6 @@ impl Switch {
     /// Root's server starts with the computer, as a system service; Windows's always at the user's login.
     fn label(self) -> String {
         match self {
-            Self::AtLogin if cfg!(unix) && sys::is_root() => crate::i18n::t!("switch-at-boot"),
             Self::AtLogin => self.to_string(),
             #[cfg(feature = "self-update")]
             Self::AutoUpdate => self.to_string(),

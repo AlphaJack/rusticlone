@@ -286,10 +286,7 @@ pub(super) async fn download(
     let mut command = tokio::process::Command::from(command);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = command.spawn().map_err(Fault::CannotRunRustic)?;
-    #[cfg(windows)]
-    if let Some(handle) = child.raw_handle() {
-        rustic::tie(handle);
-    }
+    rustic::tie_child(&child);
     let (Some(out), Some(err)) = (child.stdout.take(), child.stderr.take()) else {
         return Err(Fault::NotPiped.into());
     };

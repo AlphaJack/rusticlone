@@ -34,9 +34,6 @@ const COOKIE: &str = crate::NAME;
 const COOKIE_HTTPS: &str = concat!("__Host-", env!("CARGO_PKG_NAME"));
 /// The generated admin token's file in the state directory.
 const TOKEN_FILE: &str = "admin-token";
-/// Its mode: readable by its owner only.
-#[cfg(unix)]
-const TOKEN_MODE: u32 = 0o600;
 const SESSION: SignedDuration = SignedDuration::from_hours(365 * 24);
 
 /// A request that a browser sent on behalf of another site. Scripts send no such headers.
@@ -290,8 +287,7 @@ pub(in crate::server) fn login_tokens(dir: &Path) -> Result<Tokens> {
 fn saved_token(path: &Path) -> Result<String> {
     use std::io::Write;
     let mut options = std::fs::OpenOptions::new();
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, TOKEN_MODE);
+    crate::sys::only_owner(&mut options);
     match options.write(true).create_new(true).open(path) {
         Ok(mut file) => {
             let token = random_hex().map_err(Fault::NoToken)?;
