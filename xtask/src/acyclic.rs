@@ -2,8 +2,9 @@
 //! from rust-analyzer's [SCIP](https://github.com/sourcegraph/scip) index of the library with every
 //! feature and without tests. A module uses what its items name, function bodies included; an item uses
 //! what its signatures and fields name, so that a type and a function it returns may call each other.
-//! A method, field or variant counts as its type. With `--mermaid`, prints the module graph as a
-//! Mermaid flowchart instead.
+//! A method, field or variant counts as its type. A module may use its ancestors' types, but not call their free
+//! functions: a helper that a parent and its children share goes in a module of its own. With `--mermaid`, prints
+//! the module graph as a Mermaid flowchart instead.
 
 use std::{
     cmp::Reverse,
@@ -39,7 +40,7 @@ pub(crate) fn check(mermaid: bool) -> Result<()> {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
     let manifest: toml_edit::DocumentMut = fs::read_to_string(root.join("Cargo.toml"))?.parse()?;
     let name = manifest["package"]["name"].as_str().context("no package name in Cargo.toml")?;
-    let (modules, items) = graphs(name, &index(&root, name)?);
+    let (modules, items, upcalls) = graphs(name, &index(&root, name)?);
     if mermaid {
         print_mermaid(&modules);
         return Ok(());
@@ -60,6 +61,11 @@ pub(crate) fn check(mermaid: bool) -> Result<()> {
         }
         println!("no cycles between {what}");
     }
+    if !upcalls.is_empty() {
+        let upcalls: Vec<String> = upcalls.iter().map(|(from, to)| format!("  {from} → {to}")).collect();
+        bail!("functions that call their module's ancestors' free functions:\n{}", upcalls.join("\n"));
+    }
+    println!("no calls up to an ancestor's free function");
     Ok(())
 }
 
@@ -139,7 +145,8 @@ fn index(root: &Path, name: &str) -> Result<Vec<Vec<Occurrence>>> {
 }
 
 /// The modules and the items that use each other.
-fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph) {
+/// Also the calls from a module up to its ancestors' free functions, by caller and callee.
+fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph, BTreeSet<(String, String)>) {
     // Each definition's item: the outermost definition around it that is not a module, and for a method
     // of an inherent `impl` block, which is no definition, its type. A trait's `impl` is an item of its
     // own, which may be in another module than its type.
@@ -155,7 +162,7 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph) {
             }
         }
     }
-    let (mut modules, mut items) = (Graph::new(), Graph::new());
+    let (mut modules, mut items, mut upcalls) = (Graph::new(), Graph::new(), BTreeSet::new());
     for occurrences in documents {
         for used in occurrences.iter().filter(|o| !o.definition) {
             // What items name, not `use` declarations: those of test modules are indexed too.
@@ -173,6 +180,13 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph) {
             // other, as a parent re-exports its children and children use the parent's items. By where the
             // code is, which for a trait's `impl` may not be where its type is.
             let (a, b) = (module(&within.symbol), module(&used.symbol));
+            // A free function's symbol ends in `().`, a method's has its type's `#` before.
+            let free = used.symbol.ends_with(").") && !used.symbol.contains('#');
+            if free && b.len() < a.len() && a.starts_with(&b) {
+                let path =
+                    |symbol: &str| format!("{name}::{}", symbol.replace('/', "::").trim_end_matches(['(', ')', '.']));
+                upcalls.insert((path(&within.symbol), path(&used.symbol)));
+            }
             let common = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
             if common < a.len() && common < b.len() {
                 let path = |m: &[&str]| [name].iter().chain(&m[..=common]).copied().collect::<Vec<_>>().join("::");
@@ -186,7 +200,7 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph) {
             }
         }
     }
-    (modules, items)
+    (modules, items, upcalls)
 }
 
 /// Marks what a function's body names: from the first `{` after the function's name to its end, which
