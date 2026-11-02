@@ -21,8 +21,34 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
+  # Builds the dependencies once, for every shard to restore rather than build.
+  build:
+    name: build tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: "stable"
+      - name: Cache cargo registry and target
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: mutants
+          save-if: true
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-nextest
+      - name: Build the tests
+        run: cargo nextest run --workspace --locked --no-run
+
   mutants:
     name: mutants (${{ matrix.shard }}/40)
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 350
     strategy:
@@ -39,6 +65,11 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "stable"
+      - name: Restore the dependencies built once
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: mutants
+          save-if: false
       - name: Install cargo-nextest, cargo-mutants and cargo-binstall
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
@@ -51,7 +82,7 @@ jobs:
       - name: Mutate the library
         env:
           SHARD: ${{ matrix.shard }}
-        run: cargo mutants --test-tool nextest --shard "$SHARD/40" --no-shuffle
+        run: cargo mutants --in-place --test-tool nextest --shard "$SHARD/40" --no-shuffle
       - name: Upload what the tests missed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
