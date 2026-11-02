@@ -44,9 +44,9 @@ pub(super) fn bplist(strings: &[&str]) -> Option<Vec<u8>> {
 
 fn plist() -> Result<PathBuf> {
     Ok(if sys::is_root() {
-        PathBuf::from("/Library/LaunchDaemons")
+        PathBuf::from("/Library").join("LaunchDaemons")
     } else {
-        etcetera::home_dir()?.join("Library/LaunchAgents")
+        etcetera::home_dir()?.join("Library").join("LaunchAgents")
     }
     .join(format!("{NAME}.plist")))
 }
@@ -108,7 +108,7 @@ pub(super) fn bundle(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
         std::fs::rename(&partial, &bundled)?;
         // A package manager's executable, which it updates, is copied again at start when it no longer is
         // the one copied: see `refresh_app`. Named with its SHA-256, as signing the app changes the copy.
-        let source = source_file(&contents);
+        let source = crate::install::app::source_file(&contents);
         if crate::install::managed(exe) {
             let copied = sys::sha256(std::fs::read(exe)?);
             std::fs::write(&source, format!("{}\n{copied}\n", exe.display()))?;
@@ -140,30 +140,11 @@ pub(super) fn bundle(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
     Ok(bundled)
 }
 
-/// Where the app names the package manager's executable that it is a copy of, and that one's SHA-256.
-fn source_file(contents: &Path) -> PathBuf {
-    contents.join("Resources").join("source")
-}
-
-/// The package manager's executable that the app holding `exe` copied, and the SHA-256 it had then.
-fn source(exe: &Path) -> Option<(PathBuf, String)> {
-    if !exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) {
-        return None;
-    }
-    let text = std::fs::read_to_string(source_file(exe.parent()?.parent()?)).ok()?;
-    let mut lines = text.lines();
-    Some((PathBuf::from(lines.next()?), lines.next().unwrap_or_default().to_owned()))
-}
-
-pub(super) fn app_source(exe: &Path) -> Option<PathBuf> {
-    source(exe).map(|(path, _)| path)
-}
-
 /// The package manager's executable when it changed since the app that holds `exe` copied it: not when the
 /// app's signature changed the copy, else each start would copy it again.
 #[cfg(any(feature = "self-update", test))]
 pub(super) fn stale(exe: &Path) -> Option<PathBuf> {
-    let (source, copied) = source(exe)?;
+    let (source, copied) = crate::install::app::source(exe)?;
     let new = std::fs::read(&source).ok()?;
     (sys::sha256(new) != copied).then_some(source)
 }
@@ -188,7 +169,7 @@ pub(super) fn rewrite_app(version: &str) -> Result<()> {
     let exe = std::env::current_exe()?;
     // The executable, in `Contents/MacOS` of the app.
     match exe.parent().and_then(Path::parent).and_then(Path::parent) {
-        Some(app) if exe.ends_with(Path::new("Contents/MacOS").join(APP_NAME)) => {
+        Some(app) if exe.ends_with(Path::new("Contents").join("MacOS").join(APP_NAME)) => {
             write_app(app, &exe, version).map(drop)
         }
         _ => Ok(()),
@@ -325,7 +306,10 @@ mod tests {
     #[test]
     fn the_app_copies_homebrews_executable_again_only_once_it_changed() {
         let dir = std::env::temp_dir().join(format!("{}-brew-app-{}", crate::NAME, std::process::id()));
-        let (app, cellar) = (dir.join(format!("{}.app", crate::APP_NAME)), dir.join("Cellar/rusticlone/2.0.1/bin"));
+        let (app, cellar) = (
+            dir.join(format!("{}.app", crate::APP_NAME)),
+            dir.join("Cellar").join("rusticlone").join("2.0.1").join("bin"),
+        );
         std::fs::create_dir_all(&cellar).unwrap();
         let source = cellar.join(crate::NAME);
         std::fs::copy("/usr/bin/true", &source).unwrap();
@@ -350,7 +334,7 @@ mod tests {
             let verify = std::process::Command::new("codesign").args(["--verify", "--strict"]).arg(&app).output();
             verify.unwrap().status.success()
         };
-        let exe = super::bundle(&app, std::path::Path::new("/usr/bin/true"), "1.0.0").unwrap();
+        let exe = super::bundle(&app, &std::path::Path::new("/usr").join("bin").join("true"), "1.0.0").unwrap();
         assert!(signed());
         std::fs::copy("/usr/bin/false", &exe).unwrap();
         assert!(!signed());

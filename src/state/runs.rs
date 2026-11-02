@@ -487,7 +487,7 @@ mod tests {
     /// drops the shapes that earlier versions stored.
     #[test]
     fn runs_stored_by_earlier_versions_are_still_read() {
-        let path = crate::tests::root().join("tests/fixtures/runs.jsonl");
+        let path = crate::tests::root().join("tests").join("fixtures").join("runs.jsonl");
         if !path.exists() {
             let store = store("runs-fixture");
             let runs: Vec<String> =
@@ -553,7 +553,7 @@ mod tests {
         let using = Holds { using: vec!["Docs".into()], waiting_for: None };
         check.steps(&[StepRecord::queued("check".into(), Vec::new())]);
         assert!(check.holds(Some(0), using.clone()) && !check.holds(Some(0), using));
-        assert_eq!(fs::read_dir(store.dir.join("runs/Docs")).unwrap().count(), MAX_RUNS + 1);
+        assert_eq!(fs::read_dir(store.dir.join("runs").join("Docs")).unwrap().count(), MAX_RUNS + 1);
         fs::remove_dir_all(&store.dir).unwrap();
     }
 

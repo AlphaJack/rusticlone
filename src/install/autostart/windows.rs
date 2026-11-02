@@ -107,7 +107,7 @@ fn install_service(exe: &Path, serve: &[String]) -> Result<PathBuf> {
     service.set_failure_actions_on_non_crash_failures(true)?;
     // This `PATH` and rustic, so that it runs the same rustic, even one downloaded into this user's
     // directory rather than the system account's.
-    let rustic = crate::rustic::bin();
+    let rustic = crate::rustic::install::bin();
     let environment = [format!("PATH={}", std::env::var("PATH").unwrap_or_default())]
         .into_iter()
         .chain(rustic.is_absolute().then(|| format!("{}={}", settings::RUSTIC.key, rustic.display())));
@@ -347,11 +347,6 @@ pub(super) fn uninstall() -> Result<Option<Removed>> {
 
 fn exe() -> Result<String> {
     Ok(std::env::current_exe()?.to_string_lossy().into_owned())
-}
-
-/// macOS's alone.
-pub(super) fn app_source(_: &Path) -> Option<PathBuf> {
-    None
 }
 
 /// macOS's alone.

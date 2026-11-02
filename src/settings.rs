@@ -2,8 +2,6 @@
 
 use std::{env, path::PathBuf};
 
-use etcetera::BaseStrategy;
-
 use anyhow::Result;
 use serde::Serialize;
 
@@ -198,10 +196,6 @@ pub(crate) fn load_env_file() -> Result<()> {
     }
 }
 
-/// The env file's mode: it may hold secrets.
-#[cfg(all(unix, feature = "desktop", feature = "self-update"))]
-const OWNER_ONLY: u32 = 0o600;
-
 #[cfg(all(feature = "desktop", feature = "self-update"))]
 /// Writes `value` for `setting` into the env file, created readable by its owner only, and returns its path.
 pub(crate) fn write_env_file(setting: &Setting, value: &str) -> Result<PathBuf> {
@@ -212,8 +206,8 @@ pub(crate) fn write_env_file(setting: &Setting, value: &str) -> Result<PathBuf> 
     };
     std::fs::create_dir_all(path.parent().unwrap_or(&path))?;
     let mut file = std::fs::OpenOptions::new();
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut file, OWNER_ONLY);
+    // It may hold secrets.
+    crate::sys::only_owner(&mut file);
     std::io::Write::write_all(
         &mut file.write(true).create(true).truncate(true).open(&path)?,
         with_line(&text, setting.key, value).as_bytes(),
@@ -222,7 +216,7 @@ pub(crate) fn write_env_file(setting: &Setting, value: &str) -> Result<PathBuf> 
 }
 
 /// Whether the env file switches `setting` on, which the next start reads unless the environment sets it.
-#[cfg(all(tray, feature = "self-update"))]
+#[cfg(all(feature = "desktop", feature = "self-update"))]
 pub(crate) fn on_in_env_file(setting: &Setting) -> bool {
     let set = env_file().and_then(|path| dotenvy::from_path_iter(path).ok()).and_then(|vars| {
         vars.filter_map(Result::ok).filter(|(key, _)| key == setting.key).last().map(|(_, value)| value)
@@ -259,19 +253,9 @@ pub(crate) fn state_dir() -> Result<PathBuf> {
         return Ok(dir.into());
     }
     if crate::sys::is_root() {
-        return Ok(if cfg!(windows) {
-            PathBuf::from(env::var_os("PROGRAMDATA").unwrap_or_else(|| r"C:\ProgramData".into()))
-                .join(crate::NAME)
-                .join("state")
-        } else if cfg!(target_os = "macos") {
-            PathBuf::from("/Library/Application Support").join(crate::NAME)
-        } else {
-            PathBuf::from("/var/lib").join(crate::NAME)
-        });
+        return Ok(crate::sys::system_state_dir(crate::NAME));
     }
-    let base = etcetera::base_strategy::choose_native_strategy()?;
-    let dir = base.state_dir().unwrap_or_else(|| if cfg!(windows) { base.cache_dir() } else { base.data_dir() });
-    Ok(dir.join(crate::NAME))
+    Ok(crate::sys::user_state_dir(&etcetera::base_strategy::choose_native_strategy()?, crate::NAME))
 }
 
 #[cfg(test)]
@@ -406,8 +390,8 @@ CMD ["serve"]
         }
         let root = crate::tests::root();
         let read = |path: &std::path::Path| std::fs::read_to_string(path).unwrap_or_default();
-        let tests: String = files(&root.join("tests/integration")).iter().map(|p| read(p)).collect();
-        for doc in [root.join("README.md")].into_iter().chain(files(&root.join("screenshots/scripts"))) {
+        let tests: String = files(&root.join("tests").join("integration")).iter().map(|p| read(p)).collect();
+        for doc in [root.join("README.md")].into_iter().chain(files(&root.join("screenshots").join("scripts"))) {
             let text = read(&doc);
             let names = text
                 .split(|c: char| !(c.is_ascii_uppercase() || c == '_'))

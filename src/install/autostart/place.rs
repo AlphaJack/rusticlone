@@ -144,7 +144,7 @@ mod tests {
     #[test]
     fn one_where_the_installer_script_put_it_stays_before_path_has_it() {
         let folder = Folder::new("installer");
-        let (cargo, installer) = (folder.exe(".cargo/bin/rusticlone"), folder.0.join(".cargo/bin"));
+        let (cargo, installer) = (folder.exe(".cargo/bin/rusticlone"), folder.0.join(".cargo").join("bin"));
         assert_eq!(kept(&cargo, &path(&[&folder.0.join("elsewhere")]), Some(&installer)), Some(cargo.clone()));
         assert_eq!(kept(&cargo, &path(&[&folder.0.join("elsewhere")]), None), None);
     }

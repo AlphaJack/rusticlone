@@ -322,7 +322,7 @@ pub(crate) fn load(name: &str, dir: &Path, config: &Config) -> Result<RusticProf
         return Err(Error::SlashedDrive { location: repository.to_owned() });
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
-        && let Some(scheme) = backslash_after_scheme(repository, cfg!(windows))
+        && let Some(scheme) = backslash_after_scheme(repository, std::path::MAIN_SEPARATOR == '\\')
     {
         let (location, scheme) = (repository.to_owned(), scheme.to_owned());
         return Err(Error::BackslashAfterScheme { location, scheme });
@@ -511,9 +511,15 @@ mod tests {
 
     #[test]
     fn normalize_paths() {
-        assert_eq!(normalize(Path::new("/a/./b//c/../d/")), PathBuf::from("/a/b/d"));
-        assert_eq!(normalize(Path::new("../../a/../b")), PathBuf::from("../../b"));
-        assert_eq!(normalize(Path::new("/../a")), PathBuf::from("/a"));
+        assert_eq!(
+            normalize(&Path::new("/a").join(".").join("b").join("c").join("..").join("d")),
+            PathBuf::from("/a").join("b").join("d")
+        );
+        assert_eq!(
+            normalize(&Path::new("..").join("..").join("a").join("..").join("b")),
+            PathBuf::from("..").join("..").join("b")
+        );
+        assert_eq!(normalize(&Path::new("/..").join("a")), PathBuf::from("/a"));
     }
 
     /// Rustic reads `C:/b` as the backend `C`, and `C:\b` or `local:C:/b` as paths.
@@ -536,9 +542,9 @@ mod tests {
     #[test]
     fn snapshot_paths_match_rustic() {
         let dir = sys::test_dir("paths");
-        fs::create_dir_all(dir.join("a/b/sub")).unwrap();
-        fs::create_dir_all(dir.join("a/other")).unwrap();
-        let (b, dir) = (dir.join("a/b"), dunce::canonicalize(&dir).unwrap());
+        fs::create_dir_all(dir.join("a").join("b").join("sub")).unwrap();
+        fs::create_dir_all(dir.join("a").join("other")).unwrap();
+        let (b, dir) = (dir.join("a").join("b"), dunce::canonicalize(&dir).unwrap());
         let paths = |sources: &[&str]| snapshot_paths(&sources.iter().map(ToString::to_string).collect::<Vec<_>>(), &b);
         // With the system's separators, as rustic records them.
         let abs = |p: &str| p.split('/').fold(dir.clone(), |d, c| d.join(c)).to_string_lossy().into_owned();
@@ -547,9 +553,10 @@ mod tests {
         assert_eq!(paths(&["../other"]), [abs("a/other")]);
         assert_eq!(paths(&["sub", "../other"]), [abs("a/b/sub"), abs("a/other")]);
         // Another system's folders stay as that system recorded them.
-        let foreign = if cfg!(windows) { "/home/me/Docs" } else { r"C:\Users\me\Docs" };
+        let backslashed = std::path::MAIN_SEPARATOR == '\\';
+        let foreign = if backslashed { "/home/me/Docs" } else { r"C:\Users\me\Docs" };
         assert_eq!(paths(&[foreign]), [foreign]);
-        let (separator, root) = if cfg!(windows) { ("/", "/") } else { ("\\", "D:\\") };
+        let (separator, root) = if backslashed { ("/", "/") } else { ("\\", "D:\\") };
         assert_eq!(paths(&[&format!("{foreign}{separator}")]), [foreign], "rustic drops a trailing separator");
         assert_eq!(paths(&[root]), [root]);
         fs::remove_dir_all(dir).unwrap();

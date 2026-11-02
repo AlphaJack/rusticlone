@@ -87,12 +87,6 @@ pub(crate) fn answers_soon(listen: &str) -> bool {
     true
 }
 
-/// The package manager's executable that the macOS app holding `exe` is a copy of: the package manager
-/// updates that one.
-pub(crate) fn app_source(exe: &Path) -> Option<PathBuf> {
-    imp::app_source(exe)
-}
-
 /// Copies the package manager's executable into the macOS app again when it updated it, and says so.
 /// Whether it did: the app then starts again.
 #[cfg(feature = "self-update")]

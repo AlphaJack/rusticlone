@@ -408,7 +408,7 @@ mod tests {
 
     #[test]
     fn restored_below_a_root() {
-        assert_eq!(below_root("/home/me/docs"), PathBuf::from("home/me/docs"));
-        assert_eq!(below_root("relative/x"), PathBuf::from("relative/x"));
+        assert_eq!(below_root("/home/me/docs"), PathBuf::from("home").join("me").join("docs"));
+        assert_eq!(below_root("relative/x"), PathBuf::from("relative").join("x"));
     }
 }

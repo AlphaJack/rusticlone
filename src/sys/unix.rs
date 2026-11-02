@@ -2,12 +2,20 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{HOSTNAME_BUFFER, windows_drive};
+use super::HOSTNAME_BUFFER;
 
 /// `app`'s configuration directory for the system.
 #[expect(clippy::unnecessary_wraps, reason = "Windows's may be unknown")]
 pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
     Some(PathBuf::from("/etc").join(app))
+}
+
+/// The drive letter of a Windows path such as `C:\Users`, and what follows it.
+pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
+    let mut chars = path.chars();
+    let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
+    let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
+    windows.then(|| (letter, path.get(2..).unwrap_or_default()))
 }
 
 /// Whether `path` is an absolute path of another system: a Windows drive's. Its folder has no place here.
@@ -17,7 +25,7 @@ pub(crate) fn foreign_path(path: &str) -> bool {
 
 /// Where `install` places rusticlone for root.
 pub(crate) fn system_bin_dir() -> PathBuf {
-    PathBuf::from("/usr/local/bin")
+    PathBuf::from("/usr").join("local").join("bin")
 }
 
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.
@@ -124,4 +132,29 @@ mod tests {
         assert!(device(root).is_some());
         assert_eq!(device(&root.join("not yet").join("created")), device(root));
     }
+}
+
+/// The system packages' folders, which root can write too.
+#[cfg(any(feature = "desktop", feature = "self-update"))]
+pub(crate) fn system_bins() -> Vec<PathBuf> {
+    vec![Path::new("/usr").join("bin"), PathBuf::from("/bin"), Path::new("/usr").join("sbin")]
+}
+
+/// Windows's alone: a terminal's process here has no console of its own.
+#[cfg(feature = "server")]
+pub(crate) fn release_own_console() {}
+
+/// Read and written by its owner alone.
+#[cfg(any(feature = "server", all(feature = "desktop", feature = "self-update")))]
+const OWNER_ONLY: u32 = 0o600;
+
+/// Lets only this user read and write the file `options` opens.
+#[cfg(any(feature = "server", all(feature = "desktop", feature = "self-update")))]
+pub(crate) fn only_owner(options: &mut std::fs::OpenOptions) {
+    std::os::unix::fs::OpenOptionsExt::mode(options, OWNER_ONLY);
+}
+
+/// Where `app` keeps its state for this user: machine-local, not the purgeable caches.
+pub(crate) fn user_state_dir(base: &impl etcetera::BaseStrategy, app: &str) -> PathBuf {
+    base.state_dir().unwrap_or_else(|| base.data_dir()).join(app)
 }
