@@ -8,7 +8,7 @@ use anyhow::Result;
 use super::download::{fetch, install, untar};
 use crate::{
     i18n::t,
-    rustic::{Cli, bin, downloaded, name, parse_version, pinned},
+    rustic::{Cli, downloaded, install::bin, name, parse_version, pinned},
 };
 
 /// The key that signs rustic's releases (`.sig`), from <https://rustic.cli.rs/docs/nightly_builds.html>.

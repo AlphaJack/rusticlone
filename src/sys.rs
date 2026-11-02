@@ -6,7 +6,6 @@
 use std::sync::LazyLock;
 
 mod disk;
-mod drive;
 mod hash;
 mod paths;
 
@@ -28,7 +27,7 @@ mod windows;
 #[cfg(windows)]
 use windows as os;
 
-pub(crate) use {disk::*, drive::*, hash::*, os::*, paths::*};
+pub(crate) use {disk::*, hash::*, os::*, paths::*};
 
 /// The longest host name, with its NUL.
 const HOSTNAME_BUFFER: usize = 256;

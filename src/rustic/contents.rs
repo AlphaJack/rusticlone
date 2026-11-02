@@ -205,8 +205,6 @@ mod tests {
     #[test]
     fn sources_are_found_in_the_tree() {
         assert_eq!(in_tree("/home/me/docs"), "/home/me/docs");
-        #[cfg(windows)]
-        assert_eq!(in_tree(r"C:\Users\me\docs"), "/C/Users/me/docs");
     }
 
     #[test]

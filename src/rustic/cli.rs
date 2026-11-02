@@ -45,16 +45,8 @@ impl Cli {
     /// Windows would open one for each run, and below normal priority, as systemd's `Nice` and launchd's
     /// `Background` run it elsewhere, so that a backup does not slow down the user.
     pub(crate) fn rustic() -> Command {
-        #[cfg_attr(not(windows), expect(unused_mut, reason = "flagged on Windows only"))]
         let mut cmd = Command::new(super::install::bin());
-        #[cfg(windows)]
-        {
-            use windows_sys::Win32::System::Threading::{BELOW_NORMAL_PRIORITY_CLASS, CREATE_NO_WINDOW};
-            std::os::windows::process::CommandExt::creation_flags(
-                &mut cmd,
-                CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS,
-            );
-        }
+        super::process::quiet(&mut cmd);
         cmd
     }
 
@@ -76,8 +68,7 @@ impl Cli {
             .arg(profile)
             .current_dir(dir)
             .stdin(Stdio::null());
-        #[cfg(unix)]
-        std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+        super::process::own_group(&mut cmd);
         cmd
     }
 
@@ -106,11 +97,9 @@ impl Cli {
         if let Some(stop) = self.stop(cx, command, None) {
             return Err(stop.into());
         }
-        #[cfg(unix)]
-        inherit_locks(cmd, cx);
+        super::process::inherit_locks(cmd, &cx.held());
         let child = cmd.spawn().map_err(Error::CannotRun)?;
-        #[cfg(windows)]
-        super::process::tie(std::os::windows::io::AsRawHandle::as_raw_handle(&child));
+        super::process::tie_spawned(&child);
         log(&format!("rustic {}", args.join(" ")));
 
         let pid = child.id();
@@ -175,23 +164,6 @@ impl Cli {
             None
         }
     }
-}
-
-/// Rustic inherits the run's locks, so that they stay held while it runs, even if this process
-/// is killed. On Windows, rustic ends with this process instead (see `process::tie`).
-#[cfg(unix)]
-fn inherit_locks(cmd: &mut Command, cx: &Ctx) {
-    let locks = cx.held();
-    // SAFETY: only fcntl, async-signal-safe, between fork and exec.
-    #[expect(unsafe_code, reason = "pass lock descriptors through fork and exec with fcntl")]
-    unsafe {
-        std::os::unix::process::CommandExt::pre_exec(cmd, move || {
-            for fd in &locks {
-                libc::fcntl(*fd, libc::F_SETFD, 0);
-            }
-            Ok(())
-        })
-    };
 }
 
 /// Detached threads read rustic's output and wait for its exit. After a kill, processes that rustic
