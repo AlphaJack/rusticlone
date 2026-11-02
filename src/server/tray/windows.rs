@@ -37,8 +37,8 @@ pub(in crate::server) struct Tray {
 }
 
 /// Runs `serve` with the icon when its user runs it; as the system service or under the tests, alone.
-pub(in crate::server) fn beside(open: bool, serve: impl FnOnce(Option<Tray>) -> Result<()>) -> Result<()> {
-    if !super::attended(open) {
+pub(super) fn beside(attended: bool, serve: impl FnOnce(Option<Tray>) -> Result<()>) -> Result<()> {
+    if !attended {
         return serve(None);
     }
     let (shown, received) = mpsc::channel();

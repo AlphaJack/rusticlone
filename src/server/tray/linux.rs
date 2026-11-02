@@ -24,8 +24,8 @@ const LIGHT: u32 = 2;
 pub(in crate::server) struct Tray(Option<Handle<Shown>>);
 
 /// Runs `serve` with the icon when its user runs it; as a system service or under the tests, alone.
-pub(in crate::server) fn beside(open: bool, serve: impl FnOnce(Option<Tray>) -> Result<()>) -> Result<()> {
-    serve(super::attended(open).then_some(Tray(None)))
+pub(super) fn beside(attended: bool, serve: impl FnOnce(Option<Tray>) -> Result<()>) -> Result<()> {
+    serve(attended.then_some(Tray(None)))
 }
 
 /// What the icon shows: the web UI logged in, the collections and the switches, on a dark panel or not.
