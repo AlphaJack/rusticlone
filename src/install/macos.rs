@@ -1,0 +1,24 @@
+//! macOS's keepers: the app's copy of a package manager's executable.
+
+#![expect(clippy::disallowed_methods, reason = "lays out the app")]
+
+use std::path::Path;
+
+use super::managed;
+
+/// The app copies Homebrew's executable, and names it in its resources.
+#[test]
+fn the_macos_apps_copy_of_homebrews_executable_is_managed() {
+    let app = std::env::temp_dir().join(format!("{}-app-{}.app", crate::NAME, std::process::id()));
+    let exe = app.join("Contents/MacOS").join(crate::APP_NAME);
+    std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+    std::fs::create_dir_all(app.join("Contents/Resources")).unwrap();
+    std::fs::write(&exe, b"").unwrap();
+    let mine = managed(&exe);
+    std::fs::write(app.join("Contents/Resources/source"), "/opt/homebrew/bin/rusticlone\nabc123\n").unwrap();
+    let source = crate::install::autostart::app_source(&exe);
+    let found = managed(&exe);
+    std::fs::remove_dir_all(&app).unwrap();
+    assert!(!mine && found);
+    assert_eq!(source, Some(Path::new("/opt/homebrew/bin/rusticlone").to_path_buf()));
+}

@@ -1,4 +1,4 @@
-﻿# Generated from src/install/autostart.rs by cargo xtask generate
+﻿# Generated from src/install/autostart/packaging.rs by cargo xtask generate
 $ErrorActionPreference = 'Stop'
 $restart = Join-Path $env:TEMP 'rusticlone-restart.txt'
 

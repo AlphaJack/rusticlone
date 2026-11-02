@@ -177,7 +177,8 @@ pub(super) mod windows {
             System::Threading::{CreateEventW, INFINITE, WaitForSingleObject},
         };
         // SAFETY: a NUL-terminated name; the event resets itself, and is never closed.
-        let event = unsafe { CreateEventW(std::ptr::null(), 0, 0, crate::install::autostart::stop_event().as_ptr()) };
+        let event =
+            unsafe { CreateEventW(std::ptr::null(), 0, 0, crate::install::autostart::windows::stop_event().as_ptr()) };
         if event.is_null() {
             return;
         }

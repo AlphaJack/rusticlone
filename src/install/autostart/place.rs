@@ -93,6 +93,9 @@ fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
     }
 }
 
+#[cfg(all(test, unix))]
+mod unix;
+
 #[cfg(test)]
 mod tests {
     use std::path::{Path, PathBuf};
@@ -100,17 +103,17 @@ mod tests {
     use super::kept;
 
     /// A folder of its own in the temporary one, removed with its contents.
-    struct Folder(PathBuf);
+    pub(super) struct Folder(pub(super) PathBuf);
 
     impl Folder {
-        fn new(name: &str) -> Self {
+        pub(super) fn new(name: &str) -> Self {
             let dir = std::env::temp_dir().join(format!("{}-{name}-{}", crate::NAME, std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
             Self(dir)
         }
 
         /// An executable at `relative`, with its folders.
-        fn exe(&self, relative: &str) -> PathBuf {
+        pub(super) fn exe(&self, relative: &str) -> PathBuf {
             let exe = self.0.join(relative);
             std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
             std::fs::write(&exe, b"").unwrap();
@@ -124,7 +127,7 @@ mod tests {
         }
     }
 
-    fn path(dirs: &[&Path]) -> std::ffi::OsString {
+    pub(super) fn path(dirs: &[&Path]) -> std::ffi::OsString {
         std::env::join_paths(dirs).unwrap()
     }
 
@@ -144,23 +147,5 @@ mod tests {
         let (cargo, installer) = (folder.exe(".cargo/bin/rusticlone"), folder.0.join(".cargo/bin"));
         assert_eq!(kept(&cargo, &path(&[&folder.0.join("elsewhere")]), Some(&installer)), Some(cargo.clone()));
         assert_eq!(kept(&cargo, &path(&[&folder.0.join("elsewhere")]), None), None);
-    }
-
-    /// As Homebrew's `bin/rusticlone` leads to its `Cellar`: the link outlives the version's folder.
-    #[cfg(unix)]
-    #[test]
-    fn homebrews_executable_stays_named_by_its_link_on_path() {
-        let folder = Folder::new("linked");
-        let exe = folder.exe("Cellar/rusticlone/2.0.1/bin/rusticlone");
-        let bin = folder.0.join("bin");
-        std::fs::create_dir_all(&bin).unwrap();
-        std::os::unix::fs::symlink(&exe, bin.join(crate::NAME)).unwrap();
-        let on_path = path(&[&folder.0.join("elsewhere"), &bin]);
-        assert_eq!(super::linked(&exe, &on_path), Some(bin.join(crate::NAME)));
-        assert_eq!(kept(&exe, &on_path, None), Some(bin.join(crate::NAME)));
-        // Started through the link, as macOS then names it.
-        assert_eq!(kept(&bin.join(crate::NAME), &on_path, None), Some(bin.join(crate::NAME)));
-        // Without a link on `PATH`, where the package manager keeps it, rather than a copy.
-        assert_eq!(kept(&exe, &path(&[&folder.0.join("elsewhere")]), None), Some(exe));
     }
 }

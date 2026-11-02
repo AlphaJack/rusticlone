@@ -16,21 +16,17 @@ const KEY: &str = "RWSWSCEJEEacVeCy0va71hlrVtiW8YzMzOyJeso0Bfy/ZXq5OryWi/8T";
 const RELEASES: &str = "https://github.com/rustic-rs/rustic/releases/download";
 
 /// Rustic's release for this system, as named in its assets. Linux takes the static builds where they exist.
-const TARGET: Option<&str> = if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-    Some("x86_64-unknown-linux-musl")
-} else if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
-    Some("aarch64-unknown-linux-musl")
-} else if cfg!(all(target_os = "linux", target_arch = "arm")) {
-    Some("armv7-unknown-linux-gnueabihf")
-} else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
-    Some("aarch64-apple-darwin")
-} else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
-    Some("x86_64-apple-darwin")
-} else if cfg!(all(windows, target_arch = "x86_64")) {
-    Some("x86_64-pc-windows-msvc")
-} else {
-    None
-};
+fn target() -> Option<&'static str> {
+    match (std::env::consts::OS, std::env::consts::ARCH) {
+        ("linux", "x86_64") => Some("x86_64-unknown-linux-musl"),
+        ("linux", "aarch64") => Some("aarch64-unknown-linux-musl"),
+        ("linux", "arm") => Some("armv7-unknown-linux-gnueabihf"),
+        ("macos", "aarch64") => Some("aarch64-apple-darwin"),
+        ("macos", "x86_64") => Some("x86_64-apple-darwin"),
+        ("windows", "x86_64") => Some("x86_64-pc-windows-msvc"),
+        _ => None,
+    }
+}
 
 #[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
 #[fluent(prefix = "release-error")]
@@ -72,7 +68,7 @@ pub(crate) fn download(ask: bool) -> Result<()> {
         }
         Err(_) => return Ok(()),
     };
-    let Some(target) = TARGET else { return Err(Error::NoRelease.into()) };
+    let Some(target) = target() else { return Err(Error::NoRelease.into()) };
     let short = match &question {
         Ask::Download { .. } => t!("release-short-download", version = version.to_string()),
         Ask::Replace { found, .. } => t!("release-short-replace", found = found.clone(), version = version.to_string()),
@@ -98,7 +94,7 @@ mod tests {
 
     #[test]
     fn this_system_has_a_signed_release() {
-        assert!(TARGET.is_some());
+        assert!(target().is_some());
         assert!(minisign_verify::PublicKey::from_base64(KEY).is_ok());
     }
 }

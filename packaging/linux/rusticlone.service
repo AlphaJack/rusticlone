@@ -1,4 +1,4 @@
-# Generated from src/install/autostart.rs by cargo xtask generate
+# Generated from src/install/autostart/packaging.rs by cargo xtask generate
 [Unit]
 Description=Rusticlone server
 Wants=network-online.target

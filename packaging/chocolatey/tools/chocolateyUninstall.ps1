@@ -1,4 +1,4 @@
-﻿# Generated from src/install/autostart.rs by cargo xtask generate
+﻿# Generated from src/install/autostart/packaging.rs by cargo xtask generate
 $ErrorActionPreference = 'Stop'
 
 # Noted by chocolateyBeforeModify.ps1 for an upgrade's install script, which does not follow an uninstall.

@@ -1,4 +1,7 @@
-use super::{Logged, Path, PathBuf, Result, path_var, run};
+use super::{
+    Path, PathBuf, Removed, Result,
+    unix::{path_var, run},
+};
 use crate::{NAME, sys};
 
 const ICON: &[u8] = include_bytes!("../../../assets/images/logo.svg");
@@ -41,7 +44,7 @@ pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<Pat
     let unit = dir.join(&service);
     if !unit.exists() && !known() {
         std::fs::create_dir_all(&dir)?;
-        std::fs::write(&unit, super::unit())?;
+        std::fs::write(&unit, super::packaging::unit())?;
     }
     let drop_in = dir.join(format!("{service}.d"));
     std::fs::create_dir_all(&drop_in)?;
@@ -55,7 +58,7 @@ pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<Pat
     systemctl(&["enable", &service])?;
     systemctl(&["restart", &service])?;
     if let Some([entry, icon]) = desktop_files()? {
-        for (path, content) in [(&entry, super::desktop_entry(&exe).into_bytes()), (&icon, ICON.to_vec())] {
+        for (path, content) in [(&entry, super::packaging::desktop_entry(&exe).into_bytes()), (&icon, ICON.to_vec())] {
             std::fs::create_dir_all(path.parent().unwrap_or(path))?;
             std::fs::write(path, content)?;
         }
@@ -86,7 +89,7 @@ pub(super) fn start() -> Result<bool> {
 }
 
 /// `None` if not installed.
-pub(super) fn uninstall() -> Result<Option<Logged>> {
+pub(super) fn uninstall() -> Result<Option<Removed>> {
     let (dir, service) = (dir()?, format!("{NAME}.service"));
     let drop_in = dir.join(format!("{service}.d"));
     if !drop_in.join("install.conf").exists() {
@@ -96,12 +99,47 @@ pub(super) fn uninstall() -> Result<Option<Logged>> {
     std::fs::remove_file(drop_in.join("install.conf"))?;
     _ = std::fs::remove_dir(&drop_in);
     // A packaged unit stays.
-    if std::fs::read_to_string(dir.join(&service)).is_ok_and(|u| u == super::unit()) {
+    if std::fs::read_to_string(dir.join(&service)).is_ok_and(|u| u == super::packaging::unit()) {
         std::fs::remove_file(dir.join(&service))?;
     }
     systemctl(&["daemon-reload"])?;
     for file in desktop_files()?.into_iter().flatten() {
         _ = std::fs::remove_file(file);
     }
-    Ok(Some(Logged::Uninstalled { file: drop_in.display().to_string() }))
+    Ok(Some(Removed { file: drop_in.display().to_string(), running: false }))
+}
+
+/// macOS's alone.
+pub(super) fn app_source(_: &Path) -> Option<PathBuf> {
+    None
+}
+
+/// macOS's alone.
+#[cfg(feature = "self-update")]
+#[expect(clippy::unnecessary_wraps, reason = "macOS's copies the executable, which may fail")]
+pub(super) fn refresh_app() -> Result<Option<String>> {
+    Ok(None)
+}
+
+/// macOS's alone.
+#[cfg(feature = "self-update")]
+#[expect(clippy::unnecessary_wraps, reason = "macOS's rewrites the app, which may fail")]
+pub(super) fn rewrite_app(_: &str) -> Result<()> {
+    Ok(())
+}
+
+/// macOS's alone: Login Items.
+pub(super) fn blocked() -> bool {
+    false
+}
+
+/// macOS's alone: an app opened from Finder.
+pub(super) fn opened_as_app() -> bool {
+    false
+}
+
+/// A service manager runs it.
+#[expect(clippy::unnecessary_wraps, reason = "Windows's stops a running server, which may fail")]
+pub(super) fn stop_running(_: &Path) -> Result<()> {
+    Ok(())
 }

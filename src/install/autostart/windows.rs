@@ -14,7 +14,7 @@ use windows_sys::Win32::{
     },
 };
 
-use super::{Logged, Path, PathBuf, Result, exe};
+use super::{Path, PathBuf, Removed, Result};
 use crate::{APP_NAME, NAME, settings, sys};
 
 const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
@@ -217,7 +217,7 @@ fn wait_for(exe: &Path) {
     }
 }
 
-fn uninstall_service() -> Result<Option<Logged>> {
+fn uninstall_service() -> Result<Option<Removed>> {
     let access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
     let service = match manager(ServiceManagerAccess::empty())?.open_service(NAME, access) {
         Err(e) if not_installed(&e) => return Ok(None),
@@ -225,7 +225,7 @@ fn uninstall_service() -> Result<Option<Logged>> {
     };
     stop(&service)?;
     service.delete()?;
-    Ok(Some(Logged::Uninstalled { file: format!(r"HKEY_LOCAL_MACHINE\{SERVICES}\{NAME}") }))
+    Ok(Some(Removed { file: format!(r"HKEY_LOCAL_MACHINE\{SERVICES}\{NAME}"), running: false }))
 }
 
 fn run_key() -> String {
@@ -243,7 +243,7 @@ fn start_menu() -> Result<PathBuf> {
 /// What runs `exe` with `args` without a console window, so that none opens at login or from the Start
 /// menu: `exe` itself from Windows 11 24H2 on, which reads the console policy of its manifest, else Windows's
 /// console host, which gives it a console that has no window.
-fn headless(exe: &str, args: &str) -> (PathBuf, String) {
+fn without_window(exe: &str, args: &str) -> (PathBuf, String) {
     if sys::windows_build() >= CONSOLE_POLICY_BUILD {
         return (PathBuf::from(exe), args.into());
     }
@@ -258,7 +258,7 @@ pub(super) fn install(listen: &str, exe: &Path, serve: &[String]) -> Result<Path
     }
     let exe = exe.display().to_string();
     set_run(&exe, serve)?;
-    let (host, args) = headless(&exe, "serve --open");
+    let (host, args) = without_window(&exe, "serve --open");
     let mut link = mslnk::ShellLink::new(host)?;
     link.set_arguments(Some(args));
     link.set_icon_location(Some(exe.clone()));
@@ -279,7 +279,7 @@ pub(super) fn install(listen: &str, exe: &Path, serve: &[String]) -> Result<Path
 
 /// The `Run` key's value that starts `exe` with `serve` at login.
 fn set_run(exe: &str, serve: &[String]) -> Result<()> {
-    let (host, args) = headless(exe, &serve.join(" "));
+    let (host, args) = without_window(exe, &serve.join(" "));
     set(HKEY_CURRENT_USER, RUN, NAME, REG_SZ, &wide(&format!("\"{}\" {args}", host.display())))
 }
 
@@ -332,15 +332,59 @@ fn keep_own_handles() {
 
 /// `None` if not installed. The server started at login has no service to stop it: it runs until logout.
 #[expect(unsafe_code, reason = "deletes a registry value named by NUL-terminated strings")]
-pub(super) fn uninstall() -> Result<Option<Logged>> {
+pub(super) fn uninstall() -> Result<Option<Removed>> {
     if sys::is_root() {
         return uninstall_service();
     }
     _ = std::fs::remove_file(start_menu()?);
     // SAFETY: NUL-terminated strings.
     match unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, wide(RUN).as_ptr(), wide(NAME).as_ptr()) } {
-        ERROR_SUCCESS => Ok(Some(Logged::UninstalledRunning { file: run_key() })),
+        ERROR_SUCCESS => Ok(Some(Removed { file: run_key(), running: true })),
         ERROR_FILE_NOT_FOUND => Ok(None),
         status => Err(os_error(status).into()),
     }
+}
+
+fn exe() -> Result<String> {
+    Ok(std::env::current_exe()?.to_string_lossy().into_owned())
+}
+
+/// macOS's alone.
+pub(super) fn app_source(_: &Path) -> Option<PathBuf> {
+    None
+}
+
+/// macOS's alone.
+#[cfg(feature = "self-update")]
+#[expect(clippy::unnecessary_wraps, reason = "macOS's copies the executable, which may fail")]
+pub(super) fn refresh_app() -> Result<Option<String>> {
+    Ok(None)
+}
+
+/// macOS's alone.
+#[cfg(feature = "self-update")]
+#[expect(clippy::unnecessary_wraps, reason = "macOS's rewrites the app, which may fail")]
+pub(super) fn rewrite_app(_: &str) -> Result<()> {
+    Ok(())
+}
+
+/// macOS's alone: Login Items.
+pub(super) fn blocked() -> bool {
+    false
+}
+
+/// macOS's alone: an app opened from Finder.
+pub(super) fn opened_as_app() -> bool {
+    false
+}
+
+/// Started by hand or from the `Run` key: nothing supervises it to start.
+#[expect(clippy::unnecessary_wraps, reason = "Linux's and macOS's ask their service manager, which may fail")]
+pub(super) fn start() -> Result<bool> {
+    Ok(false)
+}
+
+/// Linux's alone: a user without a desktop.
+pub(super) fn headless() -> bool {
+    false
 }

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Generated from src/install/autostart.rs by cargo xtask generate -->
+<!-- Generated from src/install/autostart/packaging.rs by cargo xtask generate -->
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
     <id>rusticlone</id>

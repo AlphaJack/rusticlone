@@ -1,4 +1,7 @@
-use super::{Error, Logged, Path, PathBuf, Result, path_var, run};
+use super::{
+    Path, PathBuf, Removed, Result,
+    unix::{path_var, run},
+};
 use crate::{APP_NAME, NAME, sys};
 
 /// What macOS keys the user's approval and the app's permissions on: it never changes.
@@ -208,7 +211,7 @@ pub(super) fn blocked() -> bool {
 
 /// Started now and at load, restarted after a failure, at low priority, as the systemd unit.
 pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
-    let (file, dir) = (plist()?, crate::profile::own_dir().ok_or(Error::NoProfileDir)?);
+    let (file, dir) = (plist()?, crate::profile::own_dir().ok_or(NoProfileDir {})?);
     // rustic's profile directory, so that the server reads no profiles from wherever it started.
     std::fs::create_dir_all(&dir)?;
     // Stopped before its app is replaced. Loaded already when installed before.
@@ -271,7 +274,7 @@ pub(super) fn start() -> Result<bool> {
 }
 
 /// `None` if not installed.
-pub(super) fn uninstall() -> Result<Option<Logged>> {
+pub(super) fn uninstall() -> Result<Option<Removed>> {
     let file = plist()?;
     if !file.exists() {
         return Ok(None);
@@ -280,5 +283,80 @@ pub(super) fn uninstall() -> Result<Option<Logged>> {
     _ = run("launchctl", &["bootout", &format!("{}/{NAME}", domain())]);
     std::fs::remove_file(&file)?;
     _ = std::fs::remove_dir_all(app()?);
-    Ok(Some(Logged::Uninstalled { file: file.display().to_string() }))
+    Ok(Some(Removed { file: file.display().to_string(), running: false }))
+}
+
+/// rustic's profile folder is unknown, so the server would read no profiles.
+#[derive(Debug, thiserror::Error, crate::i18n::Fluent)]
+#[fluent(prefix = "autostart-error-no-profile-dir")]
+pub(crate) struct NoProfileDir {}
+
+/// Whether this is the app opened from Finder or Spotlight, which passes no arguments.
+pub(super) fn opened_as_app() -> bool {
+    let inside = format!("Contents/MacOS/{APP_NAME}");
+    std::env::args_os().len() == 1 && std::env::current_exe().is_ok_and(|exe| exe.ends_with(inside))
+}
+
+/// launchd runs it.
+#[expect(clippy::unnecessary_wraps, reason = "Windows's stops a running server, which may fail")]
+pub(super) fn stop_running(_: &Path) -> Result<()> {
+    Ok(())
+}
+
+/// Linux's alone: a user without a desktop.
+pub(super) fn headless() -> bool {
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_keywords_fit_a_short_property_list() {
+        let keywords: Vec<&str> = env!("KEYWORDS").split(';').collect();
+        let plist = super::bplist(&keywords).expect("Cargo.toml's keywords are few, short and ASCII");
+        assert!(
+            plist.starts_with(b"bplist00")
+                && keywords.iter().all(|k| plist.windows(k.len()).any(|w| w == k.as_bytes()))
+        );
+    }
+
+    /// The app copies Homebrew's executable and signs the copy, which changes it: the app is not stale then, else
+    /// each start would copy it again and restart. It is once Homebrew upgrades its executable.
+    #[test]
+    fn the_app_copies_homebrews_executable_again_only_once_it_changed() {
+        let dir = std::env::temp_dir().join(format!("{}-brew-app-{}", crate::NAME, std::process::id()));
+        let (app, cellar) = (dir.join(format!("{}.app", crate::APP_NAME)), dir.join("Cellar/rusticlone/2.0.1/bin"));
+        std::fs::create_dir_all(&cellar).unwrap();
+        let source = cellar.join(crate::NAME);
+        std::fs::copy("/usr/bin/true", &source).unwrap();
+        let exe = super::bundle(&app, &source, "2.0.1").unwrap();
+        let signed_copy_differs = std::fs::read(&exe).unwrap() != std::fs::read(&source).unwrap();
+        let after_install = super::stale(&exe);
+        std::fs::copy("/usr/bin/false", &source).unwrap();
+        let after_upgrade = super::stale(&exe);
+        std::fs::remove_dir_all(dir).unwrap();
+        assert!(signed_copy_differs, "codesign no longer changes the copy: the test proves less");
+        assert_eq!(after_install, None);
+        assert_eq!(after_upgrade, Some(source));
+    }
+
+    /// An update replaces the executable inside the app, which breaks its signature: written again, the app
+    /// shows the new version and its signature holds.
+    #[test]
+    fn the_app_is_signed_again_around_a_new_executable() {
+        let dir = std::env::temp_dir().join(format!("{}-app-{}", crate::NAME, std::process::id()));
+        let app = dir.join(format!("{}.app", crate::APP_NAME));
+        let signed = || {
+            let verify = std::process::Command::new("codesign").args(["--verify", "--strict"]).arg(&app).output();
+            verify.unwrap().status.success()
+        };
+        let exe = super::bundle(&app, std::path::Path::new("/usr/bin/true"), "1.0.0").unwrap();
+        assert!(signed());
+        std::fs::copy("/usr/bin/false", &exe).unwrap();
+        assert!(!signed());
+        super::bundle(&app, &exe, "1.0.1").unwrap();
+        let info = std::fs::read_to_string(app.join("Contents").join("Info.plist")).unwrap();
+        assert!(signed() && info.contains("<string>1.0.1</string>"));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
 }
