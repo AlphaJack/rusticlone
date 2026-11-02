@@ -11,7 +11,7 @@ The README is the only public document for now, so it has to be a complete guide
 ```sh
 cargo install cargo-binstall
 rustup component add rust-analyzer # needed by cargo xtask acyclic
-cargo binstall cargo-nextest cargo-insta rustic-rs cargo-deny cargo-mutants
+cargo binstall cargo-nextest cargo-insta rustic-rs cargo-deny
 ```
 
 Or open the repository in its dev container (`.devcontainer`), which sets all of this up on Linux.
@@ -98,7 +98,6 @@ cargo xtask fixtures     # record the installed rustic's output into tests/fixtu
 cargo insta review       # check changed snapshots and accept them
 cargo xtask vendor       # download htmx
 cargo xtask acyclic      # find dependency cycles between modules and between items
-git diff main > ../my.diff && cargo mutants --profile mutants --in-diff ../my.diff -- --lib  # find changed lines the tests miss, as the PR check does
 cargo xtask translations # list the messages each translation lacks, shown in English
 cargo xtask screenshots  # take the README's screenshots anew, in Docker, in about 25 minutes
 cargo xtask screenshots --setup              # or keep the computer they show running,

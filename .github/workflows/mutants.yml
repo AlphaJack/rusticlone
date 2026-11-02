@@ -1,48 +1,62 @@
 name: Mutants
 
-# Changes the lines a pull request changes, one mutation at a time, and lists those its unit tests do not
-# catch. Not a required check: a miss is for the author to weigh.
+# Changes the library one mutation at a time and lists those that no test catches, unit or integration.
+# On Saturday at 01:00 in Berlin's winter time, when nothing else runs, 8 shards at a time so that other
+# workflows still find runners. Everything it needs is in this file.
 on:
-  pull_request:
+  schedule:
+    - cron: "0 0 * * 6"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: mutants-${{ github.ref }}
-  cancel-in-progress: true
+  group: mutants
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
+  # Each mutant is built anew: debug info only slows every build and link.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
   mutants:
+    name: mutants (${{ matrix.shard }}/32)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: "stable"
-      - name: Install cargo-nextest and cargo-mutants
+      - name: Install cargo-nextest, cargo-mutants and cargo-binstall
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
-          tool: cargo-nextest,cargo-mutants
-      - name: Diff against the base branch
+          tool: cargo-nextest,cargo-mutants,cargo-binstall
+      # The rustic pinned in Cargo.toml, which the integration tests run.
+      - name: Install rustic
         env:
-          BASE: ${{ github.event.pull_request.base.sha }}
-        run: git diff "$BASE...HEAD" > "$RUNNER_TEMP/pr.diff"
-      - name: Mutate the changed lines
-        run: cargo mutants --profile mutants --test-tool nextest --in-diff "$RUNNER_TEMP/pr.diff" -- --lib
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
+      - name: Mutate the library
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: cargo mutants --test-tool nextest --shard "$SHARD/32" --no-shuffle
       - name: Upload what the tests missed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: mutants
+          name: mutants-${{ matrix.shard }}
           path: mutants.out
