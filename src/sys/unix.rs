@@ -2,12 +2,20 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{HOSTNAME_BUFFER, windows_drive};
+use super::HOSTNAME_BUFFER;
 
 /// `app`'s configuration directory for the system.
 #[expect(clippy::unnecessary_wraps, reason = "Windows's may be unknown")]
 pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
     Some(PathBuf::from("/etc").join(app))
+}
+
+/// The drive letter of a Windows path such as `C:\Users`, and what follows it.
+pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
+    let mut chars = path.chars();
+    let (letter, colon, separator) = (chars.next()?, chars.next()?, chars.next()?);
+    let windows = letter.is_ascii_alphabetic() && colon == ':' && (separator == '\\' || separator == '/');
+    windows.then(|| (letter, path.get(2..).unwrap_or_default()))
 }
 
 /// Whether `path` is an absolute path of another system: a Windows drive's. Its folder has no place here.

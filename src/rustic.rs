@@ -7,10 +7,18 @@ mod commands;
 #[cfg(feature = "server")]
 mod contents;
 mod ctx;
-mod install;
+pub(crate) mod install;
 mod output;
 mod process;
 mod snapshot;
+#[cfg(unix)]
+mod unix;
+#[cfg(unix)]
+use unix as os;
+#[cfg(windows)]
+mod windows;
+#[cfg(windows)]
+use windows as os;
 
 pub(crate) use cli::Cli;
 use cli::shell_word;
@@ -22,8 +30,6 @@ pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
 #[cfg(feature = "server")]
 use contents::{diff, dirs, found};
 pub(crate) use ctx::{Ctx, Origin, RunHandle, Stop};
-#[cfg(any(feature = "self-update", all(windows, feature = "desktop")))]
-pub(crate) use install::bin;
 use install::minor;
 pub(crate) use install::{TESTED, Untested};
 #[cfg(feature = "self-update")]
@@ -270,23 +276,5 @@ mod tests {
         ] {
             assert_eq!(shell_word(OsStr::new(word)), expected);
         }
-    }
-}
-
-#[cfg(test)]
-mod path_tests {
-    use super::tree_path;
-
-    /// A Windows folder restores on macOS and Linux by its name in the tree. Each system's own stays as it is.
-    #[test]
-    fn windows_folders_are_named_as_the_tree_names_them() {
-        if cfg!(windows) {
-            assert_eq!(tree_path(r"C:\Users\me"), r"C:\Users\me");
-        } else {
-            assert_eq!(tree_path(r"C:\Users\me\Résumé"), "/C/Users/me/Résumé");
-            assert_eq!(tree_path("d:/data"), "/d/data");
-        }
-        assert_eq!(tree_path("/home/me"), "/home/me");
-        assert_eq!(tree_path("C:relative"), "C:relative");
     }
 }
