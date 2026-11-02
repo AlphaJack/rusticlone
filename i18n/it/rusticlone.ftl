@@ -69,9 +69,6 @@ cli-step-delete = eliminando lo stato
 cli-step-update = aggiornando rusticlone
 cli-step-check-update = cercando una versione più recente
 cli-refresh = aggiornamento
-# The answers a question in a terminal takes, and the one that says yes.
-cli-yes-no = [s/N]
-cli-yes = s
 cli-ask-keep = Copiare { $files } in { $dir } così che { -name } li trovi da qualsiasi cartella?
 collections-directories = Cartelle dei profili
 collections-here = { $dir } ({ profile-here })

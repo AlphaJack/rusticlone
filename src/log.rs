@@ -297,10 +297,10 @@ pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
     #[cfg(not(any(feature = "server", feature = "self-update")))]
     let _ = short;
     hold(|| {
-        eprint!("{question} {} ", crate::i18n::t!("cli-yes-no"));
+        eprint!("{question} [y/N] ");
         let mut answer = String::new();
         std::io::stdin().read_line(&mut answer)?;
-        Ok(answer.trim().eq_ignore_ascii_case(&crate::i18n::t!("cli-yes")))
+        Ok(answer.trim().eq_ignore_ascii_case("y"))
     })
 }
 

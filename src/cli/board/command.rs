@@ -116,7 +116,7 @@ fn shown(shown: Shown<'_>) {
 fn ask(question: &str) -> std::io::Result<bool> {
     let rows = COMMAND.lock().as_ref().map(|command| {
         let mut branches = command.done.clone();
-        branches.push(Tree::leaf(format!("{} {question} {}", Tone::Running.dot(), crate::i18n::t!("cli-yes-no"))));
+        branches.push(Tree::leaf(format!("{} {question} [y/N]", Tone::Running.dot())));
         lines(&command.label, &branches)
     });
     let answer = log::prompt(rows.unwrap_or_default())?;
