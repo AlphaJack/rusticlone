@@ -164,7 +164,7 @@ mod tests {
     #[test]
     #[expect(clippy::disallowed_methods, reason = "reads the workflow that the constant names")]
     fn the_release_workflow_attests_its_archives() {
-        let workflow = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(super::WORKFLOW));
+        let workflow = std::fs::read_to_string(crate::tests::root().join(super::WORKFLOW));
         assert!(workflow.unwrap().contains("actions/attest"));
     }
 }

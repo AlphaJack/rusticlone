@@ -20,7 +20,11 @@ pub(crate) fn as_root() -> bool {
 }
 
 pub(crate) const NAME: &str = env!("CARGO_PKG_NAME");
-const BIN: &str = env!("CARGO_BIN_EXE_rusticlone");
+/// The executable as nextest names it where it unpacked an archive of the tests, else where cargo built it.
+#[expect(clippy::disallowed_methods, reason = "where nextest put the executable")]
+fn bin() -> PathBuf {
+    env::var_os("NEXTEST_BIN_EXE_rusticlone").map_or_else(|| env!("CARGO_BIN_EXE_rusticlone").into(), Into::into)
+}
 
 /// The environment variable `key`, with our prefix.
 pub(crate) fn var(key: &str) -> String {
@@ -350,7 +354,7 @@ impl Sandbox {
         }
     }
 
-    pub(crate) fn command(&self, program: &str) -> Command {
+    pub(crate) fn command(&self, program: impl AsRef<std::ffi::OsStr>) -> Command {
         let mut cmd = Command::new(program);
         cmd.env_clear()
             .env("PATH", env::var_os("PATH").unwrap_or_default())
@@ -386,7 +390,7 @@ impl Sandbox {
 
     /// In its own process group on Windows, which [`signal`] sends Ctrl-Break to.
     pub(crate) fn spawn(&self, args: &[&str], envs: &[(&str, &str)]) -> std::process::Child {
-        let mut cmd = self.command(BIN);
+        let mut cmd = self.command(bin());
         cmd.arg("--json")
             .args(args)
             .envs(envs.iter().copied())
@@ -405,13 +409,13 @@ impl Sandbox {
     }
 
     pub(crate) fn run_with(&self, args: &[&str], envs: &[(&str, &str)]) -> Run {
-        let out = self.command(BIN).arg("--json").args(args).envs(envs.iter().copied()).output().unwrap();
+        let out = self.command(bin()).arg("--json").args(args).envs(envs.iter().copied()).output().unwrap();
         to_run(&out)
     }
 
     /// One invocation as a person reads it: text, without `--json`.
     pub(crate) fn run_text(&self, args: &[&str]) -> Run {
-        to_run(&self.command(BIN).args(args).output().unwrap())
+        to_run(&self.command(bin()).args(args).output().unwrap())
     }
 
     pub(crate) fn rustic(&self, args: &[&str]) -> Output {
