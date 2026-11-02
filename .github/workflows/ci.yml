@@ -88,11 +88,7 @@ jobs:
       run:
         shell: bash
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      # Before anything is installed, built or written, so that no scanner reads it.
+      # Before anything is checked out, installed, built or written, so that no scanner reads it.
       - name: Turn off Defender's scanners
         if: runner.os == 'Windows'
         shell: pwsh
@@ -100,6 +96,10 @@ jobs:
           Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true
           -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true
           -DisableBlockAtFirstSeen $true
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
@@ -164,16 +164,16 @@ jobs:
     name: clippy (windows-latest)
     runs-on: windows-latest
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Turn off Defender's scanners
         shell: pwsh
         run: >
           Set-MpPreference -DisableRealtimeMonitoring $true -DisableBehaviorMonitoring $true
           -DisableIOAVProtection $true -DisableScriptScanning $true -DisableArchiveScanning $true
           -DisableBlockAtFirstSeen $true
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
