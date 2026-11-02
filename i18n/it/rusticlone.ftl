@@ -706,7 +706,6 @@ autostart-unit-description = Server { -app }
 app-description = Backup 3-2-1-1-0 pianificati per desktop e server, basati su profili rustic, con interfaccia e notifiche
 tray-open = Apri { -app }
 tray-quit = Esci (sospende i backup automatici)
-switch-at-boot = Avvia all'accensione
 switch-at-login = Avvia all'accesso
 switch-auto-update = Aggiorna automaticamente
 attest-over-digest = { $scheme } su un digest
