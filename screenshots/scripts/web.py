@@ -33,7 +33,7 @@ def dialog(page: Page, title: str, name: str) -> None:
 
 def pages(page: Page) -> None:
     page.goto(URL)
-    # The README's first picture: the collections, without the recent runs below them.
+    # The book's first picture: the collections, without the recent runs below them.
     runs = page.locator("#recent-runs").bounding_box()
     shot(page, "collections", full_page=False, clip={"x": 0, "y": 0, "width": 1200, "height": runs["y"] - 8})
     page.goto(DOCUMENTS)

@@ -6,6 +6,22 @@ use etcetera::BaseStrategy;
 
 use super::{HOSTNAME_BUFFER, fnv1a};
 
+/// Whether a variable moved one of the XDG folders: only Linux reads them.
+#[cfg(test)]
+pub(crate) fn xdg_moved() -> bool {
+    false
+}
+
+/// How the book writes `path`: under the folder a variable names, `%APPDATA%\rustic`.
+#[cfg(test)]
+#[expect(clippy::disallowed_methods, reason = "the book names folders by the variables that hold them")]
+pub(crate) fn as_documented(path: &Path) -> String {
+    let vars = ["LOCALAPPDATA", "APPDATA", "PROGRAMDATA", "WINDIR"];
+    vars.iter()
+        .find_map(|var| Some(format!("%{var}%\\{}", path.strip_prefix(std::env::var_os(var)?).ok()?.display())))
+        .unwrap_or_else(|| path.display().to_string())
+}
+
 /// `app`'s configuration directory for this user, laid out as the `directories` crate that rustic uses lays
 /// it out.
 pub(crate) fn user_config_dir(base: &impl BaseStrategy, app: &str) -> PathBuf {
