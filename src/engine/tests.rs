@@ -468,3 +468,209 @@ fn a_request_joins_the_same_one_queued() {
     let checks = [ask(Request::Check(vec![("Docs".into(), None)])), ask(Request::Check(vec![("Docs".into(), None)]))];
     assert!(checks.iter().all(|c| matches!(c, Asked::Queued(_))));
 }
+
+/// The profile of `DOCS` with these settings, as `[global.env]`.
+fn docs_with(settings: &[(&crate::settings::Setting, &str)]) -> String {
+    let env: String = settings.iter().map(|(s, v)| format!("{} = \"{v}\"\n", s.key)).collect();
+    format!("{DOCS}[global.env]\n{env}")
+}
+
+/// `key` attempted now with `result`, by a scheduled run if `scheduled`.
+fn attempted(engine: &Engine, key: crate::request::StepKey, result: &crate::result::StepResult, scheduled: bool) {
+    use crate::state::{Event, RunStep};
+    let (at, by) =
+        (engine.store.now(), scheduled.then(|| RunStep { collection: "Docs".into(), run: 1, step: None, scheduled }));
+    engine.store.apply(&[Event::Attempted { key, started: at, at, result: result.into(), by }]).unwrap();
+}
+
+fn backed_up() -> crate::result::StepResult {
+    crate::result::StepResult::BackedUp { repo: "Docs".into(), snapshots: vec![], new_repository: false }
+}
+
+fn failed() -> crate::result::StepResult {
+    crate::result::StepResult::Error { error: "repository unreachable".into() }
+}
+
+fn at(time: &str) -> jiff::Timestamp {
+    time.parse().unwrap()
+}
+
+/// A backup never made is due now, so nothing is due next. After one, the schedule's next time is.
+#[test]
+fn the_next_run_is_after_now() {
+    use crate::request::StepKey;
+    let engine = engine_with("next-due", &Replay::new(), &docs_with(&[(&crate::settings::BACKUP, "@daily")]));
+    let collection = &engine.collections()[0];
+    assert_eq!(engine.next_due(collection), None, "due now");
+    attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    assert_eq!(engine.next_due(collection), Some((Request::Backup, at("2026-10-17T00:00:00Z"))));
+}
+
+/// A failed copy is due again at its retry, not at once.
+#[test]
+fn a_failed_copy_waits_for_its_retry() {
+    use crate::request::StepKey;
+    let engine = engine("copy-retry", &Replay::new());
+    let collection = &engine.collections()[0];
+    let key = StepKey::Copy("Docs".into(), "Docs-usb".into());
+    attempted(&engine, key.clone(), &failed(), false);
+    let retry = engine.store.load().last_step(&key).unwrap().retry_at().unwrap();
+    assert!(retry > engine.store.now());
+    assert_eq!(engine.next_due(collection), Some((Request::Copy("Docs".into()), retry)));
+}
+
+/// Maintenance never run is due a schedule after the schedule was first seen, even if no process was
+/// running at that time.
+#[test]
+fn maintenance_is_due_after_its_schedule_was_first_seen() {
+    let engine = engine_with("first-seen", &Replay::new(), &docs_with(&[(&crate::settings::CHECK, "@daily")]));
+    let collection = &engine.collections()[0];
+    assert_eq!(engine.next_due(collection).map(|(_, at)| at), Some(at("2026-10-17T00:00:00Z")));
+    engine.store.wait(std::time::Duration::from_hours(13), &|| false);
+    assert_eq!(engine.due_next(collection, &[]).unwrap(), Some(Request::Check(vec![("Docs".into(), None)])));
+}
+
+/// With a backup schedule, a repository is stale once the schedule fired twice since its last backup.
+/// Without one, after a week.
+#[test]
+fn a_repository_is_stale_after_two_scheduled_backups_or_a_week() {
+    use crate::request::StepKey;
+    let stale_at = |test: &str, docs: &str| {
+        let engine = engine_with(test, &Replay::new(), docs);
+        attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+        let status = engine.status_of(&engine.collections()[0]);
+        let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
+        (status.primary.stale_at, changes)
+    };
+    let daily = docs_with(&[(&crate::settings::BACKUP, "@daily")]);
+    assert_eq!(stale_at("stale-scheduled", &daily).0, Some(at("2026-10-18T00:00:00Z")));
+    let week = at("2026-10-23T12:00:00Z");
+    assert_eq!(stale_at("stale-unscheduled", DOCS), (Some(week), Some(week)), "and the status changes then");
+}
+
+/// A repository that is missing shows once: not again through the failures of its steps, nor those of the
+/// copies that read it. Another repository's failures still show.
+#[test]
+fn a_missing_repository_hides_the_failures_it_causes() {
+    use crate::request::StepKey;
+    let missing = DOCS.replace("rest:http://backup/docs", "/nonexistent/docs");
+    let engine = engine_with("missing-hides", &Replay::new(), &missing);
+    attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    for key in [
+        StepKey::Check("Docs".into()),
+        StepKey::Copy("Docs".into(), "Docs-usb".into()),
+        StepKey::Check("Docs-usb".into()),
+    ] {
+        attempted(&engine, key, &failed(), false);
+    }
+    let issues = engine.status_of(&engine.collections()[0]).issues;
+    assert!(issues.iter().any(|i| matches!(i, super::Issue::Missing { repo, .. } if repo == "Docs")), "{issues:?}");
+    let steps: Vec<_> = issues.iter().filter_map(super::Issue::step).collect();
+    assert_eq!(steps, [&StepKey::Check("Docs-usb".into())]);
+}
+
+/// Listed without a snapshot: never backed up. Not before the first listing, which may find some.
+#[test]
+fn a_listed_primary_without_snapshots_was_never_backed_up() {
+    let engine = engine("never-backed-up", &Replay::new());
+    let collection = &engine.collections()[0];
+    let never = || engine.status_of(collection).issues.iter().any(|i| matches!(i, super::Issue::NeverBackedUp));
+    assert!(!never());
+    let inventory =
+        crate::state::Inventory { listed: engine.store.now(), result: Err("offline".into()), size_outdated: false };
+    engine.store.save_inventory("Docs", "Docs", &inventory).unwrap();
+    assert!(never());
+}
+
+/// A notification error shows only while sends fail.
+#[test]
+fn an_undelivered_notification_shows_while_it_fails() {
+    let engine =
+        engine_with("undelivered", &Replay::new(), &docs_with(&[(&crate::settings::NOTIFY, "json://127.0.0.1:1")]));
+    let collection = &engine.collections()[0];
+    let undelivered = |failures| {
+        let notified = crate::state::Notified { failures, error: Some("refused".into()), ..Default::default() };
+        engine.store.update_notified("Docs", |_| notified.clone()).unwrap();
+        engine.status_of(collection).issues.iter().any(|i| matches!(i, super::Issue::Undelivered { .. }))
+    };
+    assert!(!undelivered(0));
+    assert!(undelivered(1));
+}
+
+/// An unreadable profile is a failing collection of its own, named after it.
+#[test]
+fn an_unreadable_profile_fails() {
+    let store = Store::at(crate::sys::test_dir("engine-broken")).unwrap();
+    let engine = Engine::with_profiles(
+        Rustic::with_runner(Arc::new(Replay::default())),
+        store,
+        Runs::new(|_| {}),
+        BTreeMap::new(),
+        vec![("Bad".into(), "expected `=`".into())],
+        Vec::new(),
+        Named::default(),
+    );
+    let status = engine.status();
+    let [bad] = status.as_slice() else { panic!("one collection") };
+    assert_eq!((bad.title.as_str(), bad.level), ("Bad", Level::Failure));
+    assert!(matches!(bad.issues.as_slice(), [super::Issue::Unreadable { error }] if error == "expected `=`"));
+    assert_eq!(engine.report_broken(), Level::Failure);
+}
+
+/// A scheduled first failure is reported once its retry is late, and the agenda wakes then. Not after.
+#[cfg(feature = "server")]
+#[test]
+fn the_agenda_wakes_when_a_pending_failure_is_reported() {
+    use crate::request::StepKey;
+    let engine = engine("agenda-pending", &Replay::new());
+    let key = StepKey::Check("Docs".into());
+    attempted(&engine, key.clone(), &failed(), true);
+    let until = engine.store.load().last_step(&key).unwrap().pending_until().unwrap();
+    let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
+    assert_eq!(changes, Some(until), "the status changes then");
+    assert_eq!(engine.agenda(engine.store.now()).1, Some(until));
+    assert_eq!(engine.agenda(until).1, None);
+}
+
+/// The agenda wakes when a repository becomes stale, and not after.
+#[cfg(feature = "server")]
+#[test]
+fn the_agenda_wakes_when_a_repository_becomes_stale() {
+    use crate::request::StepKey;
+    let engine = engine("agenda-stale", &Replay::new());
+    attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    let week = at("2026-10-23T12:00:00Z");
+    assert_eq!(engine.agenda(engine.store.now()).1, Some(week));
+    assert_eq!(engine.agenda(week).1, None);
+}
+
+/// A queued run waits for the running ones that hold its locks, and for the same request queued before
+/// it. Not for other requests queued, even with a shared lock, nor for those queued after it.
+#[test]
+fn a_queued_run_waits_for_its_locks_and_the_same_request_before_it() {
+    use crate::result::{Doing, Status};
+    let engine = engine("queued-wait", &Replay::new());
+    let collections = engine.collections();
+    let ask = |request: &Request| match engine.ask(&collections[0], request, Trigger::Cli).unwrap() {
+        Asked::Queued(queued) => queued,
+        Asked::Joined(_) => panic!("joined"),
+    };
+    let waits_for = |own: &crate::state::RunLog| -> Vec<Option<Status>> {
+        let Doing::WaitingFor { by, .. } =
+            engine.queued_wait(&engine.store.queue(Some("Docs")), &own.record, &own.request)
+        else {
+            panic!("not waiting")
+        };
+        by.into_iter().map(|h| h.status).collect()
+    };
+    let check = Request::Check(vec![("Docs".into(), None)]);
+    let mut prune = ask(&Request::Prune(vec!["Docs".into()]));
+    let mut backup = ask(&Request::Backup);
+    let (copy, first, second) = (ask(&Request::Copy("Docs".into())), ask(&check), ask(&check));
+    assert!(waits_for(&copy).is_empty(), "a backup queued before, which also copies");
+    assert!(waits_for(&first).is_empty(), "a prune queued before, and a check after");
+    assert_eq!(waits_for(&second), [Some(Status::Queued)]);
+    backup.start();
+    prune.start();
+    assert_eq!(waits_for(&copy), [Some(Status::Running)], "the backup, not the prune");
+}

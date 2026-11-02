@@ -663,4 +663,37 @@ mod tests {
         }
         fs::remove_dir_all(&a.dir).unwrap();
     }
+
+    /// A new state records what reading it takes, for older versions to refuse it if they cannot.
+    #[test]
+    fn a_new_state_records_what_reading_it_takes() {
+        let a = store("readable-from-test");
+        for (name, _, readable_from) in kinds() {
+            let stored = a.read(|r| Ok(r.open_table(READABLE_FROM)?.get(name)?.map(|v| v.value()))).unwrap();
+            assert_eq!(stored, Some(readable_from), "{name}");
+        }
+        fs::remove_dir_all(&a.dir).unwrap();
+    }
+
+    /// A session is valid until it expires, and adding one keeps the others valid.
+    #[test]
+    fn a_session_is_valid_until_it_expires() {
+        let a = store("sessions-test");
+        let (now, hour) = (a.now(), jiff::SignedDuration::from_hours(1));
+        a.add_session("valid", now + hour, "a").unwrap();
+        a.add_session("other", now + hour, "b").unwrap();
+        a.add_session("expiring", now, "c").unwrap();
+        assert_eq!(a.session("valid").as_deref(), Some("a"));
+        assert_eq!(a.session("expiring"), None, "expires now");
+        fs::remove_dir_all(&a.dir).unwrap();
+    }
+
+    /// A notification is sent again only after a failed send.
+    #[test]
+    fn a_notification_is_retried_only_after_a_failure() {
+        let now = Timestamp::from_second(1_800_000_000).unwrap();
+        let notified = |failures| Notified { failures, last_attempt: Some(now), ..Notified::default() };
+        assert_eq!(notified(0).retry_at(), None);
+        assert!(notified(1).retry_at() > Some(now));
+    }
 }

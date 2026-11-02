@@ -253,3 +253,46 @@ pub(super) enum Use {
     /// Repacks: exclusive, and reads and writes data.
     Prune,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use super::{holders, wait_changed};
+    use crate::{
+        request::{Request, Trigger},
+        result::{Doing, Holder},
+        state::{RunLog, Store},
+    };
+
+    /// Runs of one process and trigger are one holder, with each lock once.
+    #[test]
+    fn a_process_holds_each_of_its_locks_once() {
+        let store = Store::at(crate::sys::test_dir("holders")).unwrap();
+        let run = |trigger| RunLog::new(&store, "Docs", Request::Backup, trigger).record.clone();
+        let (a, b) = (String::from("repo:Docs"), String::from("upload"));
+        let by = holders(
+            [(run(Trigger::Cli), &a), (run(Trigger::Cli), &a), (run(Trigger::Cli), &b), (run(Trigger::Web), &a)],
+            false,
+        );
+        let held: Vec<(Trigger, Vec<String>)> = by.into_iter().map(|h: Holder| (h.trigger, h.locks)).collect();
+        assert_eq!(held, [(Trigger::Cli, vec![a.clone(), b]), (Trigger::Web, vec![a])]);
+    }
+
+    /// A wait is shown when it starts or changes. Not again, nor once its holders are gone: the lock is
+    /// released a moment later.
+    #[test]
+    fn a_wait_is_shown_when_it_changes() {
+        let last = RefCell::new(None);
+        let waiting = |lock: &str| Doing::WaitingFor { lock: lock.into(), by: Vec::new() };
+        let held = Doing::WaitingFor {
+            lock: "upload".into(),
+            by: vec![Holder { trigger: Trigger::Cli, pid: 1, locks: vec!["upload".into()], status: None }],
+        };
+        assert!(wait_changed(&last, "Docs", &waiting("upload")), "first");
+        assert!(!wait_changed(&last, "Docs", &waiting("upload")), "the same");
+        assert!(wait_changed(&last, "Docs", &held));
+        assert!(!wait_changed(&last, "Docs", &held), "the same");
+        assert!(!wait_changed(&last, "Docs", &waiting("download")), "its holders ended");
+    }
+}
