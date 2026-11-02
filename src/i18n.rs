@@ -2,6 +2,9 @@
 //! message. The [`t!`] macro and `#[derive(Fluent)]` check at build time that each message is in the English
 //! one. The process's language is the user's; a page's is its visitor's ([`Language::accepted`]).
 
+#[cfg(all(feature = "server", any(target_os = "linux", test)))]
+pub(crate) mod packages;
+
 use std::{
     cell::Cell,
     sync::{Arc, LazyLock},
@@ -87,12 +90,6 @@ impl Language {
         Self(chosen.first().and_then(|language| found(language)).or_else(|| found(&fallback)).unwrap_or(&LOADER))
     }
 
-    /// The language every message is in, for what is the same for everyone, such as the files packages install.
-    #[cfg(all(feature = "server", any(target_os = "linux", test)))]
-    pub(crate) fn english() -> Self {
-        Self::accepted("")
-    }
-
     /// [`Self::scope`]'s, else a request's, else the process's.
     pub(crate) fn current() -> Self {
         #[cfg(feature = "server")]
@@ -138,19 +135,6 @@ fn requested(var: impl Fn(&str) -> Option<String>) -> Option<Vec<LanguageIdentif
 /// Message `id` with `args`, which the macros check.
 pub(crate) fn text<const N: usize>(id: &str, args: [(&'static str, FluentValue<'static>); N]) -> String {
     Language::current().0.get_args_fluent(id, (N > 0).then(|| args.into_iter().collect::<FluentArgs<'_>>()).as_ref())
-}
-
-/// Message `id` in each translation whose own catalog has it, by language: `[("it", "…")]`.
-#[cfg(all(feature = "server", any(target_os = "linux", test)))]
-pub(crate) fn translations(id: &str) -> Vec<(String, String)> {
-    let fallback = fallback();
-    let own = |language: &LanguageIdentifier, loader: &FluentLanguageLoader| {
-        loader.with_message_iter(language, |mut messages| Iterator::any(&mut messages, |m| m.id.name == id))
-    };
-    (LOADERS.iter())
-        .filter(|(language, loader)| *language != fallback && own(language, loader))
-        .map(|(language, loader)| (language.to_string(), Language(loader).scope(|| text(id, []))))
-        .collect()
 }
 
 /// Message `id`, if the catalog has it: for ids made at run time, which tests check.

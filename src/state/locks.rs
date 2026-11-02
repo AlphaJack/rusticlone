@@ -37,16 +37,6 @@ pub struct RepoLocks<'a> {
     cx: &'a Ctx,
 }
 
-#[cfg(unix)]
-fn fds(files: &[File]) -> Vec<i32> {
-    files.iter().map(std::os::fd::AsRawFd::as_raw_fd).collect()
-}
-
-#[cfg(not(unix))]
-fn fds(_: &[File]) -> Vec<i32> {
-    Vec::new()
-}
-
 /// Waits for the lock, then releases it. Runs in its own thread, because the wait cannot be
 /// interrupted.
 fn lock_blocking(file: &File, mode: Mode) -> std::io::Result<()> {
@@ -57,14 +47,14 @@ fn lock_blocking(file: &File, mode: Mode) -> std::io::Result<()> {
 impl<'a> RepoLocks<'a> {
     fn new(cx: &'a Ctx, held: Vec<(&str, File)>) -> Self {
         let files: Vec<File> = held.into_iter().map(|(_, file)| file).collect();
-        cx.hold(&fds(&files));
+        cx.hold(&super::os::fds(&files));
         Self { files, cx }
     }
 }
 
 impl Drop for RepoLocks<'_> {
     fn drop(&mut self) {
-        self.cx.release(&fds(&self.files));
+        self.cx.release(&super::os::fds(&self.files));
     }
 }
 

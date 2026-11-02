@@ -73,14 +73,7 @@ impl Default for Setup {
     fn default() -> Self {
         let home = etcetera::home_dir().unwrap_or_else(|_| "/home/me".into());
         let name = "Documents";
-        let source = match (sys::is_root(), cfg!(windows), cfg!(target_os = "macos")) {
-            (false, ..) => home.join(name).display().to_string(),
-            // Every account's files, which the system service reads.
-            (true, true, _) => r"C:\Users".into(),
-            // `/etc` is a symlink there, which a backup would save as one.
-            (true, _, true) => "/private/etc".into(),
-            (true, ..) => "/etc".into(),
-        };
+        let source = if sys::is_root() { super::os::ROOT_SOURCE.into() } else { home.join(name).display().to_string() };
         let folder = &Kind::Local.fields()[0];
         Self {
             name: name.into(),
@@ -104,12 +97,7 @@ impl Default for Setup {
 
 /// The notification URL of this desktop. A system service has none to show it on.
 pub(crate) fn desktop() -> Option<&'static str> {
-    match (sys::is_root(), cfg!(windows), cfg!(target_os = "macos")) {
-        (true, ..) => None,
-        (false, true, _) => Some("windows://"),
-        (false, _, true) => Some("macosx://"),
-        (false, ..) => Some("dbus://"),
-    }
+    (!sys::is_root()).then_some(super::os::DESKTOP)
 }
 
 impl Setup {

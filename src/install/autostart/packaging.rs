@@ -46,7 +46,7 @@ WantedBy=multi-user.target default.target
 /// Message `id` in each translation that has it.
 fn translated(id: &str) -> Vec<(String, String)> {
     #[cfg(feature = "server")]
-    return crate::i18n::translations(id);
+    return crate::i18n::packages::translations(id);
     #[cfg(not(feature = "server"))]
     Vec::new()
 }

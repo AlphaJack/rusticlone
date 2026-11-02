@@ -77,6 +77,11 @@ pub(crate) fn mount_tables() -> Option<[PathBuf; 2]> {
     Some([Path::new("/proc").join("self").join("mounts"), Path::new("/etc").join("fstab")])
 }
 
+/// Where `app` keeps its state for the system.
+pub(crate) fn system_state_dir(app: &str) -> PathBuf {
+    Path::new("/var").join("lib").join(app)
+}
+
 #[cfg(test)]
 mod tests {
     use std::{fs, os::unix::fs::symlink};

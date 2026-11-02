@@ -75,6 +75,11 @@ pub(crate) fn mount_tables() -> Option<[std::path::PathBuf; 2]> {
     None
 }
 
+/// Where `app` keeps its state for the system.
+pub(crate) fn system_state_dir(app: &str) -> std::path::PathBuf {
+    Path::new("/Library").join("Application Support").join(app)
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
