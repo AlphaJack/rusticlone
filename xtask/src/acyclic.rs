@@ -34,7 +34,7 @@ struct Occurrence {
     /// Of a definition: the whole item, body included.
     enclosing: Option<Range>,
     in_body: bool,
-    /// Of a definition: in an `extern` block, a C function that no module owns.
+    /// A C function declared in an `extern` block: no module owns it.
     foreign: bool,
 }
 
@@ -210,8 +210,8 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph, BTreeSet<
     (modules, items, upcalls)
 }
 
-/// Marks the definitions in an `extern` block: rust-analyzer may index two declarations of one C function as
-/// a single item of the crate's root, which would read as a call up to it.
+/// Marks what `extern` blocks declare. rust-analyzer may index two declarations of the same C function as one
+/// item at the crate's root, which would look like a call up to it.
 fn mark_foreign(occurrences: &mut [Occurrence], source: &str) {
     let lines: Vec<&str> = source.lines().collect();
     for o in occurrences.iter_mut().filter(|o| o.definition) {

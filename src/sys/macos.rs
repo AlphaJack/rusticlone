@@ -29,9 +29,9 @@ pub(crate) fn needs_disk_access(path: &str) -> bool {
     protected && std::fs::File::open("/Library/Application Support/com.apple.TCC/TCC.db").is_err()
 }
 
-/// From `IOKit`, for the device the file system is mounted from: the `Medium Type` that the storage device
-/// above its partition or APFS volume says, as `diskutil` reads it.
-#[expect(unsafe_code, reason = "statfs fills a zeroed struct, and IOKit and CoreFoundation are C functions")]
+/// Asks `IOKit` whether the disk under `path` is an SSD. The answer sits on the storage device above the
+/// partition or APFS volume, where `diskutil` reads it too.
+#[expect(unsafe_code, reason = "statfs, IOKit and CoreFoundation are C functions")]
 #[expect(clippy::disallowed_methods, reason = "finds the folder of `path` that exists")]
 pub(super) fn solid_state(path: &Path) -> Option<bool> {
     use std::{
@@ -69,11 +69,11 @@ pub(super) fn solid_state(path: &Path) -> Option<bool> {
     if unsafe { libc::statfs(path.as_ptr(), &raw mut stat) } != 0 {
         return None;
     }
-    // SAFETY: statfs NUL-terminates the name, `/dev/disk3s1`, whose BSD name IOKit matches.
+    // SAFETY: statfs NUL-terminates the device name, such as `/dev/disk3s1`.
     let from = unsafe { std::ffi::CStr::from_ptr(stat.f_mntfromname.as_ptr()) };
     let name = std::ffi::CString::new(from.to_bytes().strip_prefix(b"/dev/")?).ok()?;
-    // SAFETY: strings created and released here, a matching dictionary the lookup consumes, the service and
-    // the property released once, and a dictionary read while it is held.
+    // SAFETY: every string, service and property is released once, the lookup consumes the matching
+    // dictionary, and the dictionary is read while held.
     unsafe {
         let string = |text: &std::ffi::CStr| CFStringCreateWithCString(std::ptr::null(), text.as_ptr(), UTF8);
         let (characteristics, medium, solid) =
@@ -145,9 +145,9 @@ mod tests {
         assert_eq!(solid_state(&root.join("not yet").join("created")), solid_state(root));
     }
 
-    /// `IOKit` answers as `diskutil` does for the disk of `/`.
+    /// `IOKit` and `diskutil` agree about the disk of `/`.
     #[test]
-    #[expect(clippy::disallowed_methods, reason = "asks diskutil, which the code no longer runs")]
+    #[expect(clippy::disallowed_methods, reason = "compares with diskutil")]
     fn iokit_agrees_with_diskutil() {
         let info = std::process::Command::new("diskutil").args(["info", "-plist", "/"]).output().unwrap();
         let plist = String::from_utf8(info.stdout).unwrap();

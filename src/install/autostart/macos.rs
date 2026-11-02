@@ -8,7 +8,7 @@ pub(crate) enum Error {
     Failed { command: String, error: String },
 }
 
-/// Runs a command of macOS's that has no API, as launchd's and codesign's, failing with its output.
+/// Runs a macOS tool that has no API, like `launchctl` or `codesign`. Fails with what it printed.
 fn run(program: &str, args: &[&str]) -> Result<()> {
     let out = (std::process::Command::new(program).args(args).output())
         .map_err(|source| Error::CannotRun { program: program.to_owned(), source })?;
@@ -120,7 +120,7 @@ fn register(app: &Path) -> Result<()> {
         fn CFRelease(object: *const c_void);
     }
     let path = app.as_os_str().as_bytes();
-    // SAFETY: a path that lives through the call, and a URL released once.
+    // SAFETY: the path outlives the call, and the URL is released once.
     let status = unsafe {
         let url = CFURLCreateFromFileSystemRepresentation(
             std::ptr::null(),
@@ -191,11 +191,11 @@ pub(super) fn bundle(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
 }
 
 /// Sets the extended attribute `name` of `path` to `value`, as `xattr -w` does.
-#[expect(unsafe_code, reason = "setxattr reads the NUL-terminated path and name, and the value, it is given")]
+#[expect(unsafe_code, reason = "setxattr reads the NUL-terminated path, name and values")]
 fn set_attribute(path: &Path, name: &std::ffi::CStr, value: &[u8]) -> Result<()> {
     use std::os::unix::ffi::OsStrExt;
     let path = std::ffi::CString::new(path.as_os_str().as_bytes())?;
-    // SAFETY: a path, a name and a value that live through the call.
+    // SAFETY: the path, name and value outlive the call.
     let set = unsafe { libc::setxattr(path.as_ptr(), name.as_ptr(), value.as_ptr().cast(), value.len(), 0, 0) };
     if set == 0 { Ok(()) } else { Err(std::io::Error::last_os_error().into()) }
 }
@@ -388,9 +388,9 @@ mod tests {
         assert_eq!(after_upgrade, Some(source));
     }
 
-    /// The app keeps its Spotlight keywords in the attribute that `xattr` reads.
+    /// Spotlight finds the app by the keywords stored in its extended attribute.
     #[test]
-    #[expect(clippy::disallowed_methods, reason = "reads the attribute with xattr, which the code no longer runs")]
+    #[expect(clippy::disallowed_methods, reason = "checks with xattr")]
     fn the_app_has_its_keywords() {
         let app = std::env::temp_dir().join(format!("{}-keywords-{}.app", crate::NAME, std::process::id()));
         super::bundle(&app, &std::path::Path::new("/usr").join("bin").join("true"), "2.0.1").unwrap();

@@ -13,12 +13,12 @@ fn desktop_files() -> Result<Option<[PathBuf; 2]>> {
     Ok(Some([entry, data.join("icons").join("hicolor").join("scalable").join("apps").join(format!("{NAME}.svg"))]))
 }
 
-/// The bus that systemd's manager of the server is on: the system's for root, else the user's.
+/// The bus where systemd manages the server: the system's for root, the user's otherwise.
 async fn bus() -> zbus::Result<zbus::Connection> {
     if sys::is_root() { zbus::Connection::system().await } else { zbus::Connection::session().await }
 }
 
-/// Calls `method` of systemd's manager with `args`, as `systemctl` does, and reads its answer as `T`.
+/// Calls systemd's manager like `systemctl` would, and reads the answer as `T`.
 fn manager<T>(method: &str, args: &(impl serde::Serialize + zbus::zvariant::DynamicType)) -> Result<T>
 where
     T: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
@@ -40,12 +40,12 @@ where
     Ok(tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(call)?)
 }
 
-/// Has systemd read the units again.
+/// Asks systemd to reread the units.
 fn reload() -> Result<()> {
     manager::<()>("Reload", &())
 }
 
-/// Enabled, so that it starts at login, or with the computer for root.
+/// Starts the service at login, or at boot for root.
 fn enable(service: &str) -> Result<()> {
     manager::<(bool, Vec<(String, String, String)>)>("EnableUnitFiles", &(&[service][..], false, true)).map(drop)
 }
@@ -136,7 +136,7 @@ fn known() -> bool {
     state(&format!("{NAME}.service")).is_some()
 }
 
-/// Whether it starts at login, as `systemctl is-enabled` succeeds.
+/// Whether the server starts at login, by the same rule as `systemctl is-enabled`.
 pub(super) fn at_login() -> Option<bool> {
     /// The states in which `systemctl is-enabled` succeeds.
     const ENABLED: [&str; 7] = ["enabled", "enabled-runtime", "static", "alias", "indirect", "generated", "transient"];
