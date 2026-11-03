@@ -42,7 +42,7 @@ fn image() -> String {
 }
 
 /// Whether a package manager keeps `exe` where it is: see [`keeper`].
-pub(crate) fn managed(exe: &std::path::Path) -> bool {
+pub(crate) fn managed(exe: &Path) -> bool {
     keeper(exe).is_some()
 }
 
