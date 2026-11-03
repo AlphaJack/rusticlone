@@ -7,14 +7,14 @@ use jiff::Timestamp;
 
 use super::{
     Base,
-    collections::{CollectionInput, CollectionMain, IndexMain},
+    collections::{CollectionInput, CollectionMain, Empty, IndexMain},
     forms::SetupFormView,
     render_str,
     repo::{RepoMain, RepoView},
     runs::{LogLineView, LogLines, LogView, RunRow},
 };
 use crate::{
-    engine::{CollectionOverview, Issue, RepoOverview, RepoStatus, Schedule},
+    engine::{CollectionOverview, Issue, RepoOverview, RepoStatus, Schedule, Unconfigured},
     live::{Activity, Running},
     log::Level,
     profile::Sources,
@@ -437,4 +437,18 @@ fn notification_toggles_follow_the_urls() {
     assert!(!page.attrs("[data-schemes]", "data-schemes").contains(&"json jsons".into()));
     let templates = page.attrs("[data-schemes=discord]", "data-template");
     assert_eq!(templates, ["discord://{webhook_id}/{webhook_token}"]);
+}
+
+/// Above the collections, the page warns of an untested rustic and of a start at login switched off. Without a
+/// collection, it says why there is none and where a first profile goes.
+#[test]
+fn the_overview_says_what_needs_attention() {
+    let untested = crate::rustic::Untested { found: crate::rustic::Version::new(0, 99, 0) };
+    let main = IndexMain::build(vec![healthy()]).with(None, Some(untested), Some("off at login".into()), None);
+    let notices = Page::of(&main).texts(".notice.warning");
+    assert!(notices.len() == 2 && notices[0].contains("0.99.0") && notices[1] == "off at login", "{notices:?}");
+    let empty = Empty { dir: "/profiles".into(), writable: true };
+    let page = Page::of(&IndexMain::build(vec![]).with(Some(empty), None, None, Some(Unconfigured::Gone)));
+    assert_eq!(page.texts(".notice").len(), 1);
+    assert!(page.texts("p").iter().any(|p| p.contains("/profiles")));
 }
