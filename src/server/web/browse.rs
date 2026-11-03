@@ -358,8 +358,9 @@ mod tests {
     /// path, opens where asked.
     #[test]
     fn a_snapshot_opens_in_its_one_directory() {
-        let one = ["/home/me/docs".to_owned()];
-        assert_eq!(opened("", &one), "/home/me/docs");
+        let docs = std::env::temp_dir().join("docs").display().to_string();
+        let one = [docs.clone()];
+        assert_eq!(opened("", &one), rustic::in_tree(&docs));
         assert_eq!(opened("/home", &one), "/home");
         assert_eq!(opened("", &["/a".to_owned(), "/b".to_owned()]), "");
         assert_eq!(opened("", &["docs".to_owned()]), "", "a relative path is not in the tree as it is");
