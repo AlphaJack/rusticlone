@@ -130,6 +130,18 @@ mod tests {
         assert_eq!(next("45m 10s"), after("46m"));
         assert_eq!(next("2h 35m"), after("3h"));
         assert_eq!(next("50h"), after("72h"));
+        // In calendar months and years, as the local calendar counts them.
+        let calendar = |ago: i64, span: Span| {
+            let since = now - SignedDuration::from_hours(24 * ago);
+            let (_, next) = crate::clock::next_change(|| human_age(since, now));
+            assert_eq!(
+                next,
+                Some(since.to_zoned(TimeZone::system()).checked_add(span).unwrap().timestamp()),
+                "{ago} days"
+            );
+        };
+        calendar(78, Span::new().months(3));
+        calendar(400, Span::new().years(2));
     }
 
     #[test]
@@ -143,7 +155,13 @@ mod tests {
         assert_eq!(human_duration(86_400 + 300), "1 day");
         let now: Timestamp = "2026-10-14T12:00:00Z".parse().unwrap();
         let ago = |secs: i64| human_age(now - SignedDuration::from_secs(secs), now);
-        assert_eq!((ago(59), ago(3 * 3600 + 125)), ("less than a minute".into(), "3 hours".into()));
+        assert_eq!(
+            (ago(59), ago(60), ago(3 * 3600 + 125)),
+            ("less than a minute".into(), "1 minute".into(), "3 hours".into())
+        );
+        // A minute's local time, whatever the time zone: `2026-10-14 12:00` in UTC.
+        let local = local(now);
+        assert!(local.len() == 16 && local.starts_with("2026-10-1") && local.ends_with(":00"), "{local}");
         // Calendar months: July 28 to October 14.
         assert_eq!(ago(86_400 * 78), "2 months");
         assert_eq!(redact("rest:https://me:secret@host:8000/repo"), "rest:https://me:***@host:8000/repo");
