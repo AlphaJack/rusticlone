@@ -427,3 +427,64 @@ pub(crate) struct CollectionOverview {
     /// In this process or another one.
     pub running: Vec<live::Running>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at(time: &str) -> Timestamp {
+        time.parse().unwrap()
+    }
+
+    /// A stale target says how far behind it is, and the primary since its last backup.
+    #[test]
+    fn a_stale_repository_says_since_when() {
+        let (now, then) = (at("2026-10-16T12:00:00Z"), at("2026-10-14T12:00:00Z"));
+        let lag = Lag { checked_at: now, behind_since: Some(then), listed: true };
+        let behind = RepoOverview {
+            name: "Docs-usb".into(),
+            lag: Some(lag),
+            status: RepoStatus::Stale { behind_since: Some(then) },
+            ..RepoOverview::default()
+        };
+        let primary = RepoOverview {
+            name: "Docs".into(),
+            status: RepoStatus::Stale { behind_since: None },
+            ..RepoOverview::default()
+        };
+        let texts: Vec<String> =
+            [behind.issues("Docs", None, &|_| false), primary.issues("Docs", Some(then), &|_| false)]
+                .into_iter()
+                .flatten()
+                .map(|issue| issue.text(now))
+                .collect();
+        insta::assert_debug_snapshot!(texts);
+    }
+
+    /// What a step never done shows.
+    #[test]
+    fn a_step_never_done_says_so() {
+        insta::assert_snapshot!(Last::never());
+    }
+
+    /// A failing notification counts for nothing: its own notification would fail too.
+    #[test]
+    fn an_undelivered_notification_does_not_count() {
+        assert!(!Issue::Undelivered { error: "refused".into() }.counts());
+        assert!(Issue::NeverBackedUp.counts());
+    }
+
+    /// A missing primary fails. A missing or stale target only warns: the backup is safe in the primary.
+    #[cfg(feature = "server")]
+    #[test]
+    fn a_repository_fails_only_when_the_primary_is_missing() {
+        let levels = [
+            RepoStatus::Missing { primary: true },
+            RepoStatus::Missing { primary: false },
+            RepoStatus::Stale { behind_since: None },
+            RepoStatus::InSync,
+        ]
+        .map(RepoStatus::level);
+        assert_eq!(levels, [Level::Failure, Level::Warning, Level::Warning, Level::Success]);
+    }
+}
