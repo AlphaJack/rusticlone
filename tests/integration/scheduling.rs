@@ -2,7 +2,7 @@ use std::fs::{self, File};
 
 use serde_json::json;
 
-use crate::common::{KEEP, NAME, Sandbox, cmd, docs_with_remote, global_env, objects, toml_str, var};
+use crate::common::{KEEP, Sandbox, cmd, docs_with_remote, global_env, objects, toml_str, var};
 
 const EVERY_MINUTE: &str = "* * * * *";
 
@@ -41,6 +41,7 @@ fn settings_a_profile_cannot_use_are_reported() {
 #[cfg(unix)]
 #[test]
 fn the_env_file_sets_what_the_environment_does_not() {
+    use crate::common::NAME;
     let sb = docs_with_remote("");
     // Without an env file: nothing backed up yet, which is a warning.
     let fine = sb.run(&["collections"]).code;
