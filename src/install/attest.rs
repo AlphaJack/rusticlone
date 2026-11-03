@@ -154,7 +154,7 @@ mod tests {
         let found = super::verify(&repository, "v1.0.0", "uv.tar.gz", b"uv").unwrap_err().to_string();
         assert!(found.contains(&format!("{repository}/.github/workflows/release.yml@refs/tags/v1.0.0")), "{found}");
         let hex = crate::sys::sha256(b"uv");
-        assert_eq!(asked.recv().unwrap(), format!("/attestations/sha256:{hex}"));
+        assert_eq!(crate::install::download::asked(&asked), format!("/attestations/sha256:{hex}"));
         let (repository, _) = crate::install::download::serve(404, b"Not Found");
         let missing = super::verify(&repository, "v1.0.0", "uv.tar.gz", b"uv").unwrap_err();
         assert!(missing.downcast_ref::<super::Error>().is_some_and(|e| matches!(e, super::Error::Missing { .. })));
