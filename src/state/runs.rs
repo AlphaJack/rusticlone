@@ -15,7 +15,7 @@ use redb::{ReadableTable, WriteTransaction};
 
 use super::record::{Holds, LogLine, LogNote, Queued, ResultRecord, RunRecord, StepRecord, stored};
 use super::{
-    Error, Kept, RUNS, Shown, Store, UNFINISHED,
+    Error, Kept, RUN_IDS, RUNS, Shown, Store, UNFINISHED,
     locks::{Mode, run_lock},
     reparse,
 };
@@ -61,20 +61,20 @@ impl Drop for RunLog {
 }
 
 impl RunLog {
-    /// A new run of `collection`, starting now. Nothing is written until it logs.
+    /// A new run of `collection`, starting now. Its record is written once it logs, but its id is taken at once.
     pub(crate) fn new(store: &Store, collection: &str, request: Request, trigger: Trigger) -> Self {
-        let id = store.now().as_millisecond();
+        // Without a state to take it from, nothing of the run can be written either.
+        let id = store
+            .write(Shown::Nothing, |w| take_id(w, store, collection))
+            .unwrap_or_else(|_| store.now().as_millisecond());
         Self::with_id(store, collection, id, request, trigger, Status::Running)
     }
 
     /// Queues `request`, visible at once, with a unique id.
     pub(crate) fn queued(store: &Store, collection: &str, request: Request, trigger: Trigger) -> Result<Self> {
         let mut run = store.write(Shown::Of(collection), |w| {
-            let table = w.open_table(RUNS)?;
-            let last = table.range(of(collection))?.next_back().transpose()?;
-            let id = store.now().as_millisecond().max(last.map_or(i64::MIN, |(key, _)| key.value().1 + 1));
-            let run = Self::with_id(store, collection, id, request, trigger, Status::Queued);
-            drop(table);
+            let run =
+                Self::with_id(store, collection, take_id(w, store, collection)?, request, trigger, Status::Queued);
             put_run(w, &run.record, &run.request)?;
             Ok(run)
         })?;
@@ -240,6 +240,17 @@ fn parse_run(kept: &mut BTreeMap<i64, Kept<RunRecord>>, id: i64, text: &str) -> 
 }
 
 /// Writes the record, and adds it to or removes it from the queue.
+/// An id for a new run of `collection`, which no other run has or will take: at least the time in milliseconds, so
+/// that runs sort by start, and after every id taken or stored.
+fn take_id(w: &WriteTransaction, store: &Store, collection: &str) -> Result<i64> {
+    let last = w.open_table(RUNS)?.range(of(collection))?.next_back().transpose()?.map(|(key, _)| key.value().1 + 1);
+    let mut taken = w.open_table(RUN_IDS)?;
+    let next = taken.get(collection)?.map(|v| v.value());
+    let id = [last, next].into_iter().flatten().fold(store.now().as_millisecond(), i64::max);
+    taken.insert(collection, id + 1)?;
+    Ok(id)
+}
+
 fn put_run(w: &WriteTransaction, record: &RunRecord, request: &Request) -> Result<()> {
     let key = (record.collection.as_str(), record.id);
     let mut row = shape::to_value(record)?;
@@ -450,6 +461,25 @@ mod tests {
 
     use super::*;
     use crate::{request::RunKind, rustic::Reading, state::tests::store};
+
+    /// Runs started in the same millisecond, queued or at once, in two processes, never share an id: the second
+    /// would overwrite the first's record.
+    #[test]
+    fn runs_started_at_once_have_their_own_ids() {
+        let at = |store: Store| store.with_clock(clock::Fixed::at("2026-10-16T12:00:00Z"));
+        let a = at(store("run-ids-test"));
+        let b = at(Store::at(a.dir.clone()).unwrap());
+        let queued = RunLog::queued(&a, "Docs", Request::Backup, Trigger::Cli).unwrap();
+        let (now, later) = (
+            RunLog::new(&b, "Docs", Request::Backup, Trigger::Schedule),
+            RunLog::new(&a, "Docs", Request::Backup, Trigger::Cli),
+        );
+        let ids = [queued.record.id, now.record.id, later.record.id];
+        assert_eq!(ids, [ids[0], ids[0] + 1, ids[0] + 2], "each after the last, from the same millisecond");
+        assert_eq!(RunLog::queued(&b, "Docs", Request::Backup, Trigger::Cli).unwrap().record.id, ids[0] + 3);
+        drop((queued, now, later));
+        fs::remove_dir_all(&a.dir).unwrap();
+    }
 
     /// Runs of each outcome, as this version stores them.
     fn runs_of_each_outcome(store: &Store) -> Vec<RunRecord> {
