@@ -277,7 +277,7 @@ pub(super) fn install(listen: &str, exe: &Path, serve: &[String]) -> Result<Path
 /// The `Run` key's value that starts `exe` with `serve` at login.
 fn set_run(exe: &str, serve: &[String]) -> Result<()> {
     let (host, args) = without_window(exe, &serve.join(" "));
-    set(HKEY_CURRENT_USER, RUN, NAME, REG_SZ, &wide(&format!("\"{}\" {args}", host.display())))
+    set(HKEY_CURRENT_USER, RUN, NAME, REG_SZ, &wide(format!("\"{}\" {args}", host.display())))
 }
 
 /// Installed with its Start menu entry; started at login by the `Run` key.
