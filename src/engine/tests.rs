@@ -686,3 +686,43 @@ fn a_queued_run_waits_for_its_locks_and_the_same_request_before_it() {
     prune.start();
     assert_eq!(waits_for(&copy), [Some(Status::Running)], "the backup, not the prune");
 }
+
+/// A scheduled run starts at once: it is neither queued nor joins the same one queued. A restore asked twice runs
+/// twice.
+#[test]
+fn a_scheduled_run_starts_without_a_queue() {
+    use crate::{request::RestoreOptions, result::Status};
+    let engine = engine("ask-scheduled", &Replay::new());
+    let collections = engine.collections();
+    let ask = |request: Request, trigger| engine.ask(&collections[0], &request, trigger).unwrap();
+    let queued = ask(Request::Backup, Trigger::Cli);
+    let scheduled = ask(Request::Backup, Trigger::Schedule);
+    assert!(
+        matches!(&scheduled, Asked::Queued(run) if run.record.status == Status::Running && run.record.id != queued.record().id)
+    );
+    let restore = || ask(Request::Restore(RestoreOptions::default()), Trigger::Cli);
+    let first = restore();
+    assert!(matches!(restore(), Asked::Queued(run) if run.record.id != first.record().id));
+}
+
+/// A result that steps running at once report alike is kept once. Failures are counted. A step that does nothing
+/// more shows no activity.
+#[test]
+fn a_run_keeps_each_result_once_and_counts_failures() {
+    use crate::{live::Guard, result::Doing, state::RunLog};
+    let engine = engine("run-results", &Replay::new());
+    let collections = engine.collections();
+    let runs = Runs::new(|_| {});
+    let guard = Guard::start(&runs, RunLog::new(&engine.store, "Docs", Request::Backup, Trigger::Cli));
+    let run = super::Run::new(&collections[0], Some(guard.live.clone()));
+    run.push_once(failed());
+    run.push_once(failed());
+    run.push_once(backed_up());
+    assert_eq!(run.results_of(None), [failed(), backed_up()]);
+    run.push(failed());
+    assert_eq!(run.failures(), 2);
+    run.activity(Some(Doing::WaitingForListing { repo: "Docs".into() }), false);
+    assert_eq!(guard.live.activities().len(), 1);
+    run.idle();
+    assert!(guard.live.activities().is_empty());
+}
