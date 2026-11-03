@@ -197,3 +197,45 @@ pub(crate) struct ForgetItem {
     #[serde(default)]
     pub reasons: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "server")]
+    use super::{Snapshot, Summary, newest_summary};
+
+    #[cfg(feature = "server")]
+    fn snapshot(path: &str, time: &str, files: u64) -> Snapshot {
+        Snapshot {
+            id: format!("{files:08x}").parse().unwrap(),
+            time: time.parse().unwrap(),
+            paths: vec![path.into()],
+            hostname: String::new(),
+            original: None,
+            summary: Some(Summary {
+                total_files_processed: files,
+                total_bytes_processed: files * 10,
+                data_added_packed: files * 100,
+                backup_duration: 1.0,
+            }),
+        }
+    }
+
+    /// The newest snapshot of each source, wherever it is listed, summed. Of two at once, the first listed.
+    #[cfg(feature = "server")]
+    #[test]
+    fn the_newest_snapshot_of_each_source_is_summed() {
+        let (old, new) = ("2026-10-15T03:00:00Z", "2026-10-16T03:00:00Z");
+        let snapshots = [
+            snapshot("docs", new, 4),
+            snapshot("docs", old, 1),
+            snapshot("pics", old, 2),
+            snapshot("pics", new, 8),
+            snapshot("music", new, 16),
+            snapshot("music", new, 32),
+        ];
+        let sum = newest_summary(&snapshots).unwrap();
+        let totals = (sum.total_files_processed, sum.total_bytes_processed, sum.data_added_packed);
+        assert_eq!(totals, (28, 280, 2800));
+        assert!(newest_summary(&[]).is_none());
+    }
+}
