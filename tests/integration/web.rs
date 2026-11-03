@@ -784,6 +784,10 @@ fn a_file_is_found_across_snapshots_and_changes_are_shown() {
     let short = ids[1].get(..8).unwrap();
     assert!(found.contains(&format!(" | Docs-remote | Docs | {APP_NAME}</title>")), "{found}");
     assert!(changes.contains(&format!(" | {short} | Docs-remote | Docs | {APP_NAME}</title>")), "{changes}");
+    // The older snapshot, from the same listing, among the others.
+    let older = server.get(&format!("/collections/Docs/repos/Docs-remote/snapshots/{}", ids[0])).body;
+    let short = ids[0].get(..8).unwrap();
+    assert!(older.contains(&format!("<title>{short} | Docs-remote | Docs | {APP_NAME}</title>")), "{older}");
     let row = |path: &str| changes.split("<tr>").find(|r| r.contains(&format!("<code>{docs}{path}</code>"))).unwrap();
     // Changed: as it was, and as it is. Added: as it is.
     assert_eq!(row("/sub/report.txt").matches("/download?").count(), 2);
