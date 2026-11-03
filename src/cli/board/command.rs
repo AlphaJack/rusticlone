@@ -203,4 +203,58 @@ mod tests {
         assert!(command("update", || Err(std::io::Error::other("offline").into())).is_err());
         assert_eq!(step("checking", "checked", || Ok(1)).unwrap(), 1);
     }
+
+    /// An ended step shows what it showed it did, else the first line it logged, else what it did. The other lines
+    /// it logged go below it, and lines logged outside steps go in the run.
+    #[test]
+    fn an_ended_step_shows_what_it_did() {
+        let mut command = Command::new("install");
+        command.start("placing");
+        command.show(Shown::Did("placed in bin"));
+        command.end(None, "placed");
+        command.start("writing");
+        command.log(Level::Warning, "kept the unit");
+        command.log(Level::Success, "linger on");
+        command.end(None, "written");
+        command.start("starting");
+        command.end(None, "started");
+        command.log(Level::Success, "outside");
+        let rows =
+            ["├── ● placed in bin", "├──┐● kept the unit", "│  └── ● linger on", "├── ● started", "└── ● outside"];
+        assert_eq!(
+            command.rows(),
+            iter::once(format!("{}: install", crate::NAME)).chain(rows.map(String::from)).collect::<Vec<_>>()
+        );
+    }
+
+    /// The step that runs is its last row, with what it does now. A question takes its place while it waits.
+    #[test]
+    fn the_running_step_is_the_last_row() {
+        let mut command = Command::new("update");
+        command.start("checking");
+        command.log(Level::Success, "found 2.1");
+        #[cfg(feature = "self-update")]
+        command.show(Shown::Now("downloading"));
+        let now = if cfg!(feature = "self-update") { "downloading" } else { "checking" };
+        let rows = command.rows();
+        assert!(rows[1].ends_with(&format!(" {now}")), "{rows:?}");
+        assert_eq!(rows[2..], ["   └── ● found 2.1".to_owned()]);
+        assert!(command.asking("Keep them?")[1].ends_with(" Keep them? [y/N]"));
+    }
+
+    /// A failed step shows its error, and the command fails without showing it again. An error outside steps is shown
+    /// last.
+    #[test]
+    fn a_failure_shows_once() {
+        let head = format!("{}: update", crate::NAME);
+        let mut command = Command::new("update");
+        command.start("checking");
+        command.end(Some("offline".into()), "checked");
+        assert_eq!(command.finish(Err(std::io::Error::other("offline").into())), Level::Failure);
+        assert_eq!(command.rows(), [head.clone(), "└── ● checking: offline".into()]);
+        let mut command = Command::new("update");
+        assert_eq!(command.finish(Err(std::io::Error::other("offline").into())), Level::Failure);
+        assert_eq!(command.rows(), [head, "└── ● offline".into()]);
+        assert_eq!(Command::new("update").finish(Ok(Level::Warning)), Level::Warning);
+    }
 }
