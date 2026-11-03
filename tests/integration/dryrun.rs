@@ -90,7 +90,17 @@ fn a_dry_run_restore_previews_or_reads() {
     sb.run(&["backup", "--all"]).assert_exit(0);
     sb.remove("source/docs");
     let preview = sb.run(&["restore", "--dry-run", "--all", "--missing"]);
-    preview.assert_exit(0).assert_result("would-restore", serde_json::json!({})).assert_no_output("rustic dump");
+    preview
+        .assert_exit(0)
+        .assert_result("would-restore", serde_json::json!({"to": null}))
+        .assert_no_output("rustic dump");
+    // Elsewhere, it says where.
+    let to = sb.path("restored").display().to_string();
+    let elsewhere = sb.run(&["restore", "--dry-run", "--all", "--missing", "--to", &to]);
+    elsewhere
+        .assert_exit(0)
+        .assert_result("would-restore", serde_json::json!({}))
+        .assert_no_result("would-restore", serde_json::json!({"to": null}));
     let read = sb.run(&["restore", "--dry-run", "--all"]);
     read.assert_exit(0).assert_result("test-restored", serde_json::json!({}));
     assert!(!sb.path("source/docs").exists(), "a dry run created the source");
