@@ -7,8 +7,6 @@ mod linux;
 mod macos;
 #[cfg(all(test, unix))]
 mod unix;
-#[cfg(all(test, windows))]
-mod windows;
 
 use std::path::Path;
 
@@ -95,8 +93,61 @@ fn folders(exe: &Path) -> Option<Keeper> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Keeper, managed};
+    #![expect(clippy::disallowed_methods, reason = "lays out package managers' folders")]
+
+    use super::{Keeper, Path, folders, managed};
     use crate::sys::writable;
+
+    /// `relative` below a folder of its own in the temporary one, with its folders. The executable itself is not
+    /// needed, only where it is.
+    fn exe(root: &Path, relative: &[&str]) -> std::path::PathBuf {
+        let exe = relative.iter().fold(root.to_owned(), |path, part| path.join(part));
+        std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        exe
+    }
+
+    /// `WinGet`'s packages are below its own `Packages`, not any folder of that name.
+    #[test]
+    fn wingets_packages_are_managed() {
+        let root = crate::sys::test_dir("keeper-winget");
+        let package = ["Packages", "AlphaJack.Rusticlone_Source", "rusticlone.exe"];
+        let winget = exe(&root, &[&["WinGet"][..], &package].concat());
+        assert_eq!(folders(&winget), Some(Keeper::WinGet));
+        assert_eq!(folders(&exe(&root, &[&["Other"][..], &package].concat())), None);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Found by its layout, as `ChocolateyInstall` may move its root anywhere.
+    #[test]
+    fn chocolateys_lib_is_managed_wherever_its_root_is() {
+        let root = crate::sys::test_dir("keeper-chocolatey");
+        let exe = exe(&root, &["lib", "rusticlone", "tools", "rusticlone.exe"]);
+        assert_eq!(folders(&exe), None, "without choco.exe beside it");
+        std::fs::write(root.join("choco.exe"), b"").unwrap();
+        assert_eq!(folders(&exe), Some(Keeper::Chocolatey));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Found by its layout, as `SCOOP` may move its root anywhere.
+    #[test]
+    fn scoops_apps_are_managed_wherever_its_root_is() {
+        let root = crate::sys::test_dir("keeper-scoop");
+        let exe = exe(&root, &["apps", "rusticlone", "current", "rusticlone.exe"]);
+        assert_eq!(folders(&exe), None, "without shims beside it");
+        std::fs::create_dir_all(root.join("shims")).unwrap();
+        assert_eq!(folders(&exe), Some(Keeper::Scoop));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    /// Nix's store is `/nix/store` only, not a folder of that name elsewhere.
+    #[test]
+    fn a_store_elsewhere_is_not_nixs() {
+        let root = crate::sys::test_dir("keeper-nix");
+        for at in [&["nix", "store"][..], &["other", "store"]] {
+            assert_eq!(folders(&exe(&root, &[at, &["abc-rusticlone", "bin", "rusticlone"]].concat())), None, "{at:?}");
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     /// Each says its own command.
     #[test]
