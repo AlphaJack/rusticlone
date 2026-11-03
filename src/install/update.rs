@@ -56,7 +56,7 @@ pub(crate) enum Logged {
         how: String,
     },
     /// At start, which goes on with the executable and rustic as they are.
-    #[cfg_attr(not(feature = "server"), expect(dead_code, reason = "only the server updates at start"))]
+    #[cfg_attr(not(any(feature = "server", test)), expect(dead_code, reason = "only the server updates at start"))]
     NotUpdated {
         error: String,
     },
@@ -241,7 +241,26 @@ fn replace(dry_run: bool) -> Result<Logged> {
 mod tests {
     use semver::Version;
 
-    use super::{Logged, Manifest, archive, without_download};
+    use super::{Logged, Manifest, archive, rustic_left, without_download};
+    use crate::log::{Level, Message};
+
+    /// Each outcome of an update, and whether rustic is left to update here: only when this release is the newest,
+    /// and not in a dry run. A failure or a package manager's copy is a warning.
+    #[test]
+    fn rustic_is_left_to_update_when_this_release_is_the_newest() {
+        let from = || ("1.0.0".to_owned(), "1.1.0".to_owned());
+        let outcomes = [
+            (Logged::Current { current: "1.0.0".into() }, true, Level::Success),
+            (Logged::Available { from: from().0, to: from().1 }, false, Level::Success),
+            (Logged::Updated { from: from().0, to: from().1 }, false, Level::Success),
+            (Logged::Packaged { from: from().0, to: from().1, how: "brew upgrade".into() }, false, Level::Warning),
+            (Logged::NotUpdated { error: "offline".into() }, false, Level::Warning),
+        ];
+        for (logged, left, level) in outcomes {
+            assert_eq!((rustic_left(&logged, false), logged.level()), (left, level), "{logged:?}");
+            assert!(!rustic_left(&logged, true), "a dry run updates nothing: {logged:?}");
+        }
+    }
 
     /// A package manager's executable is not downloaded, even with a newer release; the user's is.
     #[test]
