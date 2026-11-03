@@ -30,7 +30,7 @@ use commands::ok;
 pub(crate) use commands::tree_path;
 pub(crate) use commands::{Reading, RestorePlan};
 #[cfg(feature = "server")]
-pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
+pub(crate) use contents::{Diff, Dirs, Found, Node, NodeKind, in_tree};
 #[cfg(feature = "server")]
 use contents::{diff, dirs, found};
 pub(crate) use ctx::{Ctx, Origin, RunHandle, Stop};
