@@ -429,3 +429,19 @@ fn for_each_collection(engine: &Engine, heading: &str, f: impl Fn(&Collection<'_
     let Some(level) = found(engine, &collections) else { return Level::Warning };
     level.max(each_collection(engine, &collections, heading, f))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    /// A restore offers to keep the profiles read from the working directory, as in a disaster recovery. Not in a dry
+    /// run, nor where rusticlone reads them anyway.
+    #[test]
+    fn a_restore_keeps_the_profiles_of_the_working_directory() {
+        let (cwd, own) = (Path::new("recovery"), Path::new("profiles"));
+        let repos = || [("Docs", cwd), ("Docs-usb", own), ("Photos", cwd)].into_iter();
+        assert_eq!(super::to_keep(false, repos(), cwd, own), ["Docs.toml", "Photos.toml"]);
+        assert_eq!(super::to_keep(true, repos(), cwd, own), Vec::<String>::new());
+        assert_eq!(super::to_keep(false, repos(), own, own), Vec::<String>::new());
+    }
+}
