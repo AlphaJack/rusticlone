@@ -95,56 +95,13 @@ pub(super) async fn run(
     base: Base,
     Form(form): Form<RunForm>,
 ) -> Result {
-    let opt = |s: String| Some(s.trim().to_owned()).filter(|s| !s.is_empty());
-    let selection = match (selection, opt(form.repo)) {
-        (Selection::Collection(collection), Some(repo)) => Selection::Repo(collection, repo),
-        (selection, _) => selection,
-    };
-    let to = opt(form.to).map(PathBuf::from);
-    if to.as_ref().is_some_and(|t| !t.is_absolute()) {
-        return Err(Error::Refused(Notice::DestinationNotAbsolute));
-    }
-    let snapshot = opt(form.snapshot)
-        .map(|id| id.parse())
-        .transpose()
-        .map_err(|e: NotASnapshotId| Error::Refused(Notice::InvalidSnapshot(e.to_string())))?;
-    let at = opt(form.at).map(|at| crate::request::parse_at(&at)).transpose();
-    let at = at.map_err(|e| Error::Refused(Notice::InvalidTime(format!("{e:#}"))))?;
-    let options = RestoreOptions {
-        snapshot,
-        path: opt(form.path),
-        source: form.source,
-        at,
-        to,
-        from: opt(form.from),
-        ..RestoreOptions::default()
-    };
-    // As on the command line: without choices, a dry run reads the snapshots as a restore would; with them, it
-    // says what would be restored where.
-    let choices = options.at.is_some() || options.to.is_some() || options.path.is_some();
-    let tests = form.kind == RunKind::Restore && form.dry_run && !choices;
-    let kind = if tests { RunKind::TestRestore } else { form.kind };
-    let options = RestoreOptions { dry_run: form.dry_run && choices, ..options };
+    let (selection, kind, options) = form.asked(selection).map_err(Error::Refused)?;
     Ok(blocking(move || {
         let submitted = app.submit(&selection, kind, &options).map_err(|e| {
             Error::Refused(Notice::NotSubmitted { collection: whose(&app, &selection), error: format!("{e:#}") })
         })?;
-        let started = match selection {
-            Selection::All if !submitted.started.is_empty() => vec![kind.doing()],
-            Selection::All | Selection::Collection(_) | Selection::Repo(..) => {
-                submitted.started.iter().map(|(.., doing)| doing.clone()).collect()
-            }
-        };
-        let skipped = match (&selection, submitted.skipped.as_slice()) {
-            (_, []) => None,
-            // For every collection: the count.
-            (Selection::All, all) => Some(all.len().to_string()),
-            (Selection::Collection(_) | Selection::Repo(..), skipped) => Some(skipped.join(", ")),
-        };
-        let started = (!started.is_empty()).then(|| started.join(", "));
-        let what: Vec<String> =
-            started.into_iter().chain(skipped.map(|s| Label::AlreadyQueued { what: &s }.to_string())).collect();
-        let response = flash(&Notice::Started { collection: whose(&app, &selection), what: what.join("; ") });
+        let what = reported(&selection, kind, &submitted);
+        let response = flash(&Notice::Started { collection: whose(&app, &selection), what });
         match submitted.started.as_slice() {
             [(collection, id, _)] => {
                 let run = base.to(Route::Run(collection, *id));
@@ -155,6 +112,62 @@ pub(super) async fn run(
         }
     })
     .await)
+}
+
+impl RunForm {
+    /// What the form asks for: the selection, narrowed to the repository it names, the kind of run, and the
+    /// restore's options. Refused when a field cannot be read.
+    fn asked(self, selection: Selection) -> std::result::Result<(Selection, RunKind, RestoreOptions), Notice> {
+        let opt = |s: String| Some(s.trim().to_owned()).filter(|s| !s.is_empty());
+        let selection = match (selection, opt(self.repo)) {
+            (Selection::Collection(collection), Some(repo)) => Selection::Repo(collection, repo),
+            (selection, _) => selection,
+        };
+        let to = opt(self.to).map(PathBuf::from);
+        if to.as_ref().is_some_and(|t| !t.is_absolute()) {
+            return Err(Notice::DestinationNotAbsolute);
+        }
+        let snapshot = (opt(self.snapshot).map(|id| id.parse()).transpose())
+            .map_err(|e: NotASnapshotId| Notice::InvalidSnapshot(e.to_string()))?;
+        let at = opt(self.at).map(|at| crate::request::parse_at(&at)).transpose();
+        let at = at.map_err(|e| Notice::InvalidTime(format!("{e:#}")))?;
+        let options = RestoreOptions {
+            snapshot,
+            path: opt(self.path),
+            source: self.source,
+            at,
+            to,
+            from: opt(self.from),
+            ..RestoreOptions::default()
+        };
+        // As on the command line: without choices, a dry run reads the snapshots as a restore would; with them, it
+        // says what would be restored where.
+        let choices = options.at.is_some() || options.to.is_some() || options.path.is_some();
+        let tests = self.kind == RunKind::Restore && self.dry_run && !choices;
+        let kind = if tests { RunKind::TestRestore } else { self.kind };
+        Ok((selection, kind, RestoreOptions { dry_run: self.dry_run && choices, ..options }))
+    }
+}
+
+/// What the notice says of the runs `submitted` started and skipped: for every collection, what they do and how many
+/// were already queued; for one, each run and each label.
+fn reported(selection: &Selection, kind: RunKind, submitted: &crate::server::workers::Submitted) -> String {
+    let started = match selection {
+        Selection::All if !submitted.started.is_empty() => vec![kind.doing()],
+        Selection::All | Selection::Collection(_) | Selection::Repo(..) => {
+            submitted.started.iter().map(|(.., doing)| doing.clone()).collect()
+        }
+    };
+    let skipped = match (selection, submitted.skipped.as_slice()) {
+        (_, []) => None,
+        // For every collection: the count.
+        (Selection::All, all) => Some(all.len().to_string()),
+        (Selection::Collection(_) | Selection::Repo(..), skipped) => Some(skipped.join(", ")),
+    };
+    let started = (!started.is_empty()).then(|| started.join(", "));
+    let what: Vec<String> =
+        started.into_iter().chain(skipped.map(|s| Label::AlreadyQueued { what: &s }.to_string())).collect();
+    what.join("; ")
 }
 
 pub(super) async fn refresh(State(app): State<Arc<App>>, selection: Selection) -> Response {
