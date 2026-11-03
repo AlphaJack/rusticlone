@@ -38,6 +38,10 @@ pub(crate) fn system_bin_dir() -> PathBuf {
     PathBuf::from("/usr").join("local").join("bin")
 }
 
+/// What creating a file in a folder takes: writing to it and entering it.
+#[cfg(any(feature = "server", feature = "self-update"))]
+const CREATE: libc::c_int = libc::W_OK | libc::X_OK;
+
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.
 /// Unix asks the kernel, which also counts read-only mounts and ACLs.
 #[cfg(any(feature = "server", feature = "self-update"))]
@@ -47,7 +51,7 @@ pub(crate) fn writable(dir: &Path) -> bool {
     for dir in dir.ancestors() {
         let Ok(path) = std::ffi::CString::new(dir.as_os_str().as_bytes()) else { return false };
         // SAFETY: `path` is NUL-terminated and outlives the call.
-        if unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), libc::W_OK | libc::X_OK, libc::AT_EACCESS) } == 0 {
+        if unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), CREATE, libc::AT_EACCESS) } == 0 {
             return true;
         }
         if std::io::Error::last_os_error().kind() != std::io::ErrorKind::NotFound {
