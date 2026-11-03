@@ -3,17 +3,3 @@ all_features = true
 
 # The mutants run on Linux, where another system's files are never built: their mutants would always be missed.
 exclude_globs = ["**/windows.rs", "**/windows/**", "**/macos.rs", "**/macos/**"]
-
-exclude_re = [
-    # They draw on a terminal or wait for its answer, which tests have none of.
-    '^src/log\.rs:.* (in|replace) (Block::redraw|capture|confirm|ask|prompt|clear|init)\b',
-    '^src/cli/board\.rs:.* (in|replace) (spin|draw)\b',
-    # They ask this computer's service manager, login items and network.
-    '^src/install/autostart\.rs:.* (in|replace) (blocked|start_installed|answers_soon|refresh_app|rewrite_app|opened_as_app|with_computer|at_login|set_at_login)\b',
-    '^src/install/download\.rs:',
-    # Equivalent: they change nothing that can be read back.
-    # The same value is written again.
-    '^src/state\.rs:\d+:\d+: replace < with <= in prepare$',
-    # An expired session is never read back: `Store::session` checks the expiry again.
-    '^src/state\.rs:\d+:\d+: replace > with >= in Store::add_session$',
-]

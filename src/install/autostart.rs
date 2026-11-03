@@ -63,6 +63,7 @@ log::level!(Success: Logged);
 log::level!(Warning: Blocked);
 
 /// Whether the server is installed to start at login, and the user switched it off.
+#[cfg_attr(test, mutants::skip)] // Asks the service manager.
 pub(crate) fn blocked() -> Option<Blocked> {
     imp::blocked().then_some(Blocked {})
 }
@@ -70,11 +71,13 @@ pub(crate) fn blocked() -> Option<Blocked> {
 /// Starts the installed or packaged server, rather than one without its options, and waits until it answers on
 /// `listen`: false without one, or if it does not answer within a minute, which an update at its start can take.
 /// The service manager then supervises it, unlike a server that `serve --open` starts.
+#[cfg_attr(test, mutants::skip)] // Starts the installed server through the service manager.
 pub(crate) fn start_installed(listen: &str) -> Result<bool> {
     Ok(imp::start()? && answers_soon(listen))
 }
 
 /// Whether the server answers on `listen` within a minute, which an update at its start can take.
+#[cfg_attr(test, mutants::skip)] // Waits up to a minute for a server to answer.
 pub(crate) fn answers_soon(listen: &str) -> bool {
     const POLL: std::time::Duration = std::time::Duration::from_millis(200);
     let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
@@ -90,6 +93,7 @@ pub(crate) fn answers_soon(listen: &str) -> bool {
 /// Copies the package manager's executable into the macOS app again when it updated it, and says so.
 /// Whether it did: the app then starts again.
 #[cfg(feature = "self-update")]
+#[cfg_attr(test, mutants::skip)] // Rewrites the installed macOS app.
 pub(crate) fn refresh_app() -> Result<bool> {
     let Some(version) = imp::refresh_app()? else { return Ok(false) };
     log::event(None, &Logged::AppRefreshed { version });
@@ -99,11 +103,13 @@ pub(crate) fn refresh_app() -> Result<bool> {
 /// Writes the macOS app again around this executable, which an update replaced with `version`: its version,
 /// and a signature that covers the new executable. Nothing for an executable outside the app.
 #[cfg(feature = "self-update")]
+#[cfg_attr(test, mutants::skip)] // Rewrites the installed macOS app.
 pub(crate) fn rewrite_app(version: &str) -> Result<()> {
     imp::rewrite_app(version)
 }
 
 /// Whether this is the macOS app opened from Finder or Spotlight, which passes no arguments.
+#[cfg_attr(test, mutants::skip)] // Asks how macOS started this process.
 pub(crate) fn opened_as_app() -> bool {
     imp::opened_as_app()
 }
@@ -150,6 +156,7 @@ pub(crate) fn install(listen: &str, exe: &Path) -> Result<Logged> {
 }
 
 /// Root's server, and on Linux a headless user's, which `install` keeps running without a login.
+#[cfg_attr(test, mutants::skip)] // Asks whether this process runs as root or without a login.
 pub(crate) fn with_computer() -> bool {
     crate::sys::is_root() || imp::headless()
 }
@@ -169,11 +176,13 @@ pub(crate) fn uninstall() -> Result<Logged> {
 }
 
 /// Whether the installed server starts at login; `None` if it is not installed.
+#[cfg_attr(test, mutants::skip)] // Asks the service manager.
 pub(crate) fn at_login() -> Option<bool> {
     imp::at_login()
 }
 
 /// Switches the installed server's start at login, and leaves the running one alone.
+#[cfg_attr(test, mutants::skip)] // Changes the service manager's settings.
 pub(crate) fn set_at_login(on: bool) -> Result<()> {
     imp::set_at_login(on)
 }

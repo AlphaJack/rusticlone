@@ -88,6 +88,13 @@ pub(super) fn serve(status: u16, body: &'static [u8]) -> (String, std::sync::mps
     (url, rx)
 }
 
+/// The next path that the server of [`serve`] was asked for. A test whose request never comes fails, rather than
+/// waiting forever.
+#[cfg(test)]
+pub(super) fn asked(paths: &std::sync::mpsc::Receiver<String>) -> String {
+    paths.recv_timeout(std::time::Duration::from_secs(10)).unwrap()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -96,12 +103,20 @@ mod tests {
     fn a_download_is_its_body_on_success_only() {
         let (url, asked) = serve(200, b"archive");
         assert_eq!(fetch(&format!("{url}/v1/r.tar.gz")).unwrap(), b"archive");
-        assert_eq!(asked.recv().unwrap(), "/v1/r.tar.gz");
+        assert_eq!(super::asked(&asked), "/v1/r.tar.gz");
         let (url, _) = serve(404, b"Not Found");
         let missing = fetch(&format!("{url}/r.tar.gz")).unwrap_err();
         assert!(matches!(missing.downcast_ref(), Some(Error::Status { status: 404, .. })), "{missing}");
         // Nothing listens on port 9 (discard).
         let refused = fetch("http://127.0.0.1:9/r.tar.gz").unwrap_err();
+        assert!(matches!(refused.downcast_ref(), Some(Error::Download { .. })), "{refused}");
+    }
+
+    /// A download larger than [`MAX_SIZE`] is refused.
+    #[test]
+    fn a_larger_download_is_refused() {
+        let (url, _) = serve(200, vec![0; usize::try_from(MAX_SIZE).unwrap() + 1].leak());
+        let refused = fetch(&format!("{url}/r.tar.gz")).unwrap_err();
         assert!(matches!(refused.downcast_ref(), Some(Error::Download { .. })), "{refused}");
     }
 

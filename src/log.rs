@@ -219,6 +219,7 @@ static HOOKS: Mutex<Option<Hooks>> = Mutex::new(None);
 
 impl Block {
     /// Erases it, prints `lines` above it, and draws it again.
+    #[cfg_attr(test, mutants::skip)] // Writes to the terminal, which tests have none of.
     fn redraw(&mut self, lines: &[String]) {
         let mut out = stdout().lock();
         let held = HELD.load(Ordering::Relaxed);
@@ -259,6 +260,7 @@ pub(crate) fn hold<T>(f: impl FnOnce() -> T) -> T {
 /// Draws what this process logs in a terminal with `hooks`, as a command does in its tree, or, without, above the
 /// runs again.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
+#[cfg_attr(test, mutants::skip)] // Sets the process's hooks, which every other test would then share.
 pub(crate) fn capture(hooks: Option<Hooks>) {
     *HOOKS.lock() = hooks;
 }
@@ -282,11 +284,13 @@ pub(crate) fn did(text: &str) {
 }
 
 /// Asks `question` in a terminal, and whether the answer is yes. False without a terminal to ask in.
+#[cfg_attr(test, mutants::skip)] // Waits for an answer in a terminal, which tests have none of.
 pub(crate) fn confirm(question: &str) -> std::io::Result<bool> {
     ask(question, question)
 }
 
 /// [`confirm`], as `short` in the step of a command that runs.
+#[cfg_attr(test, mutants::skip)] // Waits for an answer in a terminal, which tests have none of.
 pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
     if !std::io::stdin().is_terminal() || !stderr().is_terminal() {
         return Ok(false);
@@ -307,6 +311,7 @@ pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
 
 /// Shows `rows` as the runs, the last one open for the answer, and reads it. Nothing is redrawn meanwhile.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
+#[cfg_attr(test, mutants::skip)] // Waits for an answer in a terminal, which tests have none of.
 pub(crate) fn prompt(rows: Vec<String>) -> std::io::Result<String> {
     let mut block = BLOCK.lock();
     let erase = if block.drawn > 0 { format!("\x1b[{}A\x1b[J", block.drawn) } else { String::new() };
@@ -322,6 +327,7 @@ pub(crate) fn prompt(rows: Vec<String>) -> std::io::Result<String> {
 }
 
 /// Erases the status line, so that what is printed next follows the printed lines.
+#[cfg_attr(test, mutants::skip)] // Writes to the terminal, which tests have none of.
 pub(crate) fn clear() {
     let mut block = BLOCK.lock();
     if block.status.take().is_some() {
@@ -329,6 +335,7 @@ pub(crate) fn clear() {
     }
 }
 
+#[cfg_attr(test, mutants::skip)] // Sets the process's output mode once, which every other test would then share.
 pub(crate) fn init(json: bool, verbose: bool) {
     let live = !json && stdout().is_terminal() && crate::sys::ansi();
     let color = live && std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
