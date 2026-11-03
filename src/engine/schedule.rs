@@ -341,8 +341,12 @@ mod tests {
         // 02:30 comes twice there on 2026-10-25: the first time only.
         assert_eq!(next("30 2 * * *", "2026-10-25T00:30:00Z", &berlin), ts("2026-10-26T01:30:00Z"));
         assert_eq!(next("5/20 * * * *", "2026-01-01T00:30:00Z", &utc), ts("2026-01-01T00:45:00Z"));
+        // The next 29 February, more than a year away.
+        assert_eq!(next("0 0 29 2 *", "2026-10-16T00:00:00Z", &utc), ts("2028-02-29T00:00:00Z"));
+        // Lists that overlap set each minute once.
+        assert_eq!(next("0-5,3 * * * *", "2026-01-01T00:02:30Z", &utc), ts("2026-01-01T00:03:00Z"));
         assert!(
-            ["never", "", "* * * *", "0 0 * * * *", "60 * * * *", "x * * * *"]
+            ["never", "", "* * * *", "0 0 * * * *", "60 * * * *", "x * * * *", "*/0 * * * *", "5-3 * * * *"]
                 .iter()
                 .all(|e| settings::cron(e).is_err())
         );
