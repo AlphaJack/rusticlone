@@ -261,8 +261,16 @@ fn notify_says_what_it_sends() {
     sb.write("docs/a.txt", "a");
     sb.run(&["backup", "--all"]).assert_exit(0);
     sb.run(&["notify", "--all", "--dry-run"]).assert_exit(0).assert_result("would-notify", json!({}));
-    // Nothing listens on port 9.
-    sb.run(&["notify", "--all"]).assert_exit(1).assert_result("undelivered", json!({}));
+    // Nothing listens on port 9. Asked for, an undelivered notification is the command's failure.
+    let failed = sb.run(&["notify", "--all"]);
+    failed.assert_exit(1).assert_json(&json!({"level": "ERROR", "event": {"kind": "undelivered"}}));
+    let event = failed
+        .stdout
+        .lines()
+        .find_map(|l| serde_json::from_str::<serde_json::Value>(l).ok().filter(|e| e["event"]["kind"] == "undelivered"))
+        .unwrap();
+    let error = event["event"]["error"].as_str().unwrap();
+    assert!(event["message"].as_str().unwrap().contains(error), "{event}");
     sb.run(&["notify"]).assert_exit(1);
 }
 
