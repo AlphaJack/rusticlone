@@ -632,7 +632,7 @@ fn fake_service_manager(sb: &Sandbox, log: &std::path::Path) -> Option<Fake> {
     }
     let path = std::env::var("PATH").unwrap();
     #[cfg(target_os = "linux")]
-    return Some(Fake { path, bus: crate::bus::FakeBus::start(sb, log) });
+    return Some(Fake { path, bus: crate::bus::FakeBus::start(sb, log, None) });
     #[cfg(not(target_os = "linux"))]
     {
         use std::os::unix::fs::PermissionsExt;
