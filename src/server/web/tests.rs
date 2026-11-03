@@ -343,6 +343,20 @@ fn unlisted_profile_shows_a_spinner() {
     let page = Page::of(&IndexMain::build(vec![CollectionInput { listed: false, ..healthy() }]));
     assert_eq!(page.texts("td .spinner").len(), 1);
     assert!(page.texts("td > .dot").is_empty());
+    // Listed: its health.
+    assert!(Page::of(&IndexMain::build(vec![healthy()])).texts("td .spinner").is_empty());
+}
+
+/// A collection whose repositories hold no snapshot offers no restore.
+#[test]
+fn nothing_to_restore_offers_no_restore() {
+    let restores = |input: CollectionInput| {
+        let page = Page::of(&CollectionMain::build(input, LogView::default()));
+        page.attrs("button[hx-get*='kind=restore']", "hx-get").len()
+    };
+    assert_eq!(restores(healthy()), 1);
+    let empty = ["Docs", "Docs-usb", "Docs-offsite"].map(|r| (r.to_owned(), listed(0, 0))).into();
+    assert_eq!(restores(CollectionInput { listings: empty, ..healthy() }), 0);
 }
 
 #[test]
