@@ -95,6 +95,7 @@ fn dir() -> Result<PathBuf> {
 }
 
 /// A user without a graphical session, as on a server over SSH, whose services systemd would stop at logout.
+#[cfg_attr(test, mutants::skip)] // Reads this session's environment, which every test shares.
 pub(super) fn headless() -> bool {
     !sys::is_root() && ["DISPLAY", "WAYLAND_DISPLAY"].iter().all(|v| std::env::var_os(v).is_none())
 }
@@ -137,18 +138,21 @@ fn known() -> bool {
 }
 
 /// Whether the server starts at login, by the same rule as `systemctl is-enabled`.
+#[cfg_attr(test, mutants::skip)] // Asks systemd.
 pub(super) fn at_login() -> Option<bool> {
     /// The states in which `systemctl is-enabled` succeeds.
     const ENABLED: [&str; 7] = ["enabled", "enabled-runtime", "static", "alias", "indirect", "generated", "transient"];
     state(&format!("{NAME}.service")).map(|s| ENABLED.contains(&s.as_str()))
 }
 
+#[cfg_attr(test, mutants::skip)] // Changes systemd's settings.
 pub(super) fn set_at_login(on: bool) -> Result<()> {
     let service = format!("{NAME}.service");
     if on { enable(&service) } else { disable(&service) }
 }
 
 /// Asks systemd to start the server unless it runs; false without its unit.
+#[cfg_attr(test, mutants::skip)] // Asks systemd to start the server.
 pub(super) fn start() -> Result<bool> {
     if !known() {
         return Ok(false);
@@ -194,6 +198,7 @@ pub(super) fn rewrite_app(_: &str) -> Result<()> {
 }
 
 /// macOS's alone: Login Items.
+#[cfg_attr(test, mutants::skip)] // macOS's alone.
 pub(super) fn blocked() -> bool {
     false
 }
