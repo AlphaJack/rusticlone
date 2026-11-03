@@ -306,17 +306,18 @@ mod tests {
         };
         let store = Store::at(crate::sys::test_dir("board-lines")).unwrap();
         let run = Guard::start(&Runs::new(|_| {}), RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli));
-        let step = |label: &str, status, results: &[StepResult]| StepRecord {
+        let step = |label: &str, repo: Option<&str>, status, results: &[StepResult]| StepRecord {
+            repo: repo.map(Into::into),
             status,
             results: results.iter().map(Into::into).collect(),
             ..StepRecord::queued(label.into(), Vec::new())
         };
         let copied = StepResult::Copied { target: "Docs-usb".into(), snapshots: 2 };
         run.live.steps(&[
-            step("backup", Status::Running, &[]),
-            step("copy to Docs-usb", Status::Succeeded, &[copied]),
-            step("forget", Status::Running, &[]),
-            step("prune", Status::Queued, &[]),
+            step("backup", None, Status::Running, &[]),
+            step("copy to Docs-usb", Some("Docs-usb"), Status::Succeeded, &[copied]),
+            step("forget", None, Status::Running, &[]),
+            step("prune", None, Status::Queued, &[]),
         ]);
         run.live.set_activity(Some(0), Some(Doing::Path { path: "/docs".into() }), None);
         // Not running: what it did shows instead.

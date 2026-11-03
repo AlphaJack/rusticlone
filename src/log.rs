@@ -524,23 +524,18 @@ mod tests {
         }
     }
 
-    /// With colors, each level has its own, success is left plain, and the spinner turns.
+    /// Each level has its own color, and the spinner turns a frame at a time. Colors stay off, and the frame is
+    /// put back, for the other tests.
     #[test]
-    fn levels_are_painted_and_the_spinner_turns() {
-        _ = MODE.set(Mode { color: true, ..Mode::default() });
-        assert_eq!(paint(Level::Success, "ok"), "ok");
-        let painted = [Level::Warning, Level::Failure].map(|level| paint(level, "x"));
-        assert_eq!(painted, ["\x1b[33mx\x1b[0m", "\x1b[31mx\x1b[0m"]);
-        assert_eq!(Tone::Muted.dot(), "\x1b[2m●\x1b[0m");
-        let frames: Vec<String> = (0..5)
-            .map(|_| {
-                let dot = Tone::Running.dot();
-                turn();
-                dot
-            })
-            .collect();
-        let at = SPINNER.iter().position(|s| frames[0].contains(s)).unwrap();
-        let expected: Vec<String> = (at..at + 5).map(|i| format!("\x1b[2m{}\x1b[0m", SPINNER[i % 4])).collect();
-        assert_eq!(frames, expected);
+    fn levels_have_their_colors_and_the_spinner_turns() {
+        let codes = [Level::Success, Level::Warning, Level::Failure].map(|level| Tone::from(level).code());
+        assert_eq!(codes, ["32", "33", "31"]);
+        assert_eq!(Tone::Muted.code(), "2");
+        let start = FRAME.load(Ordering::Relaxed);
+        FRAME.store(6, Ordering::Relaxed);
+        assert_eq!(Tone::Running.dot(), SPINNER[2]);
+        turn();
+        assert_eq!(Tone::Running.dot(), SPINNER[3]);
+        FRAME.store(start, Ordering::Relaxed);
     }
 }

@@ -5,7 +5,7 @@ expression: drawn.lines
 [
     "Docs: backup collection",
     "├── ◐ backup: /docs",
-    "├── ● copy to Docs-usb: Docs-usb: copied 2 snapshots",
+    "├── ● copy to Docs-usb: copied 2 snapshots",
     "├── ◐ forget",
     "└── ● prune",
 ]
