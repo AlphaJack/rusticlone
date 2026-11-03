@@ -189,6 +189,11 @@ impl Ledger {
         self.last_steps.get(key)
     }
 
+    /// [`Self::last_step`], to keep.
+    pub fn last_step_owned(&self, key: &StepKey) -> Option<LastStep> {
+        self.last_step(key).cloned()
+    }
+
     /// Whether any step ever ran here: collections were configured before.
     pub fn ran_before(&self) -> bool {
         !self.last_steps.is_empty()

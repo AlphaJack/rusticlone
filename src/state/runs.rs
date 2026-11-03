@@ -155,8 +155,12 @@ impl RunLog {
         }
     }
 
+    fn step_mut(&mut self, step: Option<usize>) -> Option<&mut StepRecord> {
+        step.and_then(|s| self.record.steps.get_mut(s))
+    }
+
     pub(crate) fn waited(&mut self, step: Option<usize>, secs: u64) {
-        if let Some(s) = step.and_then(|s| self.record.steps.get_mut(s)) {
+        if let Some(s) = self.step_mut(step) {
             s.waited += secs;
         }
     }
@@ -180,7 +184,7 @@ impl RunLog {
     /// Returns whether they changed: a run waiting for a lock is told so again at every change of the state,
     /// which its own save would be.
     pub(crate) fn holds(&mut self, step: Option<usize>, holds: Holds) -> bool {
-        let Some(s) = step.and_then(|s| self.record.steps.get_mut(s)).filter(|s| s.holds != holds) else {
+        let Some(s) = self.step_mut(step).filter(|s| s.holds != holds) else {
             return false;
         };
         let holding = !holds.using.is_empty();

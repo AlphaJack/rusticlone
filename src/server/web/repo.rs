@@ -69,7 +69,7 @@ fn measuring(l: &Inventory) -> bool {
 
 pub(super) fn repo_view(app: &Arc<App>, collection: &str, repo: &str) -> Option<RepoView> {
     let engine = app.engine();
-    let j = engine.collection(collection).filter(|j| j.repo(repo).is_some())?;
+    let j = engine.collection(collection).filter(|j| j.has(repo))?;
     let input = CollectionInput::read(app, &engine, Some(&j), engine.status_of(&j), 0);
     // Never measured, or measured before the last change: measure it, and show the old size meanwhile.
     let stale = |i: &Listing| matches!(i, Listing::Listed(l) if measuring(l));

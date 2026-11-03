@@ -169,7 +169,8 @@ fn prepare(w: &WriteTransaction, path: &std::path::Path) -> Result<()> {
         if stored.is_some_and(|s| s > known) {
             Err(Error::Newer { path: path.to_owned() })?;
         }
-        if stored < Some(readable_from) {
+        // Data from a newer version can need more than this one does.
+        if stored.max(Some(readable_from)) != stored {
             table.insert(name, readable_from)?;
         }
     }
@@ -186,6 +187,11 @@ fn to_json(value: &impl Serialize) -> Result<String> {
 
 fn at(ms: i64) -> Timestamp {
     Timestamp::from_millisecond(ms).unwrap_or_default()
+}
+
+/// Whether a session that expires at `expires`, in milliseconds, is still valid at `now`.
+fn unexpired(expires: i64, now: Timestamp) -> bool {
+    at(expires) > now
 }
 
 /// The state: the ledger, the runs, the listings and the sessions, in one database.
@@ -535,10 +541,10 @@ impl Store {
 
     /// Adds a session valid until `expires`, and removes expired ones.
     pub fn add_session(&self, hash: &str, expires: Timestamp, token: &str) -> Result<()> {
-        let now = self.now().as_millisecond();
+        let now = self.now();
         self.write(Shown::Nothing, |w| {
             let mut table = w.open_table(SESSIONS)?;
-            table.retain(|_, (expires, _)| expires > now)?;
+            table.retain(|_, (expires, _)| unexpired(expires, now))?;
             table.insert(hash, (expires.as_millisecond(), token))?;
             Ok(())
         })
@@ -548,7 +554,7 @@ impl Store {
     pub fn session(&self, hash: &str) -> Option<String> {
         let session =
             self.read(|r| Ok(r.open_table(SESSIONS)?.get(hash)?.map(|e| (e.value().0, e.value().1.to_owned()))));
-        session.ok().flatten().filter(|&(ms, _)| at(ms) > self.now()).map(|(_, token)| token)
+        session.ok().flatten().filter(|&(expires, _)| unexpired(expires, self.now())).map(|(_, token)| token)
     }
 
     /// Removes the session.

@@ -43,7 +43,7 @@ impl Engine {
                     } else {
                         self.list(&run, repo)
                     };
-                    (snapshots, stats.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic)))
+                    (snapshots, crate::thread::joined(stats.join()))
                 });
                 // A target that cannot be listed is not in sync.
                 let lag = match &*primary {
@@ -200,7 +200,7 @@ impl Engine {
         now: Timestamp,
         failing: &dyn Fn(&LastStep) -> bool,
     ) -> RepoOverview {
-        let last = |key: StepKey| state.last_step(&key).cloned();
+        let last = |key: StepKey| state.last_step_owned(&key);
         let primary = r.name == p.name;
         let (backed_up, last_backup) = schedule::backups(p, state);
         let stale_at = self.stale_at(p, r, state, last_backup);
@@ -263,9 +263,8 @@ impl Engine {
         now: Timestamp,
     ) -> CollectionOverview {
         let p = collection.primary;
-        let last = |key: StepKey| state.last_step(&key).cloned();
         let snapshot_key = StepKey::Snapshot(p.name.clone());
-        let snapshot = last(snapshot_key.clone());
+        let snapshot = state.last_step_owned(&snapshot_key);
         let (backed_up, last_backup) = schedule::backups(p, state);
         let running = self.running(&p.name);
         let failing = |t: &LastStep| {
