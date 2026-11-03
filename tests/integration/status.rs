@@ -251,6 +251,9 @@ fn a_collection_is_named_after_what_its_profiles_share() {
     sb.write("docs/a.txt", "version 1");
     sb.run(&["backup", "--collection", "Docs"]).assert_exit(0).assert_result("backed-up", json!({"repo": "Docs-usb"}));
     sb.run(&["collections"]).assert_exit(0).assert_json(&json!({"title": "Docs", "primary": {"name": "Docs-usb"}}));
+    // Outside a run, what it does is a progress line of its own.
+    let listing = json!({"target": "progress", "collection": "Docs", "event": {"kind": "listing", "repo": "Docs-usb"}});
+    sb.run(&["collections", "--refresh"]).assert_exit(0).assert_json(&listing);
 }
 
 /// `notify` sends the status on request; in a dry run, it says what it would send.
