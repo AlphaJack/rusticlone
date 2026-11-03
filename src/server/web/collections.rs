@@ -322,10 +322,10 @@ struct Overview {
 }
 
 /// No collections yet: where to put them, and examples.
-struct Empty {
-    dir: String,
+pub(super) struct Empty {
+    pub(super) dir: String,
     /// The setup form can save there.
-    writable: bool,
+    pub(super) writable: bool,
 }
 
 #[derive(Template)]
@@ -356,16 +356,22 @@ pub(super) fn index_main(app: &App) -> IndexMain {
     let blocked = crate::install::autostart::blocked().map(|b| b.to_string());
     #[cfg(not(feature = "desktop"))]
     let blocked = None;
-    IndexMain {
-        empty,
-        untested: engine.rustic.untested(),
-        blocked,
-        unconfigured: engine.unconfigured(),
-        ..IndexMain::build(inputs)
-    }
+    IndexMain::build(inputs).with(empty, engine.rustic.untested(), blocked, engine.unconfigured())
 }
 
 impl IndexMain {
+    /// With what the page says above the collections: where a first profile goes, an untested rustic, a start at
+    /// login switched off, and why there is no collection.
+    pub(super) fn with(
+        self,
+        empty: Option<Empty>,
+        untested: Option<rustic::Untested>,
+        blocked: Option<String>,
+        unconfigured: Option<Unconfigured>,
+    ) -> Self {
+        Self { empty, untested, blocked, unconfigured, ..self }
+    }
+
     pub(super) fn build(inputs: Vec<CollectionInput>) -> Self {
         let mut runs: Vec<RunRow> = inputs.iter().filter(|i| i.configured).flat_map(|i| i.runs.clone()).collect();
         runs.sort_by_key(RunRow::order);

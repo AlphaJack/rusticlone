@@ -193,9 +193,6 @@ pub(crate) enum Fault {
         listen: String,
         source: std::io::Error,
     },
-    /// Ends the Windows service after an update, so that the service manager starts the new executable.
-    #[cfg(feature = "self-update")]
-    Restarting,
     NoSession(#[source] getrandom::Error),
     NoToken(#[source] getrandom::Error),
     SessionNotKept(#[source] Box<dyn std::error::Error + Send + Sync>),
@@ -294,15 +291,11 @@ pub(crate) fn serve(
     tray::beside(open, serve)
 }
 
-/// Starts the executable, just replaced, in place of this process, with the same arguments: on Unix as the
-/// same process, which the service manager keeps following; as the Windows service, by ending with an
-/// error, after which the service manager starts it again; else as a new process, and this one ends.
+/// Starts the executable, just replaced, in place of this process, with the same arguments, as each system does.
 #[cfg(feature = "self-update")]
+#[cfg_attr(test, mutants::skip)] // Replaces this process.
 #[expect(clippy::disallowed_methods, reason = "starts the updated rusticlone, not rustic")]
 fn restart(exe: &std::path::Path) -> Result<()> {
-    if service::running() {
-        return Err(Fault::Restarting.into());
-    }
     let mut command = std::process::Command::new(exe);
     command.args(std::env::args_os().skip(1));
     os::restart(&mut command)
