@@ -123,6 +123,24 @@ fn volume_root(path: &Path) -> Option<String> {
 /// Whether `\` separates the parts of a path, as `/` does.
 pub(crate) const BACKSLASH_SEPARATES: bool = true;
 
+/// Moves `from` over `to`. Windows keeps an executable locked a moment after its process exits, while the system or
+/// an antivirus still holds it: retried meanwhile.
+#[cfg(feature = "desktop")]
+#[expect(clippy::disallowed_methods, reason = "replaces an installed file, retried while Windows holds it")]
+pub(crate) fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    const RETRY: std::time::Duration = std::time::Duration::from_millis(100);
+    const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
+    let deadline = std::time::Instant::now() + TIMEOUT;
+    loop {
+        match std::fs::rename(from, to) {
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied && std::time::Instant::now() < deadline => {
+                std::thread::sleep(RETRY);
+            }
+            done => return done,
+        }
+    }
+}
+
 /// macOS's alone.
 pub(crate) fn needs_disk_access(_: &str) -> bool {
     false
