@@ -1,8 +1,17 @@
 # The server's code is mutated too.
 all_features = true
 
-# The mutants run on Linux, where another system's files are never built: their mutants would always be missed.
-exclude_globs = ["**/windows.rs", "**/windows/**", "**/macos.rs", "**/macos/**"]
+# The mutants run on Linux with every feature. Files that this build never compiles would always be missed:
+# another system's, the tray's for macOS and Windows, and the ones for a build without the desktop.
+exclude_globs = [
+  "**/windows.rs",
+  "**/windows/**",
+  "**/macos.rs",
+  "**/macos/**",
+  "src/server/tray/icon.rs",
+  "src/server/no_tray.rs",
+  "src/server/desktop/headless.rs",
+]
 
 # Mutants dealt out one by one, so that shards finish together: in source order, those of slow files share a shard.
 sharding = "round-robin"
