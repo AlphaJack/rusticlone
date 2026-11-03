@@ -529,6 +529,50 @@ fn resolve_within(path: &Path, links: usize) -> PathBuf {
 mod tests {
     use super::*;
 
+    /// A profile whose one snapshot has `snapshot`'s fields, in `repository`.
+    fn with_snapshot(repository: &str, snapshot: &str) -> RusticProfile {
+        parse(
+            "Docs",
+            &format!("[repository]\nrepository = '{repository}'\npassword = 'x'\n[[backup.snapshots]]\n{snapshot}\n"),
+        )
+    }
+
+    /// A folder that a hook creates has its paths learned from what rustic records. One that rustic reads from
+    /// stdin, from a remote, or as a path of its own does not, and neither does one without a hook.
+    #[test]
+    fn only_a_folder_a_hook_creates_is_learned() {
+        let hook = "hooks = { run-before = ['mount'] }";
+        let unknown = |snapshot: &str| with_snapshot("/backup", snapshot).sources[0].unknown();
+        assert!(unknown(&format!("sources = ['not yet']\n{hook}")));
+        assert!(!unknown("sources = ['not yet']"));
+        assert!(!unknown(&format!("sources = ['not yet']\nas-path = '/data'\n{hook}")));
+        assert!(!unknown(&format!("sources = ['-']\n{hook}")));
+        assert!(!unknown(&format!("sources = ['opendal:s3']\n{hook}")));
+        let profile = with_snapshot("/backup", &format!("sources = ['not yet']\n{hook}"));
+        let sources = &profile.sources[0];
+        assert!(sources.unlearned());
+        sources.learn(vec!["/mnt/data".into()]);
+        assert!(sources.learned() && !sources.unlearned());
+        assert_eq!(sources.paths(), ["/mnt/data"]);
+    }
+
+    /// A repository without a local path is remote.
+    #[cfg(feature = "server")]
+    #[test]
+    fn a_repository_without_a_path_is_remote() {
+        assert!(!with_snapshot("/backup", "sources = ['docs']").is_remote());
+        assert!(with_snapshot("rest:http://nas:8000", "sources = ['docs']").is_remote());
+    }
+
+    /// The profile folders, as shown.
+    #[test]
+    fn the_profile_folders_are_shown() {
+        let dirs = profile_dirs().unwrap();
+        assert!(!dirs.is_empty());
+        assert_eq!(dirs_display(), display(&dirs));
+        assert_eq!(dirs_searched(), searched(&dirs));
+    }
+
     /// The folders searched, by name, and the current one as "here", last.
     #[test]
     fn the_current_folder_is_searched_as_here() {
