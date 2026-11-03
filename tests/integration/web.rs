@@ -909,3 +909,15 @@ fn stopping_what_does_not_run_is_refused() {
     // Every run of the collection: there is none to stop, and nothing to refuse.
     assert_eq!(server.delete("/collections/Docs/runs").code, 200);
 }
+
+/// A run's page goes on showing its log from where the page left it, so that no line is shown twice or lost.
+#[test]
+fn a_run_s_page_follows_its_log_from_where_it_left_it() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    let id = sb.store().runs("Docs", 1)[0].id;
+    let server = sb.server(&[]);
+    let page = server.get(&format!("/collections/Docs/runs/{id}"));
+    assert_eq!(page.code, 200);
+    assert!(page.body.contains(&format!("&amp;log={id}&amp;at=")), "{}", page.body);
+}
