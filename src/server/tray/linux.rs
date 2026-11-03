@@ -150,3 +150,92 @@ impl ksni::Tray for Shown {
 pub(in crate::server) fn managed() -> bool {
     std::env::var_os("NOTIFY_SOCKET").is_some()
 }
+
+#[cfg(test)]
+mod tests {
+    use parking_lot::Mutex;
+
+    use ksni::Tray as _;
+
+    use super::*;
+    use crate::log::Level;
+
+    /// A failing collection, a profile that cannot be read and a switch that is on. Clicks are kept in `clicks`.
+    fn shown(clicks: &Arc<Mutex<Vec<Click>>>) -> Shown {
+        let clicks = Arc::clone(clicks);
+        let row = |label: &str, level, url: Option<&str>| Row { label: label.into(), level, url: url.map(Into::into) };
+        Shown {
+            login: "http://web/login".into(),
+            rows: vec![
+                row("docs: failing", Level::Failure, Some("http://web/docs")),
+                row("broken", Level::Warning, None),
+            ],
+            switches: vec![(Switch::AtLogin, Some(true))],
+            dark: true,
+            run: Arc::new(move |click| clicks.lock().push(click)),
+        }
+    }
+
+    /// Each item says what the menu says, and a click on it does what the menu says.
+    #[test]
+    fn the_panel_draws_each_item_of_the_menu() {
+        let clicks = Arc::default();
+        let mut shown = shown(&clicks);
+        let mut drawn = Vec::new();
+        for item in shown.menu() {
+            drawn.push(match item {
+                MenuItem::Standard(item) => {
+                    (item.activate)(&mut shown);
+                    let click = clicks.lock().pop();
+                    assert_eq!(
+                        item.enabled,
+                        click.is_some(),
+                        "only an item that does something is enabled: {}",
+                        item.label
+                    );
+                    Item::Entry { label: item.label, click }
+                }
+                MenuItem::Checkmark(item) => {
+                    (item.activate)(&mut shown);
+                    let click = clicks.lock().pop().unwrap();
+                    Item::Check { label: item.label, enabled: item.enabled, checked: item.checked, click }
+                }
+                MenuItem::Separator => Item::Separator,
+                MenuItem::SubMenu(_) | MenuItem::RadioGroup(_) => panic!("the menu has no submenu"),
+            });
+        }
+        assert_eq!(drawn, items(&shown.login, &shown.rows, &shown.switches));
+    }
+
+    /// A click on the icon opens the web UI, logged in.
+    #[test]
+    fn a_click_on_the_icon_opens_the_web_ui() {
+        let clicks = Arc::default();
+        shown(&clicks).activate(0, 0);
+        assert_eq!(*clicks.lock(), [Click::Open("http://web/login".into())]);
+    }
+
+    #[test]
+    fn the_panel_names_the_icon_and_says_the_health() {
+        let shown = shown(&Arc::default());
+        assert_eq!((shown.id(), shown.title()), ("rusticlone".into(), "Rusticlone".into()));
+        assert_eq!(shown.tool_tip().title, "Rusticlone: failing");
+    }
+
+    /// The logo of the worst level, in white for the dark panel, with each pixel's alpha moved first.
+    #[test]
+    fn the_icon_is_the_logo_in_argb() {
+        let icons = shown(&Arc::default()).icon_pixmap();
+        let [icon] = icons.as_slice() else { panic!("{} icons", icons.len()) };
+        assert_eq!((icon.width, icon.height), (i32::try_from(SIDE).unwrap(), i32::try_from(SIDE).unwrap()));
+        let rgba = pixels(Level::Failure, ink(true), false);
+        let argb = rgba.chunks(4).flat_map(|p| [p[3], p[0], p[1], p[2]]).collect::<Vec<_>>();
+        assert_eq!(icon.data, argb);
+    }
+
+    /// Only a light scheme makes the panel light.
+    #[test]
+    fn the_panel_is_dark_unless_the_scheme_is_light() {
+        assert_eq!([None, Some(0), Some(1), Some(LIGHT)].map(dark), [true, true, true, false]);
+    }
+}
