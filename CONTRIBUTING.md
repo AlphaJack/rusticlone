@@ -120,6 +120,7 @@ cargo nextest run restores_a                    # tests by name
 
 Run the `run:` steps of [ci.yml](.github/workflows/ci.yml) before pushing.
 Tests for another system do not compile on yours, so the dev container covers Linux.
+The `mutants` label on a PR runs [cargo-mutants](https://mutants.rs) on the lines it changes, and lists the changes no test catches.
 
 ## Pull requests
 
