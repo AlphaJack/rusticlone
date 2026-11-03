@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.5](https://github.com/AlphaJack/rusticlone/compare/v2.0.4...v2.0.5) - 2026-11-03
+
+### Fixed
+
+- Give each run its own id, also when two start in the same millisecond ([#155](https://github.com/AlphaJack/rusticlone/pull/155))
+- Build with each feature alone ([#133](https://github.com/AlphaJack/rusticlone/pull/133))
+- Define tie_child once ([#127](https://github.com/AlphaJack/rusticlone/pull/127))
+
+#### Backup
+
+- Restore a source behind a link whose folder is gone ([#161](https://github.com/AlphaJack/rusticlone/pull/161))
+
+### Translated
+
+- Translate the tray's Open item and an update error ([#118](https://github.com/AlphaJack/rusticlone/pull/118))
+
 ## [2.0.4](https://github.com/AlphaJack/rusticlone/compare/v2.0.3...v2.0.4) - 2026-11-02
 
 ### Fixed
