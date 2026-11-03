@@ -564,8 +564,8 @@ fn a_missing_repository_hides_the_failures_it_causes() {
         attempted(&engine, key, &failed(), false);
     }
     let issues = engine.status_of(&engine.collections()[0]).issues;
-    assert!(issues.iter().any(|i| matches!(i, super::Issue::Missing { repo, .. } if repo == "Docs")), "{issues:?}");
-    let steps: Vec<_> = issues.iter().filter_map(super::Issue::step).collect();
+    assert!(issues.iter().any(|i| matches!(i, super::report::Issue::Missing { repo, .. } if repo == "Docs")), "{issues:?}");
+    let steps: Vec<_> = issues.iter().filter_map(super::report::Issue::step).collect();
     assert_eq!(steps, [&StepKey::Check("Docs-usb".into())]);
 }
 
@@ -574,7 +574,7 @@ fn a_missing_repository_hides_the_failures_it_causes() {
 fn a_listed_primary_without_snapshots_was_never_backed_up() {
     let engine = engine("never-backed-up", &Replay::new());
     let collection = &engine.collections()[0];
-    let never = || engine.status_of(collection).issues.iter().any(|i| matches!(i, super::Issue::NeverBackedUp));
+    let never = || engine.status_of(collection).issues.iter().any(|i| matches!(i, super::report::Issue::NeverBackedUp));
     assert!(!never());
     let inventory =
         crate::state::Inventory { listed: engine.store.now(), result: Err("offline".into()), size_outdated: false };
@@ -594,7 +594,7 @@ fn an_undelivered_notification_shows_while_it_fails() {
     let undelivered = |failures| {
         let notified = crate::state::Notified { failures, error: Some("refused".into()), ..Default::default() };
         engine.store.update_notified("Docs", |_| notified.clone()).unwrap();
-        engine.status_of(collection).issues.iter().any(|i| matches!(i, super::Issue::Undelivered { .. }))
+        engine.status_of(collection).issues.iter().any(|i| matches!(i, super::report::Issue::Undelivered { .. }))
     };
     assert!(!undelivered(0));
     assert!(undelivered(1));
@@ -616,7 +616,7 @@ fn an_unreadable_profile_fails() {
     let status = engine.status();
     let [bad] = status.as_slice() else { panic!("one collection") };
     assert_eq!((bad.title.as_str(), bad.primary.name.as_str(), bad.level), ("Bad", "Bad", Level::Failure));
-    assert!(matches!(bad.issues.as_slice(), [super::Issue::Unreadable { error }] if error == "expected `=`"));
+    assert!(matches!(bad.issues.as_slice(), [super::report::Issue::Unreadable { error }] if error == "expected `=`"));
     assert_eq!(engine.report_broken(), Level::Failure);
 }
 
