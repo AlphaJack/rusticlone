@@ -76,6 +76,17 @@ $R backup --all
 - What should be refactored is refactored first, in a PR of its own, not built upon.
 - A system's calls go in a file per system, picked by a `cfg` over its `mod` declaration and a `use ... as imp;`. Each such file defines the same functions, so no other code needs a system's `cfg`. `tests/conventions/systems.rs` checks it.
 
+## Tests
+
+What lets a test catch a mutant:
+
+- Decide in plain functions. The edges only act.
+- One rule, one place.
+- A system's answer is a value in its own file.
+- Assert exact values. Snapshot text.
+- Wait with a timeout. Share no global.
+- Skip only what no test reaches: `#[cfg_attr(test, mutants::skip)] // why`.
+
 ## DRY principle
 
 - A setting is a line of `settings!` in `src/settings.rs`. `packaging/rusticlone.env` is generated from the settings read at startup and committed. `documented_variables_exist` fails on a README variable that no setting reads.
