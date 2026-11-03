@@ -113,6 +113,37 @@ mod tests {
         assert_eq!(found, [Some(false), Some(true), None]);
     }
 
+    /// Network file systems by their magic number, also when a signed field extends it. Not a disk's.
+    #[test]
+    fn network_file_systems_are_known_by_their_number() {
+        let cifs = i32::from_ne_bytes(0xff53_4d42_u32.to_ne_bytes());
+        assert!(super::network(0x6969) && super::network(cifs.into()));
+        assert!(!super::network(0xef53), "ext4");
+    }
+
+    /// The kind of disk the kernel gives for a folder's device.
+    #[test]
+    fn a_folders_disk_is_the_kernels() {
+        let root = std::path::Path::new("/");
+        let dev = crate::sys::device(root).unwrap();
+        let kernel = solid_state_in(std::path::Path::new("/sys"), libc::major(dev), libc::minor(dev));
+        assert_eq!(super::solid_state(root), kernel);
+    }
+
+    /// Where Linux keeps what is the system's, and what tells a container.
+    #[test]
+    fn linux_answers_its_own_way() {
+        use std::path::Path;
+        assert_eq!(super::system_state_dir("app"), Path::new("/var").join("lib").join("app"));
+        let (proc, etc) = (Path::new("/proc"), Path::new("/etc"));
+        assert_eq!(super::mount_tables(), Some([proc.join("self").join("mounts"), etc.join("fstab")]));
+        #[cfg(any(feature = "desktop", feature = "self-update"))]
+        assert_eq!(
+            super::container_markers(),
+            Some([std::path::PathBuf::from("/.dockerenv"), Path::new("/run").join(".containerenv")])
+        );
+    }
+
     /// As `/usr/bin` of a package. Root writes there anyway.
     #[cfg(any(feature = "server", feature = "self-update"))]
     #[test]
