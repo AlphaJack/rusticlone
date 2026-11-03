@@ -77,7 +77,7 @@ pub(super) fn beside(attended: bool, serve: impl FnOnce(Option<Tray>) -> Result<
         served
     });
     app.run();
-    server.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))
+    crate::thread::joined(server.join())
 }
 
 /// Ends `run`, which returns once it handles an event.

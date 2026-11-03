@@ -121,30 +121,21 @@ pub(crate) trait Choice: std::fmt::Debug + strum::IntoEnumIterator {
     }
 }
 
-impl Choice for Kind {}
-impl Choice for Every {}
-impl Choice for Keep {}
+/// Makes each type a [`Choice`] that the form's text converts to.
+macro_rules! choices {
+    ($($choice:ty),*) => {$(
+        impl Choice for $choice {}
 
-impl TryFrom<String> for Keep {
-    type Error = Unknown;
-    fn try_from(sent: String) -> Result<Self, Unknown> {
-        Self::chosen(&sent)
-    }
+        impl TryFrom<String> for $choice {
+            type Error = Unknown;
+            fn try_from(sent: String) -> Result<Self, Unknown> {
+                Self::chosen(&sent)
+            }
+        }
+    )*};
 }
 
-impl TryFrom<String> for Kind {
-    type Error = Unknown;
-    fn try_from(sent: String) -> Result<Self, Unknown> {
-        Self::chosen(&sent)
-    }
-}
-
-impl TryFrom<String> for Every {
-    type Error = Unknown;
-    fn try_from(sent: String) -> Result<Self, Unknown> {
-        Self::chosen(&sent)
-    }
-}
+choices!(Kind, Every, Keep);
 
 /// How to configure a remote.
 #[cfg(feature = "server")]

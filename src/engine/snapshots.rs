@@ -212,7 +212,7 @@ pub(super) fn pick(snapshots: &[Snapshot], groups: &[Vec<String>], at: Option<Ti
 pub(super) fn each<I: Sync, T: Send>(items: &[I], f: impl Fn(&I) -> T + Sync) -> Vec<T> {
     std::thread::scope(|scope| {
         let threads: Vec<_> = items.iter().map(|item| scope.spawn(|| f(item))).collect();
-        threads.into_iter().map(|t| t.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))).collect()
+        threads.into_iter().map(|t| crate::thread::joined(t.join())).collect()
     })
 }
 
