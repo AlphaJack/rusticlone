@@ -7,5 +7,6 @@ exclude_globs = ["**/windows.rs", "**/windows/**", "**/macos.rs", "**/macos/**"]
 # Mutants dealt out one by one, so that shards finish together: in source order, those of slow files share a shard.
 sharding = "round-robin"
 
-# A lint denied in the crate, such as an expectation left unfulfilled, is only a warning: the mutant is tested.
-cap_lints = true
+# A mutant whose build takes three times the unmutated one is stopped. Such a build does not end: a loop in a
+# `const fn` that never stops runs at compile time.
+build_timeout_multiplier = 3.0
