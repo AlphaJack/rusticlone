@@ -564,7 +564,10 @@ fn a_missing_repository_hides_the_failures_it_causes() {
         attempted(&engine, key, &failed(), false);
     }
     let issues = engine.status_of(&engine.collections()[0]).issues;
-    assert!(issues.iter().any(|i| matches!(i, super::report::Issue::Missing { repo, .. } if repo == "Docs")), "{issues:?}");
+    assert!(
+        issues.iter().any(|i| matches!(i, super::report::Issue::Missing { repo, .. } if repo == "Docs")),
+        "{issues:?}"
+    );
     let steps: Vec<_> = issues.iter().filter_map(super::report::Issue::step).collect();
     assert_eq!(steps, [&StepKey::Check("Docs-usb".into())]);
 }
