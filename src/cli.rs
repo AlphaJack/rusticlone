@@ -438,7 +438,7 @@ mod tests {
     /// run, nor where rusticlone reads them anyway.
     #[test]
     fn a_restore_keeps_the_profiles_of_the_working_directory() {
-        let (cwd, own) = (Path::new("/recovery"), Path::new("/home/me/.config/rusticlone"));
+        let (cwd, own) = (Path::new("recovery"), Path::new("profiles"));
         let repos = || [("Docs", cwd), ("Docs-usb", own), ("Photos", cwd)].into_iter();
         assert_eq!(super::to_keep(false, repos(), cwd, own), ["Docs.toml", "Photos.toml"]);
         assert_eq!(super::to_keep(true, repos(), cwd, own), Vec::<String>::new());
