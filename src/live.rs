@@ -220,14 +220,14 @@ impl Live {
     pub(crate) fn cancel(&self) {
         self.cancel.store(true, Ordering::Relaxed);
         self.changed();
-        crate::clock::wake();
+        crate::clock::WAKES.wake();
     }
 
     #[cfg(feature = "server")]
     pub(crate) fn cancel_step(&self, step: usize) {
         self.cancelled_steps.lock().insert(step);
         self.changed();
-        crate::clock::wake();
+        crate::clock::WAKES.wake();
     }
 
     pub(crate) fn trigger(&self) -> Trigger {

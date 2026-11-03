@@ -72,7 +72,7 @@ impl Store {
     ) -> Result<RepoLocks<'a>> {
         let (mut held, mut freed, mut watcher) = (Vec::new(), BTreeMap::new(), None);
         loop {
-            let seen = clock::wakes();
+            let seen = clock::WAKES.seen();
             let (shown, busy) = match (keys.first(), behind()?) {
                 (Some((first, _)), Some(ahead)) => (*first, (ahead, Mode::Exclusive)),
                 _ => match self.lock_rest(keys, &mut held)? {
@@ -90,9 +90,9 @@ impl Store {
             }
             if freed.get(&busy.0).is_none_or(JoinHandle::is_finished) {
                 let file = self.lock_file(&busy.0)?;
-                freed.insert(busy.0, thread::spawn(move || lock_blocking(&file, busy.1).map(|()| clock::wake())));
+                freed.insert(busy.0, thread::spawn(move || lock_blocking(&file, busy.1).map(|()| clock::WAKES.wake())));
             }
-            clock::wait(seen);
+            clock::WAKES.wait(seen);
         }
         Ok(RepoLocks::new(cx, held))
     }
@@ -101,7 +101,7 @@ impl Store {
     fn watch_state(&self) -> Option<RecommendedWatcher> {
         let mut watcher = notify::recommended_watcher(|event: notify::Result<notify::Event>| {
             if event.is_ok_and(|e| !matches!(e.kind, EventKind::Access(_))) {
-                clock::wake();
+                clock::WAKES.wake();
             }
         })
         .ok()?;

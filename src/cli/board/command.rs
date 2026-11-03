@@ -42,7 +42,7 @@ pub(in crate::cli) fn command(label: &str, f: impl FnOnce() -> anyhow::Result<Le
     log::capture(Some(Hooks { logged, shown, ask }));
     let spinner = std::thread::spawn(|| {
         while COMMAND.lock().is_some() && !clock::interrupted() {
-            clock::sleep(SPIN, &clock::interrupted);
+            clock::WAKES.sleep(SPIN, &clock::interrupted);
             log::turn();
             draw();
         }
