@@ -726,3 +726,32 @@ fn a_run_keeps_each_result_once_and_counts_failures() {
     run.idle();
     assert!(guard.live.activities().is_empty());
 }
+
+/// Checks cycle through as many data subsets as set. Zero reads the structure only, and a sample takes none.
+#[test]
+fn checks_cycle_through_the_subsets_set() {
+    use crate::settings::CHECK_SUBSETS;
+    let subsets =
+        |value: &str| super::maintain::subsets(&[&profile::parse("Docs", &docs_with(&[(&CHECK_SUBSETS, value)]))]);
+    assert_eq!([subsets("7"), subsets("1"), subsets("0"), subsets("5%")], [Some(7), Some(1), None, None]);
+}
+
+/// A check that will not run owes the data subset it took: the next check reads it again.
+#[test]
+fn a_check_that_does_not_run_owes_its_subset() {
+    use crate::{rustic::Reading, settings::CHECK_SUBSETS};
+    let engine = engine_with("owed-subset", &Replay::new(), &docs_with(&[(&CHECK_SUBSETS, "3")]));
+    let collections = engine.collections();
+    let check = Request::Check(vec![("Docs".into(), None)]);
+    let claimed = |engine: &Engine| {
+        let Request::Check(repos) = engine.claim(&collections[0], &check).unwrap() else {
+            panic!("a check claims a check")
+        };
+        repos[0].1
+    };
+    let first = claimed(&engine);
+    assert_eq!(first, Some(Reading::Subset { n: 1, of: 3 }));
+    engine.unread(&collections[0], &Request::Check(vec![("Docs".into(), first)]));
+    assert_eq!(claimed(&engine), first);
+    assert_eq!(claimed(&engine), Some(Reading::Subset { n: 2, of: 3 }));
+}
