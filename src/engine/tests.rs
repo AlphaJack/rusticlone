@@ -580,6 +580,9 @@ fn a_listed_primary_without_snapshots_was_never_backed_up() {
         crate::state::Inventory { listed: engine.store.now(), result: Err("offline".into()), size_outdated: false };
     engine.store.save_inventory("Docs", "Docs", &inventory).unwrap();
     assert!(never());
+    // Failing instead: the failure says why.
+    attempted(&engine, crate::request::StepKey::Snapshot("Docs".into()), &failed(), false);
+    assert!(!never());
 }
 
 /// A notification error shows only while sends fail.
@@ -612,7 +615,7 @@ fn an_unreadable_profile_fails() {
     );
     let status = engine.status();
     let [bad] = status.as_slice() else { panic!("one collection") };
-    assert_eq!((bad.title.as_str(), bad.level), ("Bad", Level::Failure));
+    assert_eq!((bad.title.as_str(), bad.primary.name.as_str(), bad.level), ("Bad", "Bad", Level::Failure));
     assert!(matches!(bad.issues.as_slice(), [super::Issue::Unreadable { error }] if error == "expected `=`"));
     assert_eq!(engine.report_broken(), Level::Failure);
 }
@@ -630,6 +633,21 @@ fn the_agenda_wakes_when_a_pending_failure_is_reported() {
     assert_eq!(changes, Some(until), "the status changes then");
     assert_eq!(engine.agenda(engine.store.now()).1, Some(until));
     assert_eq!(engine.agenda(until).1, None);
+    engine.store.wait(until.duration_since(engine.store.now()).unsigned_abs(), &|| false);
+    let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
+    assert_ne!(changes, Some(until), "not again once reported");
+}
+
+/// A failure of a collection whose profile is gone wakes the agenda only while pending.
+#[cfg(feature = "server")]
+#[test]
+fn a_pending_failure_without_its_collection_wakes_the_agenda_once() {
+    use crate::request::StepKey;
+    let engine = engine_of("agenda-gone", &Replay::new(), &[]);
+    attempted(&engine, StepKey::Check("Docs".into()), &failed(), true);
+    let until = engine.store.load().last_step(&StepKey::Check("Docs".into())).unwrap().pending_until().unwrap();
+    assert_eq!(engine.agenda(engine.store.now()).1, Some(until));
+    assert_eq!(engine.agenda(until).1, None);
 }
 
 /// The agenda wakes when a repository becomes stale, and not after.
@@ -642,6 +660,9 @@ fn the_agenda_wakes_when_a_repository_becomes_stale() {
     let week = at("2026-10-23T12:00:00Z");
     assert_eq!(engine.agenda(engine.store.now()).1, Some(week));
     assert_eq!(engine.agenda(week).1, None);
+    engine.store.wait(week.duration_since(engine.store.now()).unsigned_abs(), &|| false);
+    let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
+    assert_ne!(changes, Some(week), "stale already");
 }
 
 /// A queued run waits for the running ones that hold its locks, and for the same request queued before

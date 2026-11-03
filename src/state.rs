@@ -678,7 +678,7 @@ mod tests {
     /// A session is valid until it expires, and adding one keeps the others valid.
     #[test]
     fn a_session_is_valid_until_it_expires() {
-        let a = store("sessions-test");
+        let a = store("sessions-test").with_clock(clock::Fixed::at("2026-10-16T12:00:00Z"));
         let (now, hour) = (a.now(), jiff::SignedDuration::from_hours(1));
         a.add_session("valid", now + hour, "a").unwrap();
         a.add_session("other", now + hour, "b").unwrap();
