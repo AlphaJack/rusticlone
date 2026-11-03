@@ -11,7 +11,7 @@ use tray_icon::{
 use super::{
     Row, Switch,
     logo::{Rgb, SIDE, pixels},
-    menu::{level, open_label, quit, quit_label, tooltip, version_label},
+    menu::{Click, Item, items, level, tooltip},
 };
 use crate::log::Level;
 
@@ -24,41 +24,42 @@ thread_local! {
 const QUIT: &str = "quit";
 
 pub(super) fn open_clicked() {
-    MenuEvent::set_event_handler(Some(|event: MenuEvent| match event.id.0.as_str() {
-        QUIT => quit(),
-        id => match id.parse::<Switch>() {
-            Ok(switch) => switch.toggle(),
-            Err(_) => _ = crate::server::open_on_desktop(id),
-        },
+    MenuEvent::set_event_handler(Some(|event: MenuEvent| {
+        match event.id.0.as_str() {
+            QUIT => Click::Quit,
+            id => id.parse::<Switch>().map_or_else(|_| Click::Open(id.to_owned()), Click::Toggle),
+        }
+        .run();
     }));
+}
+
+fn id(click: &Click) -> &str {
+    match click {
+        Click::Open(url) => url,
+        Click::Toggle(switch) => (*switch).into(),
+        Click::Quit => QUIT,
+    }
 }
 
 /// `paint` draws the icon for the level, as each system wants it.
 pub(super) fn show(
-    login: String,
+    login: &str,
     rows: &[Row],
     switches: &[(Switch, Option<bool>)],
     paint: impl FnOnce(&TrayIcon, Level),
 ) {
     let level = level(rows);
     let menu = Menu::new();
-    _ = menu.append(&MenuItem::new(version_label(), false, None));
-    _ = menu.append(&MenuItem::with_id(login, open_label(), true, None));
-    _ = menu.append(&PredefinedMenuItem::separator());
-    for row in rows {
-        let item = match &row.url {
-            Some(url) => MenuItem::with_id(url, row.label.clone(), true, None),
-            None => MenuItem::new(row.label.clone(), false, None),
+    for item in items(login, rows, switches) {
+        _ = match item {
+            Item::Entry { label, click: Some(click) } => menu.append(&MenuItem::with_id(id(&click), label, true, None)),
+            Item::Entry { label, click: None } => menu.append(&MenuItem::new(label, false, None)),
+            Item::Check { label, enabled, checked, click } => {
+                menu.append(&CheckMenuItem::with_id(id(&click), label, enabled, checked, None))
+            }
+            Item::Separator => menu.append(&PredefinedMenuItem::separator()),
         };
-        _ = menu.append(&item);
     }
-    _ = menu.append(&PredefinedMenuItem::separator());
-    for (switch, state) in switches {
-        let id: &str = (*switch).into();
-        _ = menu.append(&CheckMenuItem::with_id(id, switch.label(), state.is_some(), *state == Some(true), None));
-    }
-    _ = menu.append(&PredefinedMenuItem::separator());
-    _ = menu.append(&MenuItem::with_id(QUIT, quit_label(), true, None));
     SHOWN.with_borrow_mut(|shown| {
         match shown {
             // Updated in place, so that it keeps its place in the menu bar.

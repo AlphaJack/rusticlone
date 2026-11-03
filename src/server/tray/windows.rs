@@ -76,7 +76,7 @@ fn run(started: &mpsc::Sender<u32>, received: &mpsc::Receiver<Shown>) {
     while unsafe { GetMessageW(&raw mut message, std::ptr::null_mut(), 0, 0) } > 0 {
         if message.hwnd.is_null() && message.message == WM_APP {
             for (login, rows, switches) in received.try_iter() {
-                icon::show(login, &rows, &switches, |tray, level| {
+                icon::show(&login, &rows, &switches, |tray, level| {
                     _ = tray.set_icon(icon::image(level, ink(dark()), false));
                 });
             }
