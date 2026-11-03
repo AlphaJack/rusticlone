@@ -121,3 +121,45 @@ impl Clock for Fixed {
         *now = now.checked_add(for_).unwrap();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::Arc, thread};
+
+    use super::*;
+
+    /// A wait ends at the first wake after the count it read, so no wake between the read and the wait is missed.
+    #[test]
+    fn a_wait_ends_at_the_next_wake() {
+        let wakes = Arc::new(Wakes::new());
+        let seen = wakes.seen();
+        let (done, ended) = std::sync::mpsc::channel();
+        let waiting = Arc::clone(&wakes);
+        thread::spawn(move || {
+            waiting.wait(seen);
+            done.send(()).unwrap();
+        });
+        assert!(ended.recv_timeout(Duration::from_millis(100)).is_err(), "ended before a wake");
+        wakes.wake();
+        assert_eq!(wakes.seen(), seen + 1);
+        ended.recv().unwrap();
+    }
+
+    /// A sleep lasts its time, and ends early once woken with its condition met.
+    #[test]
+    fn a_sleep_lasts_its_time_unless_stopped() {
+        let (wakes, stop) = (Arc::new(Wakes::new()), Arc::new(AtomicBool::new(false)));
+        let start = Instant::now();
+        wakes.sleep(Duration::from_millis(50), &|| false);
+        assert!(start.elapsed() >= Duration::from_millis(50));
+        System.wait(Duration::from_millis(50), &|| false);
+        assert!(start.elapsed() >= Duration::from_millis(100));
+        let sleeping = {
+            let (wakes, stop) = (Arc::clone(&wakes), Arc::clone(&stop));
+            thread::spawn(move || wakes.sleep(Duration::from_secs(3600), &|| stop.load(Ordering::Relaxed)))
+        };
+        stop.store(true, Ordering::Relaxed);
+        wakes.wake();
+        sleeping.join().unwrap();
+    }
+}
