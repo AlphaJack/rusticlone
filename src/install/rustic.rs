@@ -133,6 +133,65 @@ fn agreed(
 mod tests {
     use super::*;
 
+    /// Each supported system and architecture has rustic's release built for it, and others have none.
+    #[test]
+    fn each_system_has_its_own_release() {
+        let systems = [
+            ("linux", "x86_64"),
+            ("linux", "aarch64"),
+            ("linux", "arm"),
+            ("macos", "aarch64"),
+            ("macos", "x86_64"),
+            ("windows", "x86_64"),
+        ];
+        for (os, arch) in systems {
+            let target = target_of(os, arch).unwrap_or_else(|| panic!("{os} on {arch}"));
+            let family = match os {
+                "linux" => "-linux-",
+                "macos" => "-apple-darwin",
+                _ => "-windows-",
+            };
+            assert!(
+                target.starts_with(arch.replace("arm", "armv7").as_str()) && target.contains(family),
+                "{os} on {arch}: {target}"
+            );
+        }
+        assert_eq!(target_of("freebsd", "x86_64"), None);
+    }
+
+    /// Rustic is downloaded where none runs, and replaces an older one in the download folder. One elsewhere, as
+    /// new, or that cannot be asked, is left alone.
+    #[test]
+    fn rustic_is_downloaded_where_none_or_an_older_one_runs() {
+        let (pinned, older, newer) = (Version::new(0, 11, 4), Version::new(0, 10, 0), Version::new(0, 12, 0));
+        let next = |ran: std::io::Result<Option<Version>>, here| next(ran, here, &pinned, "dir".into());
+        let missing = std::io::Error::from(std::io::ErrorKind::NotFound);
+        assert!(matches!(next(Err(missing), false), Next::Ask(Ask::Download { .. })));
+        assert!(matches!(next(Err(std::io::Error::other("busy")), true), Next::Nothing));
+        assert!(
+            matches!(next(Ok(Some(older.clone())), true), Next::Ask(Ask::Replace { found, .. }) if found == "0.10.0")
+        );
+        assert!(matches!(next(Ok(None), true), Next::Ask(Ask::Replace { .. })), "its version is unknown");
+        assert!(matches!(next(Ok(Some(older)), false), Next::Found(found) if found == "0.10.0"), "installed elsewhere");
+        assert!(matches!(next(Ok(Some(pinned.clone())), true), Next::Found(_)));
+        assert!(matches!(next(Ok(Some(newer)), true), Next::Found(_)), "never downgraded");
+    }
+
+    /// Without asking, the download goes on. Asked, it goes on as the answer says, to the question and its short form.
+    #[test]
+    fn a_download_goes_on_as_agreed() {
+        let (version, question) =
+            (Version::new(0, 11, 4), Ask::Download { version: "0.11.4".into(), dir: "dir".into() });
+        assert!(agreed(false, &question, &version, |_, _| panic!("not asked")).unwrap());
+        for answer in [true, false] {
+            let said = agreed(true, &question, &version, |long, short| {
+                assert!(long.contains("0.11.4") && short.contains("0.11.4") && long != short);
+                Ok(answer)
+            });
+            assert_eq!(said.unwrap(), answer);
+        }
+    }
+
     #[test]
     fn this_system_has_a_signed_release() {
         assert!(target().is_some());
