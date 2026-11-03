@@ -75,7 +75,7 @@ mod tests {
     #[test]
     fn a_mount_table_lists_its_points() {
         let table = "# comment\n/dev/sda1 / ext4 rw 0 0\n  # indented\nserver:/share /mnt/My\\040Disk nfs rw 0 0\n";
-        assert_eq!(points(table), [PathBuf::from("/"), PathBuf::from("/mnt/My Disk")]);
+        assert_eq!(points(table), [PathBuf::from("/"), Path::new("/mnt").join("My Disk")]);
     }
 
     /// A path is unmounted where `fstab` mounts a device above it that is not mounted. The innermost mount point
@@ -83,10 +83,10 @@ mod tests {
     #[test]
     fn a_path_below_a_mount_that_is_not_there_is_unmounted() {
         let fstab = "/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n/dev/c /data/usb ext4 rw 0 0\n";
-        let path = Path::new("/data/usb/docs");
-        assert!(unmounted(path, "/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n", fstab), "/data/usb is missing");
-        assert!(!unmounted(path, "/dev/c /data/usb ext4 rw 0 0\n", fstab), "the innermost is there");
-        assert!(!unmounted(Path::new("/home/me"), "", fstab), "only / is above it");
+        let path = Path::new("/data").join("usb").join("docs");
+        assert!(unmounted(&path, "/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n", fstab), "/data/usb is missing");
+        assert!(!unmounted(&path, "/dev/c /data/usb ext4 rw 0 0\n", fstab), "the innermost is there");
+        assert!(!unmounted(&Path::new("/home").join("me"), "", fstab), "only / is above it");
         assert!(!unmounted(Path::new("/database"), "", fstab), "a name that starts like a mount point is not below it");
     }
 
