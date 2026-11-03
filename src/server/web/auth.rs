@@ -324,6 +324,9 @@ mod tests {
     fn tokens_and_cross_site_requests() {
         let token = Token("abc".into());
         assert!(token == *"abc" && token != *"abd" && token != *"ab");
+        // Differences in two places do not cancel out.
+        assert!(Token("ab".into()) != *"ba");
+        assert_eq!(token.reveal(), "abc");
         let tokens = Tokens { admin: Token("admin".into()), file: None, metrics: Some(Token("metrics".into())) };
         assert!(tokens.access("admin") == Some(Access::Token) && tokens.access("metrics") == Some(Access::Metrics));
         assert!(tokens.access("").is_none() && Tokens { metrics: None, ..tokens }.access("metrics").is_none());
@@ -337,5 +340,24 @@ mod tests {
         assert!(cross_site(&headers(&[("origin", "https://evil.example"), ("host", "backup.example")])));
         assert!(!cross_site(&headers(&[("origin", "https://backup.example"), ("host", "backup.example")])));
         assert!(!cross_site(&headers(&[("host", "backup.example")])), "not a browser");
+    }
+
+    /// The session lasts a year. Over HTTPS, the browser binds it to this host and sends it only over HTTPS.
+    #[test]
+    fn a_session_cookie_is_kept_for_a_year_and_only_here() {
+        let plain = "rusticlone=id; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict";
+        assert_eq!(set_cookie(COOKIE, "id", SESSION.as_secs()), (header::SET_COOKIE, plain.into()));
+        let https = "__Host-rusticlone=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict; Secure";
+        assert_eq!(set_cookie(COOKIE_HTTPS, "", 0).1, https);
+    }
+
+    /// A tunnel passes on the public name, a proxy adds its header, and a script logs in with the token.
+    #[test]
+    fn only_a_browser_logged_in_here_is_in_front_of_the_desktop() {
+        assert_eq!(here_by(true, true, "localhost:32110", false), cfg!(feature = "desktop"));
+        assert!(!here_by(true, true, "backup.example.com", false));
+        assert!(!here_by(true, false, "localhost", false));
+        assert!(!here_by(true, true, "localhost", true));
+        assert!(!here_by(false, true, "localhost", false));
     }
 }
