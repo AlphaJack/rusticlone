@@ -1,0 +1,12 @@
+---
+source: src/result.rs
+expression: texts
+---
+[
+    "forgot 2 snapshots",
+    "forgot 2 snapshots, kept 1 expired snapshot until copied, kept 2 expired snapshots because the newest one is almost empty",
+    "the last backup could not read 1 item: /a (denied)",
+    "the last backup could not read 3 items, among them /a (denied)",
+    "waiting for upload",
+    "waiting for web 7 (upload)",
+]

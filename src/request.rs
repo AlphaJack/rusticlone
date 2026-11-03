@@ -468,4 +468,17 @@ mod tests {
         }
         assert!("copy:Docs".parse::<StepKey>().is_err() && "unknown:x".parse::<StepKey>().is_err());
     }
+
+    /// What a request does, who started it, and which repository a step works on.
+    #[test]
+    fn requests_read_as_what_they_do() {
+        let texts: Vec<String> =
+            [Request::Backup, Request::Copy("Docs-usb".into()), Request::Check(vec![("Docs".into(), None)])]
+                .iter()
+                .map(|r| r.doing("Docs"))
+                .chain([Trigger::Cli, Trigger::Schedule, Trigger::Web].map(Trigger::who))
+                .collect();
+        insta::assert_debug_snapshot!(texts);
+        assert_eq!(StepKey::Copy("Docs".into(), "Docs-usb".into()).repo(), "Docs-usb");
+    }
 }

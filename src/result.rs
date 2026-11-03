@@ -728,4 +728,29 @@ mod tests {
         // Stopped: whatever the results say.
         assert_eq!(Status::ended(Level::Failure, Some(Stop::Cancelled)), Status::Cancelled);
     }
+
+    /// A step that only found it has nothing to do is skipped. A run that was stopped is a warning.
+    #[test]
+    fn how_steps_and_runs_rate() {
+        assert_eq!(Status::of(&[StepResult::KeepsEverything { repo: "Docs".into() }]), Status::Skipped);
+        let levels = [Status::Skipped, Status::Cancelled, Status::Failed].map(Status::level);
+        assert_eq!(levels, [Level::Success, Level::Warning, Level::Failure]);
+        let failed = StepResult::Error { error: "unreachable".into() };
+        assert_eq!(Unnamed(&failed).level(), Level::Failure);
+    }
+
+    /// What results and waits read like, each with and without their optional parts.
+    #[test]
+    fn results_read_as_sentences() {
+        let forgot = |held, shrunk| StepResult::Forgot { repo: "Docs".into(), snapshots: 2, held, shrunk };
+        let skipped = |count| StepResult::Skipped { items: vec![("/a".into(), "denied".into())], count };
+        let holder = Holder { trigger: Trigger::Web, pid: 7, locks: vec!["upload".into()], status: None };
+        let waiting = |by| Doing::WaitingFor { lock: "upload".into(), by };
+        let texts: Vec<String> = [forgot(0, 0), forgot(1, 2), skipped(1), skipped(3)]
+            .iter()
+            .map(|r| Detail(r).to_string())
+            .chain([waiting(vec![]), waiting(vec![holder])].iter().map(ToString::to_string))
+            .collect();
+        insta::assert_debug_snapshot!(texts);
+    }
 }
