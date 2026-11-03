@@ -262,6 +262,21 @@ pub(crate) fn state_dir() -> Result<PathBuf> {
 mod tests {
     use super::ALL;
 
+    /// A collection's setting on a copy target is ignored, unless every backup profile that copies there sets the same.
+    #[test]
+    fn a_targets_own_collection_setting_is_ignored() {
+        let profile = |name: &str, snapshots: &str, notify: &str| {
+            let env = format!("[global.env]\n{} = '{notify}'\n", super::NOTIFY.key);
+            let config = format!("[repository]\nrepository = '/{name}'\npassword = 'x'\n{snapshots}{env}");
+            crate::profile::parse(name, &config)
+        };
+        let docs = profile("Docs", "[[backup.snapshots]]\nsources = ['docs']\n", "json://a");
+        let ignored = |notify| super::ignored(&profile("Docs-usb", "", notify), &[&docs]);
+        let why: Vec<_> = ignored("json://b").iter().map(|i| serde_json::to_value(&i.why).unwrap()).collect();
+        assert_eq!(why, [serde_json::json!({"follows-profiles": ["Docs"]})]);
+        assert!(ignored("json://a").is_empty());
+    }
+
     #[cfg(all(feature = "desktop", feature = "self-update"))]
     /// The env file in `packaging`: every setting read from the environment, commented out, with its default.
     fn env_file() -> String {

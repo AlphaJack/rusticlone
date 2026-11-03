@@ -37,6 +37,26 @@ fn settings_a_profile_cannot_use_are_reported() {
     sb.run(&["collections"]).assert_result("setting-ignored", typo);
 }
 
+/// The env file sets what the environment does not. One that cannot be read fails the command, unless it is missing.
+#[cfg(unix)]
+#[test]
+fn the_env_file_sets_what_the_environment_does_not() {
+    use crate::common::NAME;
+    let sb = docs_with_remote("");
+    // Without an env file: nothing backed up yet, which is a warning.
+    let fine = sb.run(&["collections"]).code;
+    let config = if cfg!(target_vendor = "apple") { "home/Library/Application Support" } else { "config" };
+    let file = sb.path(&format!("{config}/{NAME}/{NAME}.env"));
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+    fs::write(&file, format!("{}=never\n", var("STALL_TIMEOUT"))).unwrap();
+    sb.run(&["collections"]).assert_exit(1).assert_output(&var("STALL_TIMEOUT"));
+    sb.run_with(&["collections"], &[(&var("STALL_TIMEOUT"), "1h")]).assert_exit(fine);
+    fs::remove_file(&file).unwrap();
+    sb.run(&["collections"]).assert_exit(fine);
+    fs::create_dir(&file).unwrap();
+    sb.run(&["collections"]).assert_exit(1).assert_output(&file.display().to_string());
+}
+
 #[test]
 fn shadowed_profile_is_reported() {
     let sb = docs_with_remote("");
