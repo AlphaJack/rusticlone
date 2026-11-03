@@ -63,7 +63,9 @@ fn dry_runs_change_no_file() {
     }
     // The findings, not what was done.
     let backup = sb.run(&["backup", "--dry-run", "--all"]);
-    backup.assert_result("would-back-up", serde_json::json!({})).assert_no_output("rustic backup --json");
+    // Every file of the sources, with their size: a.txt, b.txt and c.txt.
+    let would = serde_json::json!({"files": 3, "bytes": 11});
+    backup.assert_result("would-back-up", would).assert_no_output("rustic backup --json");
     backup.assert_result("would-forget", serde_json::json!({"repo": "Docs"}));
     sb.run(&["prune", "--dry-run", "--all"]).assert_result("would-prune", serde_json::json!({"repo": "Docs"}));
     sb.run(&["check", "--dry-run", "--all"]).assert_result("would-check", serde_json::json!({"repo": "Docs"}));
