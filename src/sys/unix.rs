@@ -4,6 +4,13 @@ use std::path::{Path, PathBuf};
 
 use super::HOSTNAME_BUFFER;
 
+/// Moves `from` over `to`, which a running copy of it keeps as it was.
+#[cfg(feature = "desktop")]
+#[expect(clippy::disallowed_methods, reason = "replaces an installed file")]
+pub(crate) fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
+    std::fs::rename(from, to)
+}
+
 /// `app`'s configuration directory for the system.
 #[expect(clippy::unnecessary_wraps, reason = "Windows's may be unknown")]
 pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
