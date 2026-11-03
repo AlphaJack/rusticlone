@@ -46,7 +46,7 @@ impl Click {
 pub(super) fn items(login: &str, rows: &[Row], switches: &[(Switch, Option<bool>)]) -> Vec<Item> {
     let entry = |label, url: Option<&str>| Item::Entry { label, click: url.map(|u| Click::Open(u.to_owned())) };
     let switches = switches.iter().map(|&(switch, state)| Item::Check {
-        label: switch.label(),
+        label: switch.to_string(),
         enabled: state.is_some(),
         checked: state == Some(true),
         click: Click::Toggle(switch),
