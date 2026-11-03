@@ -120,6 +120,9 @@ fn volume_root(path: &Path) -> Option<String> {
     String::from_utf16(root.get(..root.iter().position(|&c| c == 0)?)?).ok()
 }
 
+/// Whether `\` separates the parts of a path, as `/` does.
+pub(crate) const BACKSLASH_SEPARATES: bool = true;
+
 /// macOS's alone.
 pub(crate) fn needs_disk_access(_: &str) -> bool {
     false
