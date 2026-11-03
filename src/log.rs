@@ -590,4 +590,58 @@ mod tests {
         assert_eq!(Tone::Running.dot(), SPINNER[3]);
         FRAME.store(start, Ordering::Relaxed);
     }
+
+    /// Rustic's log goes to stderr and the rest to stdout. In a terminal, progress is the status line, and
+    /// this process's lines go to a command's tree. Text leaves out rustic's log without `--verbose`, and progress
+    /// outside a terminal.
+    #[test]
+    fn each_line_goes_where_its_mode_shows_it() {
+        let quiet = Mode { quiet: true, ..Mode::default() };
+        let (json, live) = (Mode { json: true, ..Mode::default() }, Mode { live: true, ..quiet });
+        assert_eq!(route(quiet, "rustic"), None);
+        assert_eq!(route(Mode::default(), "rustic"), Some(Out::Stderr));
+        assert_eq!(route(quiet, "progress"), None);
+        assert_eq!(route(json, "progress"), Some(Out::Stdout));
+        assert_eq!(route(quiet, crate::NAME), Some(Out::Stdout));
+        assert_eq!(route(live, "progress"), Some(Out::Status));
+        assert_eq!(route(live, crate::NAME), Some(Out::Tree));
+        assert_eq!(route(live, "other"), Some(Out::Above));
+    }
+
+    /// Text reads `collection: message`, `[profile] message` for rustic's, or capitalized on its own, in the
+    /// level's color where colors show. JSON has the level that log processors expect, and the extra fields.
+    #[test]
+    fn a_line_reads_as_its_mode_writes_it() {
+        let color = Mode { color: true, ..Mode::default() };
+        let text = |mode, target, level, name, message| line(mode, target, level, name, message, Value::Null);
+        assert_eq!(text(Mode::default(), "rustic", Level::Success, Some("Docs"), "read"), "[Docs] read");
+        assert_eq!(text(color, crate::NAME, Level::Success, Some("Docs"), "backed up"), "Docs: backed up");
+        assert_eq!(text(color, crate::NAME, Level::Failure, None, "failed"), "\x1b[31mFailed\x1b[0m");
+        let json = Mode { json: true, ..Mode::default() };
+        let written = line(json, "rustic", Level::Warning, Some("Docs"), "read", json!({ "doing": "x" }));
+        let written: Value = serde_json::from_str(&written).unwrap();
+        let fields = ["level", "target", "profile", "message", "doing"].map(|k| written[k].clone());
+        assert_eq!(fields, [json!("WARN"), json!("rustic"), json!("Docs"), json!("read"), json!("x")]);
+    }
+
+    /// The runs are drawn again when they change, or when lines are printed above them.
+    #[test]
+    fn the_runs_are_drawn_again_when_they_change() {
+        let (a, b) = (vec!["a".to_owned()], vec!["b".to_owned()]);
+        assert!(!redraws(&a, &a, &[]));
+        assert!(redraws(&a, &b, &[]));
+        assert!(redraws(&a, &a, &b));
+    }
+
+    /// An error outside runs is a failure. What is not kept is a warning. A copy not made is only said.
+    #[test]
+    fn logged_events_have_their_levels() {
+        let levels = [
+            Logged::Error { error: String::new() },
+            Logged::NoProfiles { dirs: String::new() },
+            Logged::NotCopied { error: String::new() },
+        ]
+        .map(|logged| logged.level());
+        assert_eq!(levels, [Level::Failure, Level::Warning, Level::Success]);
+    }
 }
