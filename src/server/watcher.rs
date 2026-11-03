@@ -139,3 +139,47 @@ fn shown<'a>(seen: &Changes, now: &'a Changes) -> (Vec<Option<&'a str>>, bool) {
     let pages = now.writes.iter().filter(|(c, n)| seen.writes.get(*c) != Some(n)).map(|(c, _)| c.as_deref()).collect();
     (pages, now.writes.get(&None) != seen.writes.get(&None) || now.unfinished != seen.unfinished)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, BTreeSet};
+
+    use super::*;
+
+    /// A profile is a `.toml` file in a profile folder, or any file there once the folder's listing changed. A
+    /// run's log is named by its collection and id.
+    #[test]
+    fn a_changed_file_is_a_profile_a_run_s_log_or_the_state() {
+        let (profiles, state) = (Path::new("/profiles"), Path::new("/state"));
+        let (dirs, runs) = ([profiles.to_owned()], state.join("runs"));
+        let (toml, old, nested) =
+            (profiles.join("Docs.toml"), profiles.join("Docs.toml.old"), profiles.join("old").join("Docs.toml"));
+        assert_eq!(changed(&toml, false, &dirs, &runs), File::Profile);
+        assert_eq!(changed(&old, false, &dirs, &runs), File::Other, "only its data changed");
+        assert_eq!(changed(&old, true, &dirs, &runs), File::Profile, "renamed away");
+        assert_eq!(changed(&nested, true, &dirs, &runs), File::Other, "below a profile folder");
+        let (log, notes) = (runs.join("Docs").join("17.log"), runs.join("Docs").join("notes.log"));
+        assert_eq!(changed(&log, false, &dirs, &runs), File::RunLog { collection: "Docs", id: Some(17) });
+        assert_eq!(changed(&notes, false, &dirs, &runs), File::RunLog { collection: "Docs", id: None });
+        assert_eq!(changed(&runs, false, &dirs, &runs), File::Other);
+        let (redb, locks) = (state.join("state.redb"), state.join("locks"));
+        assert_eq!(changed(&redb, false, &dirs, &runs), File::State);
+        assert_eq!(changed(&locks, false, &dirs, &runs), File::Other);
+    }
+
+    /// A change of the state shows on the pages of the collections it wrote to, and on every page when it wrote to
+    /// all. What is due may have changed when it wrote to all, or when a run started or ended.
+    #[test]
+    fn a_change_of_the_state_shows_where_it_wrote() {
+        let changes = |writes: &[(Option<&str>, u64)], unfinished: &[(&str, i64)]| Changes {
+            writes: writes.iter().map(|&(c, n)| (c.map(Into::into), n)).collect::<BTreeMap<_, _>>(),
+            unfinished: unfinished.iter().map(|&(c, id)| (c.into(), id)).collect::<BTreeSet<_>>(),
+        };
+        let seen = changes(&[(None, 1), (Some("Docs"), 1)], &[]);
+        assert_eq!(shown(&seen, &changes(&[(None, 1), (Some("Docs"), 2)], &[])), (vec![Some("Docs")], false));
+        let written = changes(&[(None, 2), (Some("Docs"), 1), (Some("Pics"), 1)], &[]);
+        assert_eq!(shown(&seen, &written), (vec![None, Some("Pics")], true));
+        assert_eq!(shown(&seen, &changes(&[(None, 1), (Some("Docs"), 1)], &[("Docs", 7)])), (vec![], true));
+        assert_eq!(shown(&seen, &seen), (vec![], false));
+    }
+}
