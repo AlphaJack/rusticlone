@@ -290,3 +290,100 @@ pub(super) async fn dismiss(
     })
     .await
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::server::workers::Submitted;
+
+    fn form(kind: RunKind) -> RunForm {
+        RunForm {
+            kind,
+            repo: String::new(),
+            snapshot: String::new(),
+            path: String::new(),
+            dry_run: false,
+            source: None,
+            to: String::new(),
+            at: String::new(),
+            from: String::new(),
+        }
+    }
+
+    fn docs() -> Selection {
+        Selection::Collection("Docs".into())
+    }
+
+    /// A repository narrows a collection, and the fields are read without their spaces.
+    #[test]
+    fn a_form_names_what_to_run_and_how() {
+        let named =
+            RunForm { repo: " Docs-usb ".into(), source: Some(1), from: " Docs ".into(), ..form(RunKind::Recreate) };
+        let (selection, kind, options) = named.asked(docs()).unwrap();
+        assert_eq!((selection, kind), (Selection::Repo("Docs".into(), "Docs-usb".into()), RunKind::Recreate));
+        assert_eq!((options.source, options.from.as_deref()), (Some(1), Some("Docs")));
+        let every = RunForm { repo: "Docs-usb".into(), ..form(RunKind::Backup) };
+        assert_eq!(every.asked(Selection::All).unwrap().0, Selection::All, "no collection to narrow");
+    }
+
+    /// A dry run of a restore without choices reads the snapshots as a test restore. With a choice, it says what it
+    /// would restore where.
+    #[test]
+    fn a_dry_run_restore_tests_unless_it_has_choices() {
+        let dry = || RunForm { dry_run: true, ..form(RunKind::Restore) };
+        let (_, kind, options) = dry().asked(docs()).unwrap();
+        assert_eq!((kind, options.dry_run), (RunKind::TestRestore, false));
+        let to = std::env::temp_dir().display().to_string();
+        for chosen in [
+            RunForm { path: "a".into(), ..dry() },
+            RunForm { to, ..dry() },
+            RunForm { at: "2026-10-16".into(), ..dry() },
+        ] {
+            let (_, kind, options) = chosen.asked(docs()).unwrap();
+            assert_eq!((kind, options.dry_run), (RunKind::Restore, true));
+        }
+        let (_, kind, options) = form(RunKind::Restore).asked(docs()).unwrap();
+        assert_eq!((kind, options.dry_run), (RunKind::Restore, false));
+        let (_, kind, _) = RunForm { dry_run: true, ..form(RunKind::Check) }.asked(docs()).unwrap();
+        assert_eq!(kind, RunKind::Check, "only a restore tests");
+    }
+
+    /// A relative destination, a snapshot id or a time that cannot be read refuse the form.
+    #[test]
+    fn a_form_that_cannot_be_read_is_refused() {
+        let refused = |form: RunForm| form.asked(docs()).err();
+        assert!(matches!(
+            refused(RunForm { to: "restored".into(), ..form(RunKind::Restore) }),
+            Some(Notice::DestinationNotAbsolute)
+        ));
+        assert!(matches!(
+            refused(RunForm { snapshot: "zz".into(), ..form(RunKind::Restore) }),
+            Some(Notice::InvalidSnapshot(_))
+        ));
+        assert!(matches!(
+            refused(RunForm { at: "soon".into(), ..form(RunKind::Restore) }),
+            Some(Notice::InvalidTime(_))
+        ));
+    }
+
+    /// For every collection, the notice says what started once and how many were queued already. For one, it names
+    /// each run and each one queued.
+    #[test]
+    fn the_notice_names_what_started() {
+        let submitted = |started: &[&str], skipped: &[&str]| Submitted {
+            started: started.iter().zip(1..).map(|(doing, id)| ("Docs".into(), id, (*doing).into())).collect(),
+            skipped: skipped.iter().map(|s| (*s).into()).collect(),
+        };
+        let texts = [
+            reported(
+                &Selection::All,
+                RunKind::Backup,
+                &submitted(&["backing up Docs", "backing up Pics"], &["backup Mail"]),
+            ),
+            reported(&Selection::All, RunKind::Backup, &submitted(&[], &["backup Mail", "backup Pics"])),
+            reported(&docs(), RunKind::Check, &submitted(&["checking Docs", "checking Docs-usb"], &["prune Docs"])),
+            reported(&docs(), RunKind::Check, &submitted(&[], &[])),
+        ];
+        insta::assert_debug_snapshot!(texts);
+    }
+}
