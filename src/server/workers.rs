@@ -18,7 +18,7 @@ use crate::{
     engine::{Asked, Batch, Engine},
     log::{self, Level, Message},
     request::{Request, RestoreOptions, RunKind, Selection, Trigger},
-    result::Status,
+    result::{RunResults, Status, StepResult},
     state::RunLog,
 };
 
@@ -53,6 +53,16 @@ pub(super) struct Submitted {
     pub(super) started: Vec<(String, i64, String)>,
     /// Labels of requests already queued or running here.
     pub(super) skipped: Vec<String>,
+}
+
+/// What a run that the page started shows there when it fails: its first failure.
+fn shown_failure(report: &RunResults, trigger: Trigger) -> Option<&StepResult> {
+    report.results.iter().find(|l| l.level() == Level::Failure).filter(|_| trigger == Trigger::Web)
+}
+
+/// Whether a run that the page started, stopped with the server, is queued again for the next start.
+fn queued_again(interrupted: bool, trigger: Trigger, status: Option<Status>) -> bool {
+    interrupted && trigger == Trigger::Web && status == Some(Status::Interrupted)
 }
 
 impl App {
@@ -97,9 +107,7 @@ impl App {
                 let report = engine.execute(&j, queued, &batch);
                 report.print();
                 // Shown on whichever page is open now.
-                if let Some(why) =
-                    report.results.iter().find(|l| l.level() == Level::Failure).filter(|_| trigger == Trigger::Web)
-                {
+                if let Some(why) = shown_failure(&report, trigger) {
                     app.pages.failed(Notice::RunFailed {
                         collection: report.collection.clone(),
                         line: Box::new(why.clone()),
@@ -107,11 +115,7 @@ impl App {
                 }
                 engine.notify(&j);
             }
-            // Stopped with the server: queued again at the next start.
-            if clock::interrupted()
-                && trigger == Trigger::Web
-                && engine.store.run(&collection, id).is_some_and(|r| r.status == Status::Interrupted)
-            {
+            if queued_again(clock::interrupted(), trigger, engine.store.run(&collection, id).map(|r| r.status)) {
                 _ = RunLog::queued(&engine.store, &collection, request, trigger);
             }
             drop(working);
