@@ -186,3 +186,32 @@ impl Kind {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{Field, Kind};
+
+    /// A field reads its label, and a choice its meaning, in English. So does a repository's password.
+    #[cfg(feature = "server")]
+    #[test]
+    fn fields_and_choices_read_in_english() {
+        assert_eq!(Kind::S3.fields()[1].text(), "Region");
+        assert_eq!([Field::meaning("accept"), Field::meaning("strict")], ["Any key", "Known keys only"]);
+        assert_eq!(super::password(), "Repository password");
+    }
+
+    /// Some fields come filled: S3's region, so that requests don't wait for it to be found, and pCloud's server for
+    /// most accounts.
+    #[test]
+    fn some_fields_come_filled() {
+        assert_eq!(Kind::S3.fields()[1].value, "auto");
+        assert_eq!(Kind::Pcloud.fields()[0].value, "https://api.pcloud.com");
+    }
+
+    /// A folder's example is what a user types on this system.
+    #[test]
+    fn a_folder_example_is_this_systems() {
+        let native = super::super::os::native(r"D:\backup", "/Volumes/USB/backup", "/mnt/usb/backup");
+        assert_eq!(Kind::Local.fields()[0].example, native);
+    }
+}
