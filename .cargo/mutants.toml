@@ -3,3 +3,9 @@ all_features = true
 
 # The mutants run on Linux, where another system's files are never built: their mutants would always be missed.
 exclude_globs = ["**/windows.rs", "**/windows/**", "**/macos.rs", "**/macos/**"]
+
+# Mutants dealt out one by one, so that shards finish together: in source order, those of slow files share a shard.
+sharding = "round-robin"
+
+# A lint denied in the crate, such as an expectation left unfulfilled, is only a warning: the mutant is tested.
+cap_lints = true
