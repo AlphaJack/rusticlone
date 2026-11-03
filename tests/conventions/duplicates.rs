@@ -1,7 +1,9 @@
 //! Each thing is done in one place: no two functions or closures have the same body, and no chain of calls is
 //! written out again and again. A body is compared with its own parameters renamed, so `|a| a.len()` and
-//! `|b| b.len()` are the same. A body that only builds a value, as `|e| Error::Io { e }` does, or only reads a
-//! field, as `self.calls.lock().clone()` does, says nothing twice, and tests may repeat themselves.
+//! `|b| b.len()` are the same. Some bodies say nothing twice, and tests may repeat themselves. Those that only:
+//! - build a value, as `|e| Error::Io { e }` and `Missing::Page(path)` do
+//! - read a field, as `self.calls.lock().clone()` does, or pass fields on, as `retry_at(self.at, self.failures)`
+//! - compare with a constant, as `|r| r.level() == Level::Failure` does
 
 #![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
@@ -18,7 +20,7 @@ use syn::{
 use super::{is_test, root};
 
 /// Bodies of fewer tokens are too short to say the same thing twice: `{ Ok(()) }`, `self.name.clone()`.
-const SHORTEST_BODY: usize = 13;
+const SHORTEST_BODY: usize = 10;
 /// Calls in a row that make a chain worth naming.
 const LONGEST_CHAIN: usize = 3;
 /// How often a chain may be written out before it should be a function.
@@ -68,12 +70,28 @@ impl Visitor<'_> {
     }
 }
 
-/// Whether it only builds a struct or a tuple, or reads a field of `self` through calls without arguments.
+/// Whether it only builds a value, reads or passes on fields of `self`, or compares with a constant.
 fn builds(expr: &Expr) -> bool {
     if let Expr::Block(b) = expr {
         return builds_only(&b.block.stmts);
     }
+    if let Expr::Call(call) = expr {
+        return constructor(&call.func) || call.args.iter().all(reads_field);
+    }
+    if let Expr::Binary(b) = expr {
+        return matches!(b.op, syn::BinOp::Eq(_) | syn::BinOp::Ne(_)) && (constant(&b.left) || constant(&b.right));
+    }
     matches!(expr, Expr::Struct(_) | Expr::Tuple(_)) || reads_field(expr)
+}
+
+/// A tuple struct or an enum variant, named with a capital: `Missing::Page`.
+fn constructor(func: &Expr) -> bool {
+    matches!(func, Expr::Path(p) if p.path.segments.last().is_some_and(|s| s.ident.to_string().starts_with(char::is_uppercase)))
+}
+
+/// A literal, or a path to a constant or a unit variant: `Level::Failure`, `MAX`.
+fn constant(expr: &Expr) -> bool {
+    matches!(expr, Expr::Lit(_)) || constructor(expr)
 }
 
 fn reads_field(expr: &Expr) -> bool {
