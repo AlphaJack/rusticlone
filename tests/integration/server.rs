@@ -761,6 +761,28 @@ fn install_enables_a_user_service() {
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0).assert_result("not-installed", json!({}));
 }
 
+/// With a unit from a package, which systemd knows, `install` writes only the drop-in. `uninstall` takes the
+/// drop-in back and leaves the unit to the package.
+#[cfg(target_os = "linux")]
+#[test]
+fn install_keeps_a_packaged_unit() {
+    #[expect(unsafe_code, reason = "geteuid has no preconditions")]
+    // SAFETY: no preconditions.
+    if unsafe { libc::geteuid() } == 0 {
+        return; // As root, it would write in /etc/systemd/system.
+    }
+    let sb = docs_with_remote("");
+    let log = sb.path("systemd.log");
+    let bus = crate::bus::FakeBus::start(&sb, &log, Some("enabled"));
+    sb.run_with(&["install"], &bus.env()).assert_exit(0);
+    let dir = sb.path("config/systemd/user");
+    assert_eq!(leftovers(&dir), [format!("{NAME}.service.d")]);
+    let calls = fs::read_to_string(&log).unwrap();
+    assert!(calls.ends_with(&format!("EnableUnitFiles {NAME}.service\nRestartUnit {NAME}.service\n")), "{calls}");
+    sb.run_with(&["uninstall"], &bus.env()).assert_exit(0);
+    assert_eq!(leftovers(&dir), Vec::<String>::new());
+}
+
 /// `install` writes a login agent that runs the app it writes, signed, and loads it; `uninstall` unloads it
 /// and leaves nothing of either.
 #[cfg(target_vendor = "apple")]
