@@ -88,6 +88,7 @@ const SPIN: Duration = Duration::from_millis(250);
 
 /// Turns the spinners of running steps while the runs exist.
 #[expect(clippy::disallowed_methods, reason = "a spinner turns with time, which no event tells")]
+#[cfg_attr(test, mutants::skip)] // Turns the spinners with time until the runs end, in a thread of its own.
 fn spin(runs: &Weak<Runs>) {
     while runs.strong_count() > 0 && !clock::interrupted() {
         clock::sleep(SPIN, &clock::interrupted);
@@ -186,6 +187,7 @@ fn section_lines(collection: &str, heading: &str, messages: &[&dyn Message]) -> 
     iter::once(head).chain(tree(&branches.collect::<Vec<_>>()).lines().map(ToOwned::to_owned)).collect()
 }
 
+#[cfg_attr(test, mutants::skip)] // Writes to the terminal, which tests have none of.
 fn draw() {
     let Some(runs) = BOARD.runs.get().and_then(Weak::upgrade) else { return };
     let live: BTreeMap<_, _> = runs.all().into_iter().map(|l| ((l.collection.clone(), l.id), l)).collect();
