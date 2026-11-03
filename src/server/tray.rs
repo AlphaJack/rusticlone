@@ -71,7 +71,9 @@ pub(super) fn beside(
 }
 
 /// A setting that the menu switches on and off. Its item's id is its name, which parses back to it.
-#[derive(Clone, Copy, PartialEq, crate::i18n::Fluent, strum::EnumString, strum::IntoStaticStr, strum::EnumIter)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, crate::i18n::Fluent, strum::EnumString, strum::IntoStaticStr, strum::EnumIter,
+)]
 enum Switch {
     AtLogin,
     #[cfg(feature = "self-update")]

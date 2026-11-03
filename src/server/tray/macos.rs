@@ -107,7 +107,7 @@ impl Tray {
         let (login, rows, switches) = (login.to_owned(), rows.to_vec(), switches.to_vec());
         *LOGIN.lock() = Some(login.clone());
         DispatchQueue::main().exec_async(move || {
-            icon::show(login, &rows, &switches, |tray, level| {
+            icon::show(&login, &rows, &switches, |tray, level| {
                 // A template, which macOS draws in black or white to suit the menu bar, and the dot apart, in color.
                 _ = tray.set_icon_templated(icon::image(level, ink(false), true));
                 badge(tray, dot(level));
