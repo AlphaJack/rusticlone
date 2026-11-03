@@ -4,7 +4,6 @@
 #![expect(
     clippy::needless_pass_by_value,
     clippy::used_underscore_binding,
-    clippy::unused_self,
     clippy::disallowed_types,
     reason = "zbus's interface macro takes owned arguments, every one, and a map of its own"
 )]
@@ -36,12 +35,16 @@ fn record(log: &Path, call: &str) {
     writeln!(file, "{call}").unwrap();
 }
 
-struct Systemd(PathBuf);
+/// Records to its log, and answers the unit's state as systemd would once it knows the unit.
+struct Systemd {
+    log: PathBuf,
+    unit: Option<String>,
+}
 
 #[zbus::interface(name = "org.freedesktop.systemd1.Manager")]
 impl Systemd {
     fn reload(&self) {
-        record(&self.0, "Reload");
+        record(&self.log, "Reload");
     }
 
     fn enable_unit_files(
@@ -50,12 +53,12 @@ impl Systemd {
         _runtime: bool,
         _force: bool,
     ) -> (bool, Vec<(String, String, String)>) {
-        record(&self.0, &format!("EnableUnitFiles {}", files.join(" ")));
+        record(&self.log, &format!("EnableUnitFiles {}", files.join(" ")));
         (false, Vec::new())
     }
 
     fn disable_unit_files(&self, files: Vec<String>, _runtime: bool) -> Vec<(String, String, String)> {
-        record(&self.0, &format!("DisableUnitFiles {}", files.join(" ")));
+        record(&self.log, &format!("DisableUnitFiles {}", files.join(" ")));
         Vec::new()
     }
 
@@ -71,15 +74,15 @@ impl Systemd {
         self.job("StopUnit", &name)
     }
 
-    /// Unknown, as a unit that is not installed yet.
+    /// Unknown without a unit, as one that is not installed yet.
     fn get_unit_file_state(&self, file: String) -> zbus::fdo::Result<String> {
-        Err(zbus::fdo::Error::FileNotFound(file))
+        self.unit.clone().ok_or(zbus::fdo::Error::FileNotFound(file))
     }
 }
 
 impl Systemd {
     fn job(&self, method: &str, name: &str) -> zbus::zvariant::OwnedObjectPath {
-        record(&self.0, &format!("{method} {name}"));
+        record(&self.log, &format!("{method} {name}"));
         zbus::zvariant::OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/1").unwrap()
     }
 }
@@ -94,8 +97,9 @@ impl Logind {
 }
 
 impl FakeBus {
-    /// Starts the bus in the sandbox, with the fake services recording to `log`.
-    pub(crate) fn start(sb: &Sandbox, log: &Path) -> Self {
+    /// Starts the bus in the sandbox, with the fake services recording to `log`. systemd knows a unit in
+    /// the `unit` state, as one a package installed, or none.
+    pub(crate) fn start(sb: &Sandbox, log: &Path, unit: Option<&str>) -> Self {
         let mut daemon = Command::new("dbus-daemon")
             .args(["--session", "--nofork", "--print-address=1"])
             .arg(format!("--address=unix:path={}", sb.path("bus").display()))
@@ -106,7 +110,7 @@ impl FakeBus {
         std::io::BufReader::new(daemon.stdout.take().unwrap()).read_line(&mut address).unwrap();
         let address = address.trim().to_owned();
         let (ready, served) = std::sync::mpsc::channel();
-        let (at, log) = (address.clone(), log.to_owned());
+        let (at, log, unit) = (address.clone(), log.to_owned(), unit.map(str::to_owned));
         std::thread::spawn(move || {
             let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             runtime.block_on(async {
@@ -116,7 +120,7 @@ impl FakeBus {
                     .unwrap()
                     .name("org.freedesktop.login1")
                     .unwrap()
-                    .serve_at("/org/freedesktop/systemd1", Systemd(log.clone()))
+                    .serve_at("/org/freedesktop/systemd1", Systemd { log: log.clone(), unit })
                     .unwrap()
                     .serve_at("/org/freedesktop/login1", Logind(log))
                     .unwrap()
