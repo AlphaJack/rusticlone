@@ -176,6 +176,18 @@ impl Tray {
 mod tests {
     use super::*;
 
+    /// The icon shows for a server its user runs: to open the web UI, from a terminal, or by the service manager of
+    /// their session. Never as root, nor under another program.
+    #[test]
+    fn the_icon_shows_for_a_server_its_user_runs() {
+        let user = [(true, false, false), (false, true, false), (false, false, true)];
+        for (open, terminal, managed) in user {
+            assert!(attended_by(false, open, terminal, managed), "{open} {terminal} {managed}");
+            assert!(!attended_by(true, open, terminal, managed), "as root");
+        }
+        assert!(!attended_by(false, false, false, false), "under another program");
+    }
+
     /// A click names the item by its id, which is not its label: that one is translated.
     #[test]
     fn each_switch_is_found_by_its_items_id() {
