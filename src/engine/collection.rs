@@ -77,6 +77,12 @@ impl<'a> Collection<'a> {
         self.repos().find(|p| p.name == name)
     }
 
+    /// Whether `name` is one of [`Self::repos`].
+    #[cfg(feature = "server")]
+    pub(crate) fn has(&self, name: &str) -> bool {
+        self.repo(name).is_some()
+    }
+
     pub(crate) fn repo_named(&self, name: &str) -> Result<&'a RusticProfile> {
         Ok(self
             .repo(name)

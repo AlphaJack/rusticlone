@@ -40,6 +40,7 @@ mod setup;
 mod shape;
 mod state;
 mod sys;
+mod thread;
 
 /// What people type: the executable, its commands, files and services.
 const NAME: &str = env!("CARGO_PKG_NAME");

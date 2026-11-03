@@ -64,7 +64,7 @@ impl App {
             // The profiles may have been reloaded.
             let j = engine.collection(&collection);
             let (configured, gone): (Vec<_>, Vec<_>) =
-                repos.iter().partition(|repo| j.as_ref().is_some_and(|j| j.repo(repo).is_some()));
+                repos.iter().partition(|repo| j.as_ref().is_some_and(|j| j.has(repo)));
             if let Some(j) = &j {
                 let repos: Vec<_> = j.repos().filter(|p| configured.contains(&&p.name)).collect();
                 engine.list_repos(j, &repos, |p| listed(&p.name));
