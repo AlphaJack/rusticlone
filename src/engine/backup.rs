@@ -4,7 +4,7 @@ use std::collections::BTreeSet;
 
 use anyhow::Result;
 
-use super::{Engine, Error, Run, Use, newest, shrunk};
+use super::{Engine, Error, Run, Use, known, newest, shrunk};
 use crate::request::StepKey;
 use crate::result::Doing;
 use crate::{
@@ -201,8 +201,7 @@ impl Engine {
     /// the snapshots that no other source explains are theirs, in profile order, which rustic backs up in.
     /// Learned only when each of them made one, else the order would not tell.
     fn learn_hooked(&self, p: &RusticProfile, snapshots: &[Snapshot]) {
-        let known: BTreeSet<String> =
-            p.sources.iter().filter(|s| !s.unknown()).map(|s| rustic::source_key(&s.paths())).collect();
+        let known = known(&p.sources);
         let theirs: Vec<&Snapshot> = snapshots.iter().filter(|sn| !known.contains(&sn.source())).collect();
         let unknown: Vec<&Sources> = p.sources.iter().filter(|s| s.unknown()).collect();
         if unknown.is_empty() || theirs.len() != unknown.len() {

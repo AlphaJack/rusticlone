@@ -377,9 +377,13 @@ impl Store {
         Ok(kept.as_ref().map(|(_, ledger)| ledger.clone()).unwrap_or_default())
     }
 
+    fn read_ledger(&self) -> Result<Ledger> {
+        self.read(|r| self.ledger(&r.open_table(LEDGER)?))
+    }
+
     /// The ledger. Empty if unreadable.
     pub fn load(&self) -> Ledger {
-        self.read(|r| self.ledger(&r.open_table(LEDGER)?)).unwrap_or_else(|e| {
+        self.read_ledger().unwrap_or_else(|e| {
             crate::log::event(None, &Logged::StateUnread { error: format!("{e:#}") });
             Ledger::default()
         })
@@ -399,7 +403,7 @@ impl Store {
             }
             state
         };
-        let old = self.read(|r| self.ledger(&r.open_table(LEDGER)?))?;
+        let old = self.read_ledger()?;
         if fold(old.clone()) == old {
             return Ok(old);
         }
@@ -597,7 +601,7 @@ pub(crate) struct Notified {
 impl Notified {
     /// After a failed send, when to send again.
     pub(crate) fn retry_at(&self) -> Option<Timestamp> {
-        retry_at(self.last_attempt.filter(|_| self.failures > 0)?, self.failures)
+        retry_at(self.last_attempt, self.failures)
     }
 }
 

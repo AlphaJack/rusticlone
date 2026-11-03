@@ -62,6 +62,12 @@ impl<'a> Collection<'a> {
         std::iter::once(self.primary).chain(self.targets.iter().copied())
     }
 
+    /// The names of [`Self::repos`].
+    #[cfg(feature = "server")]
+    pub(crate) fn repo_names(&self) -> Vec<String> {
+        self.repos().map(|p| p.name.clone()).collect()
+    }
+
     /// The `[[backup.snapshots]]` entry that backs up `path`, by its index.
     pub(crate) fn source_index(&self, path: &str) -> Option<usize> {
         self.primary.sources.iter().position(|s| s.paths().iter().chain(&s.sources).any(|p| p == path))

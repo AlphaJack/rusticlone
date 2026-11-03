@@ -153,7 +153,7 @@ impl Overview {
                 Text::Scheduled { cron: &cron, ran: &self.last(last) }.to_string()
             }
         };
-        field(log::capitalized(&kind.label()), &when)
+        field(fmt::capitalized(&kind.label()), &when)
     }
 
     fn collection(&self, c: &CollectionOverview) -> Vec<Tree> {
