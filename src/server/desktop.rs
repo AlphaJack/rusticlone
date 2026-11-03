@@ -36,3 +36,13 @@ pub(super) fn open_on_desktop(target: &str) -> bool {
 fn is_page(target: &str) -> bool {
     target.starts_with("http://") || target.starts_with("https://")
 }
+
+#[cfg(test)]
+mod tests {
+    /// A page is a web address. Anything else is a folder.
+    #[test]
+    fn a_page_is_a_web_address() {
+        assert!(super::is_page("http://127.0.0.1:32110/") && super::is_page("https://nas.local/"));
+        assert!(!super::is_page("/home/me/docs") && !super::is_page("file:///home/me"));
+    }
+}
