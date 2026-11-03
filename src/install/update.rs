@@ -133,25 +133,29 @@ fn system(target: &str) -> impl Iterator<Item = &str> {
 /// Updates this executable. Then the new executable updates rustic, since it knows the rustic it is tested
 /// with. Returns whether rustic is left to update here: this executable is the newest. A dry run only says
 /// whether there is a newer release.
+#[cfg_attr(test, mutants::skip)] // Downloads the newest release, and starts it.
 pub(crate) fn update(dry_run: bool) -> Result<bool> {
     // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
     let exe = std::env::current_exe()?;
     let logged = replace(dry_run)?;
     crate::log::event(None, &logged);
-    match logged {
-        Logged::Updated { .. } => {
-            crate::log::hold(|| std::process::Command::new(exe).arg("update").status())?;
-            Ok(false)
-        }
-        Logged::Current { .. } => Ok(!dry_run),
-        Logged::Available { .. } | Logged::Packaged { .. } | Logged::NotUpdated { .. } => Ok(false),
+    if matches!(logged, Logged::Updated { .. }) {
+        crate::log::hold(|| std::process::Command::new(exe).arg("update").status())?;
     }
+    Ok(rustic_left(&logged, dry_run))
+}
+
+/// Whether rustic is left to update here after `logged`: only when this release is the newest, and not in a dry
+/// run. A new release updates rustic itself.
+fn rustic_left(logged: &Logged, dry_run: bool) -> bool {
+    matches!(logged, Logged::Current { .. }) && !dry_run
 }
 
 /// For `serve --auto-update`: updates this executable without asking, else the rustic it is tested with.
 /// Returns whether this executable was replaced: the new one, started in its place, updates rustic. A
 /// failure, as without a network, is logged, and the server starts as it is.
 #[cfg_attr(not(feature = "server"), expect(dead_code, reason = "only the server updates at start"))]
+#[cfg_attr(test, mutants::skip)] // Downloads the newest release, else rustic.
 pub(crate) fn at_start() -> bool {
     let not_updated = |e: anyhow::Error| crate::log::event(None, &Logged::NotUpdated { error: format!("{e:#}") });
     match replace(false) {
@@ -168,6 +172,7 @@ pub(crate) fn at_start() -> bool {
 }
 
 /// Whether this executable can replace itself: not when a package manager keeps it.
+#[cfg_attr(test, mutants::skip)] // Asks where this executable is.
 pub(crate) fn replaceable() -> bool {
     std::env::current_exe().is_ok_and(|exe| !super::managed(&exe))
 }
@@ -195,6 +200,7 @@ fn without_download(
 
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
 /// executable with it.
+#[cfg_attr(test, mutants::skip)] // Downloads the newest release.
 fn replace(dry_run: bool) -> Result<Logged> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))?;
     let api = REPOSITORY.replace("://github.com/", "://api.github.com/repos/");
