@@ -498,7 +498,7 @@ fn list_unknown(app: &Arc<App>) {
 
 #[cfg(test)]
 mod tests {
-    use super::Changes;
+    use super::{Changed, Changes, Level, Logged, Message, Pages};
 
     #[test]
     fn page_updates_only_for_its_own_changes() {
@@ -510,5 +510,50 @@ mod tests {
         assert!(changes.since(seen, None), "the overview shows every collection");
         changes.all = changes.next();
         assert!(changes.since(seen, Some("Docs")));
+        // Not after the last change seen.
+        let seen = changes.count;
+        assert!(!changes.since(seen, Some("Docs")) && !changes.since(seen, None));
+    }
+
+    /// A change of every page counts for all collections, and a collection's for its own.
+    #[test]
+    fn pages_count_their_changes() {
+        let (changes, _) = tokio::sync::watch::channel(Changes::default());
+        let pages = Pages { changes, failures: tokio::sync::broadcast::channel(1).0 };
+        pages.changed();
+        pages.changed_of("Docs");
+        let changes = pages.changes.borrow();
+        assert_eq!((changes.count, changes.all, changes.collections.get("Docs")), (2, 1, Some(&2)));
+    }
+
+    /// A reload says which files changed it. A signal's says nothing more.
+    #[test]
+    fn a_reload_says_which_files_changed() {
+        assert_eq!(Changed(Vec::new()).to_string(), "");
+        let files = Changed(vec!["Docs.toml".into(), "Photos.toml".into()]);
+        assert_eq!(
+            files.to_string(),
+            format!(": {}", crate::i18n::t!("server-changed", files = "Docs.toml, Photos.toml"))
+        );
+        let levels = [
+            Logged::NotReloaded { error: String::new() },
+            Logged::Reloaded { changed: files },
+            Logged::RunsUnread { runs: 3 },
+        ]
+        .map(|logged| logged.level());
+        assert_eq!(levels, [Level::Failure, Level::Success, Level::Warning]);
+    }
+
+    /// The web UI's login page, with the token in its fragment, which no request sends. Without a server to open,
+    /// nothing opens.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "removes the test's folder")]
+    fn the_login_url_keeps_the_token_out_of_requests() {
+        let dir = crate::sys::test_dir("login-url");
+        let tokens = super::login_tokens(&dir).unwrap();
+        let url = super::login_url("http://127.0.0.1:8080/", &tokens);
+        assert_eq!(url, format!("http://127.0.0.1:8080/login#{}", tokens.admin.reveal()));
+        assert!(!super::open_running("127.0.0.1:9").unwrap());
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }
