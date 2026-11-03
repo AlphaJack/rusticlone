@@ -40,9 +40,22 @@ fn solid_state_in(sys: &Path, major: u32, minor: u32) -> Option<bool> {
     rotational.map(|r| r.trim() == "0")
 }
 
+#[cfg_attr(test, mutants::skip)] // Asks the kernel, and tests have no network mount.
 #[expect(unsafe_code, reason = "statfs fills a zeroed struct for a NUL-terminated path")]
 pub(super) fn network_fs(path: &Path) -> bool {
     use std::os::unix::ffi::OsStrExt;
+    let Ok(path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else { return false };
+    // SAFETY: a valid C string and a struct statfs fills.
+    let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statfs(path.as_ptr(), &raw mut stat) } != 0 {
+        return false;
+    }
+    network(stat.f_type.into())
+}
+
+/// Whether `f_type`, as `statfs` gives it, is a network file system's. It is a 32-bit magic number, in a field whose
+/// integer type depends on the libc and the architecture: a signed one extends it.
+fn network(f_type: i128) -> bool {
     const NETWORK: [u32; 8] = [
         0x6969,      // NFS
         0x517b,      // SMB
@@ -53,14 +66,7 @@ pub(super) fn network_fs(path: &Path) -> bool {
         0x00c3_6400, // Ceph
         0x5346_414f, // AFS
     ];
-    let Ok(path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else { return false };
-    // SAFETY: a valid C string and a struct statfs fills.
-    let mut stat: libc::statfs = unsafe { std::mem::zeroed() };
-    if unsafe { libc::statfs(path.as_ptr(), &raw mut stat) } != 0 {
-        return false;
-    }
-    // A 32-bit magic number, in a field whose integer type depends on the libc and the architecture.
-    let magic = i128::from(stat.f_type) & i128::from(u32::MAX);
+    let magic = f_type & i128::from(u32::MAX);
     NETWORK.iter().any(|&m| i128::from(m) == magic)
 }
 
