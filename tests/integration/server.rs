@@ -47,17 +47,32 @@ fn web_ui_needs_the_token() {
     assert!(page.code == 303 && page.head.contains("location: /login"), "{}", page.head);
     let htmx = server.request("GET", "/", &["HX-Request: true"], "");
     assert!(htmx.code == 401 && htmx.head.contains("hx-redirect: /login"), "{}", htmx.head);
-    assert_eq!(server.request("GET", "/login", &[], "").code, 200);
+    let field = r#"<input type="password" name="token""#;
+    let page = server.request("GET", "/login", &[], "");
+    assert!(page.code == 200 && page.body.contains(field), "{}", page.body);
     assert_eq!(server.request("GET", "/assets/style.css", &[], "").code, 200);
 
     let form = ["Content-Type: application/x-www-form-urlencoded"];
-    assert_eq!(server.request("POST", "/login", &form, "token=guess").code, 401);
+    let guess = server.request("POST", "/login", &form, "token=guess");
+    assert!(
+        guess.code == 401 && guess.body.contains(field) && guess.body.contains(r#"class="error""#),
+        "{}",
+        guess.body
+    );
     let login = server.request("POST", "/login", &form, &format!("token={}", server.token));
     assert_eq!(login.code, 303);
     let cookie = login.head.lines().find_map(|l| l.strip_prefix("set-cookie: ")).unwrap();
     assert!(cookie.contains("HttpOnly") && cookie.contains("SameSite=Strict"), "{cookie}");
     // The token itself never reaches the browser.
     assert!(!cookie.contains(&server.token), "{cookie}");
+    assert!(cookie.starts_with("rusticlone=") && cookie.contains("Max-Age=31536000"), "{cookie}");
+    // Behind an HTTPS proxy, the browser binds it to this host.
+    let https = [form[0], "X-Forwarded-Proto: https"];
+    let secure = server.request("POST", "/login", &https, &format!("token={}", server.token));
+    let secure = secure.head.lines().find_map(|l| l.strip_prefix("set-cookie: ")).unwrap();
+    assert!(secure.starts_with("__Host-rusticlone=") && secure.ends_with("; Secure"), "{secure}");
+    // A session that was not started here does not log in.
+    assert_eq!(server.request("GET", "/", &["Cookie: rusticlone=made-up"], "").code, 303);
     let cookie = format!("Cookie: {}", cookie.split(';').next().unwrap());
     let page = server.request("GET", "/", &[&cookie], "");
     // The icons are inlined in the page.
@@ -67,6 +82,11 @@ fn web_ui_needs_the_token() {
     let html = "Accept: text/html,application/xhtml+xml";
     let missing = server.request("GET", "/collections/Unknown", &[&cookie, html], "");
     assert!(missing.code == 404 && missing.body.contains("<h1>404</h1>"));
+    // Not for htmx, which swaps the text in, nor for a form that was sent.
+    let swapped = server.request("GET", "/collections/Unknown", &[&cookie, html, "HX-Request: true"], "");
+    assert!(swapped.code == 404 && !swapped.body.contains("<h1>404</h1>"), "{}", swapped.body);
+    let sent = server.request("POST", "/unknown", &[&cookie, html, "Sec-Fetch-Site: same-origin"], "");
+    assert!(sent.code == 404 && !sent.body.contains("<h1>404</h1>"), "{}", sent.body);
     assert_eq!(server.request("GET", "/unknown", &[&cookie], "").code, 404);
     assert_eq!(server.request("GET", "/collections/Docs/unknown", &[&cookie], "").code, 404);
     assert_eq!(server.get("/collections/Unknown").code, 404);
