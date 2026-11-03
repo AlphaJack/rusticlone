@@ -673,6 +673,26 @@ fn install_turns_auto_update_on_in_the_env_file() {
     install(&["uninstall"]);
 }
 
+/// `install` puts its folder on `PATH` for new terminals: in `.profile`, which it creates, and in the other startup
+/// files of the shell that exist, once however often it runs.
+#[cfg(unix)]
+#[test]
+fn install_puts_its_folder_on_path_for_new_terminals() {
+    let sb = docs_with_remote("");
+    let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
+    let home = sb.path("home");
+    fs::create_dir_all(&home).unwrap();
+    fs::write(home.join(".bashrc"), "# mine").unwrap();
+    for _ in 0..2 {
+        sb.run_with(&["install"], &fake.env()).assert_exit(0);
+    }
+    let line = |file: &str| fs::read_to_string(home.join(file)).unwrap().matches("env\"\n").count();
+    assert_eq!((line(".profile"), line(".bashrc")), (1, 1), "once each");
+    assert!(fs::read_to_string(home.join(".bashrc")).unwrap().starts_with("# mine\n"), "below the user's own lines");
+    assert!(!home.join(".bash_profile").exists(), "not created");
+    sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
+}
+
 /// What `install` left in `dir`: files named after rusticlone.
 #[cfg(any(target_os = "linux", target_vendor = "apple"))]
 fn leftovers(dir: &std::path::Path) -> Vec<String> {

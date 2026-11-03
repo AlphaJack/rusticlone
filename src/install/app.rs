@@ -25,3 +25,24 @@ pub(crate) fn source(exe: &Path) -> Option<(PathBuf, String)> {
 pub(crate) fn app_source(exe: &Path) -> Option<PathBuf> {
     source(exe).map(|(path, _)| path)
 }
+
+#[cfg(test)]
+mod tests {
+    #![expect(clippy::disallowed_methods, reason = "lays out an app")]
+
+    use super::{APP_NAME, app_source, source};
+
+    /// The app names the executable it copied, and the SHA-256 it had then, in its `Contents`. An executable outside
+    /// an app has no source.
+    #[test]
+    fn the_app_names_what_it_copied() {
+        let app = crate::sys::test_dir("app").join(format!("{APP_NAME}.app")).join("Contents");
+        let exe = app.join("MacOS").join(APP_NAME);
+        std::fs::create_dir_all(app.join("Resources")).unwrap();
+        let copied = std::path::Path::new("/opt").join("homebrew").join("bin").join("rusticlone");
+        std::fs::write(app.join("Resources").join("source"), format!("{}\nabc123\n", copied.display())).unwrap();
+        assert_eq!(source(&exe), Some((copied.clone(), "abc123".into())));
+        assert_eq!(app_source(&exe), Some(copied));
+        assert_eq!(source(&app.join("MacOS").join("other")), None, "not the app's executable");
+    }
+}
