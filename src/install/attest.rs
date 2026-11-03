@@ -133,6 +133,62 @@ impl CryptoProvider for Ring {
 mod tests {
     use super::check;
 
+    /// Each scheme that Sigstore signs with is checked with ring's algorithm for it: a signature of the data passes,
+    /// the same of other data fails. ring signs with most of them; `openssl` made the two it cannot sign with, and the
+    /// RSA key, as `tests/fixtures/attest` holds them.
+    #[test]
+    fn each_scheme_checks_its_own_signatures() {
+        use ring::{
+            rand::SystemRandom,
+            signature::{self, EcdsaKeyPair, Ed25519KeyPair, KeyPair, RsaKeyPair},
+        };
+        use sigstore_verify::crypto::{CryptoProvider, SigningScheme as Scheme};
+        let (rng, data) = (SystemRandom::new(), b"attested");
+        let checks = |scheme: Scheme, key: &[u8], sig: &[u8]| {
+            assert!(super::Ring.verify_raw(scheme, key, data, sig).is_ok(), "{scheme:?}");
+            assert!(super::Ring.verify_raw(scheme, key, b"other", sig).is_err(), "{scheme:?} of other data");
+        };
+        for (scheme, algorithm) in [
+            (Scheme::EcdsaP256Sha256, &signature::ECDSA_P256_SHA256_ASN1_SIGNING),
+            (Scheme::EcdsaP384Sha384, &signature::ECDSA_P384_SHA384_ASN1_SIGNING),
+        ] {
+            let pair = EcdsaKeyPair::from_pkcs8(
+                algorithm,
+                EcdsaKeyPair::generate_pkcs8(algorithm, &rng).unwrap().as_ref(),
+                &rng,
+            )
+            .unwrap();
+            checks(scheme, pair.public_key().as_ref(), pair.sign(&rng, data).unwrap().as_ref());
+        }
+        let pair = Ed25519KeyPair::from_pkcs8(Ed25519KeyPair::generate_pkcs8(&rng).unwrap().as_ref()).unwrap();
+        checks(Scheme::Ed25519, pair.public_key().as_ref(), pair.sign(data).as_ref());
+        let rsa = RsaKeyPair::from_pkcs8(include_bytes!("../../tests/fixtures/attest/rsa.pk8")).unwrap();
+        let paddings: [(Scheme, &dyn signature::RsaEncoding); 6] = [
+            (Scheme::RsaPssSha256, &signature::RSA_PSS_SHA256),
+            (Scheme::RsaPssSha384, &signature::RSA_PSS_SHA384),
+            (Scheme::RsaPssSha512, &signature::RSA_PSS_SHA512),
+            (Scheme::RsaPkcs1Sha256, &signature::RSA_PKCS1_SHA256),
+            (Scheme::RsaPkcs1Sha384, &signature::RSA_PKCS1_SHA384),
+            (Scheme::RsaPkcs1Sha512, &signature::RSA_PKCS1_SHA512),
+        ];
+        for (scheme, padding) in paddings {
+            let mut sig = vec![0; rsa.public().modulus_len()];
+            rsa.sign(padding, &rng, data, &mut sig).unwrap();
+            checks(scheme, rsa.public_key().as_ref(), &sig);
+        }
+        checks(
+            Scheme::EcdsaP256Sha384,
+            include_bytes!("../../tests/fixtures/attest/p256.pub"),
+            include_bytes!("../../tests/fixtures/attest/p256-sha384.sig"),
+        );
+        checks(
+            Scheme::EcdsaP384Sha256,
+            include_bytes!("../../tests/fixtures/attest/p384.pub"),
+            include_bytes!("../../tests/fixtures/attest/p384-sha256.sig"),
+        );
+        assert!(super::Ring.verify_prehashed(Scheme::Ed25519, b"", b"", b"").is_err(), "over a digest");
+    }
+
     /// A release of uv, attested by its own workflow.
     const UV: &[u8] = include_bytes!("../../tests/fixtures/attestations-uv.json");
     const UV_HEX: &str = "7906c79adb21c81abd559841ba76bb1d9af9d791acac7a041b2972e03ae16538";
