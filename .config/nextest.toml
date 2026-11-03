@@ -3,6 +3,16 @@
 [profile.default]
 slow-timeout = { period = "20s", terminate-after = 3 }
 
+# Unit tests take under 4 seconds: one that a mutant holds up, waiting on a lock or a wake-up, fails after 20.
+[[profile.default.overrides]]
+filter = 'kind(lib)'
+platform = 'cfg(windows)'
+slow-timeout = { period = "15s", terminate-after = 2 }
+
+[[profile.default.overrides]]
+filter = 'kind(lib)'
+slow-timeout = { period = "10s", terminate-after = 2 }
+
 [[profile.default.overrides]]
 platform = 'cfg(windows)'
 slow-timeout = { period = "30s", terminate-after = 4 }
