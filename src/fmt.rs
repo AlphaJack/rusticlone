@@ -92,6 +92,12 @@ pub(crate) fn local_time(t: Timestamp) -> String {
     t.to_zoned(TimeZone::system()).strftime("%H:%M:%S").to_string()
 }
 
+/// Whether a URI keeps `b` as it is: a letter, a digit, `/` or `-._~`.
+#[cfg(feature = "server")]
+pub(crate) fn unreserved(b: u8) -> bool {
+    b.is_ascii_alphanumeric() || b"/-._~".contains(&b)
+}
+
 /// Hides the password in a repository URL such as `rest:https://user:password@host/`.
 pub(crate) fn redact(repository: &str) -> String {
     let Some((scheme, rest)) = repository.split_once("://") else { return repository.to_owned() };

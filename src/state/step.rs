@@ -14,8 +14,9 @@ const FIRST_RETRY: SignedDuration = SignedDuration::from_mins(5);
 const LAST_RETRY: SignedDuration = SignedDuration::from_hours(6);
 
 /// After `failures` failures in a row, the last at `last`, when to retry: [`FIRST_RETRY`] later, doubling each
-/// time up to [`LAST_RETRY`].
-pub(super) fn retry_at(last: Timestamp, failures: u32) -> Option<Timestamp> {
+/// time up to [`LAST_RETRY`]. `None` without a failure.
+pub(super) fn retry_at(last: Option<Timestamp>, failures: u32) -> Option<Timestamp> {
+    let last = last.filter(|_| failures > 0)?;
     let backoff = FIRST_RETRY.saturating_mul(2_i32.saturating_pow(failures.saturating_sub(1))).min(LAST_RETRY);
     last.checked_add(backoff).ok()
 }
@@ -84,7 +85,7 @@ impl LastStep {
     }
 
     pub fn retry_at(&self) -> Option<Timestamp> {
-        retry_at(self.last_attempt.filter(|_| self.failures > 0)?, self.failures)
+        retry_at(self.last_attempt, self.failures)
     }
 
     /// Until when a scheduled first failure is not reported yet: its retry may well succeed, as after a

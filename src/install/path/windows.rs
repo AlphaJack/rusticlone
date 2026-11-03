@@ -10,13 +10,11 @@ use windows_sys::Win32::{
     UI::WindowsAndMessaging::{HWND_BROADCAST, SMTO_ABORTIFHUNG, SendMessageTimeoutW, WM_SETTINGCHANGE},
 };
 
+use crate::sys::wide;
+
 const SYSTEM: &str = r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
 /// How long a window may take to read the change of `Path`, in milliseconds.
 const BROADCAST_TIMEOUT: u32 = 5000;
-
-fn wide(text: &str) -> Vec<u16> {
-    text.encode_utf16().chain([0]).collect()
-}
 
 /// The key that holds `Path`, by its name too.
 fn key() -> (HKEY, &'static str, String) {
@@ -55,7 +53,7 @@ pub(super) fn add(dir: &Path) -> Result<String> {
     if path.split(';').any(|d| d.eq_ignore_ascii_case(&dir)) {
         return Ok(name);
     }
-    let data = wide(&[dir.as_str(), &path].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join(";"));
+    let data = wide([dir.as_str(), &path].into_iter().filter(|p| !p.is_empty()).collect::<Vec<_>>().join(";"));
     let size = u32::try_from(size_of_val(data.as_slice()))?;
     // SAFETY: NUL-terminated strings, and the data's size in bytes.
     let status = unsafe {

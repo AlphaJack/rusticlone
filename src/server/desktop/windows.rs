@@ -3,10 +3,10 @@
 /// Opens `target` as double-clicking it would.
 #[expect(unsafe_code, reason = "ShellExecuteW reads the NUL-terminated strings it is given")]
 pub(super) fn open(target: &str, _: bool) -> std::io::Result<()> {
+    use crate::sys::wide;
     use windows_sys::Win32::UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL};
     /// Above this, `ShellExecuteW` succeeded; at or below, it is an error code.
     const OPENED: isize = 32;
-    let wide = |text: &str| text.encode_utf16().chain([0]).collect::<Vec<u16>>();
     let (verb, file) = (wide("open"), wide(target));
     // SAFETY: strings that live through the call, and no window that owns it.
     let done = unsafe {

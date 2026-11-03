@@ -343,12 +343,6 @@ pub(crate) fn paint(level: Level, text: &str) -> String {
     style(Tone::from(level).code(), text)
 }
 
-/// `text` starting with a capital, as a heading or a line of its own: `Backup` for `backup`.
-pub(crate) fn capitalized(text: &str) -> String {
-    let mut chars = text.chars();
-    chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
-}
-
 /// `text` in bold, where colors are shown.
 pub(crate) fn bold(text: &str) -> String {
     style("1", text)
@@ -402,7 +396,7 @@ fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: V
         v.to_string()
     } else {
         // A line of its own starts with a capital.
-        let message = if name.is_none() { capitalized(message) } else { message.to_owned() };
+        let message = if name.is_none() { crate::fmt::capitalized(message) } else { message.to_owned() };
         let message = if level == Level::Success { message } else { paint(level, &message) };
         match name {
             Some(profile) if target == "rustic" => format!("[{profile}] {message}"),

@@ -15,7 +15,7 @@ use windows_sys::Win32::{
 };
 
 use super::{Path, PathBuf, Removed, Result};
-use crate::{APP_NAME, NAME, settings, sys};
+use crate::{APP_NAME, NAME, settings, sys, sys::wide};
 
 const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const SERVICES: &str = r"SYSTEM\CurrentControlSet\Services";
@@ -29,10 +29,6 @@ const STOP_TIMEOUT: Duration = Duration::from_secs(30);
 const CONSOLE_POLICY_BUILD: u32 = 26100;
 /// Longer than any path of an executable that Windows runs.
 const MAX_PATH: usize = 1024;
-
-fn wide(text: &str) -> Vec<u16> {
-    text.encode_utf16().chain([0]).collect()
-}
 
 fn os_error(status: u32) -> std::io::Error {
     std::io::Error::from_raw_os_error(status.cast_signed())
@@ -111,7 +107,8 @@ fn install_service(exe: &Path, serve: &[String]) -> Result<PathBuf> {
     let environment = [format!("PATH={}", std::env::var("PATH").unwrap_or_default())]
         .into_iter()
         .chain(rustic.is_absolute().then(|| format!("{}={}", settings::RUSTIC.key, rustic.display())));
-    let data: Vec<u16> = environment.flat_map(|v| v.encode_utf16().chain([0]).collect::<Vec<_>>()).chain([0]).collect();
+    // A NUL-terminated string each, then one more NUL.
+    let data: Vec<u16> = environment.flat_map(wide).chain([0]).collect();
     let key = format!(r"{SERVICES}\{NAME}");
     set(HKEY_LOCAL_MACHINE, &key, "Environment", REG_MULTI_SZ, &data)?;
     // Restarted, so that a running server takes the new executable.
@@ -157,7 +154,7 @@ fn ask_to_stop() {
 /// The event that asks the server in this session to stop, as the service manager asks the service, so
 /// that `install` can replace its executable.
 pub(crate) fn stop_event() -> Vec<u16> {
-    format!(r"Local\{NAME}-stop").encode_utf16().chain([0]).collect()
+    wide(format!(r"Local\{NAME}-stop"))
 }
 
 /// Waits until the processes that run `exe` have exited, at most [`STOP_TIMEOUT`].
@@ -280,7 +277,7 @@ pub(super) fn install(listen: &str, exe: &Path, serve: &[String]) -> Result<Path
 /// The `Run` key's value that starts `exe` with `serve` at login.
 fn set_run(exe: &str, serve: &[String]) -> Result<()> {
     let (host, args) = without_window(exe, &serve.join(" "));
-    set(HKEY_CURRENT_USER, RUN, NAME, REG_SZ, &wide(&format!("\"{}\" {args}", host.display())))
+    set(HKEY_CURRENT_USER, RUN, NAME, REG_SZ, &wide(format!("\"{}\" {args}", host.display())))
 }
 
 /// Installed with its Start menu entry; started at login by the `Run` key.
