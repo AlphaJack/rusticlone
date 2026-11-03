@@ -705,8 +705,13 @@ fn install_enables_a_user_service() {
     let calls = fs::read_to_string(&log).unwrap();
     let started = format!("Reload\nEnableUnitFiles {NAME}.service\nRestartUnit {NAME}.service\n");
     assert!(calls.ends_with(&started), "{calls}");
+    // The desktop's entry and its icon, which open the web UI.
+    let data = sb.path("home/.local/share");
+    let desktop = [data.join("applications"), data.join("icons").join("hicolor").join("scalable").join("apps")];
+    assert!(desktop.iter().all(|dir| leftovers(dir).len() == 1), "{desktop:?}");
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
     assert_eq!(leftovers(&dir), Vec::<String>::new());
+    assert!(desktop.iter().all(|dir| leftovers(dir).is_empty()), "{desktop:?}");
     assert!(
         fs::read_to_string(&log)
             .unwrap()
