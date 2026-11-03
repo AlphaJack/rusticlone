@@ -457,9 +457,14 @@ mod tests {
                 .into_iter()
                 .flatten()
                 .map(|issue| issue.text(now))
-                .chain([Last::never()])
                 .collect();
         insta::assert_debug_snapshot!(texts);
+    }
+
+    /// What a step never done shows.
+    #[test]
+    fn a_step_never_done_says_so() {
+        insta::assert_snapshot!(Last::never());
     }
 
     /// A failing notification counts for nothing: its own notification would fail too.
