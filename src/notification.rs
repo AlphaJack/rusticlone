@@ -177,6 +177,38 @@ mod tests {
         }
     }
 
+    /// Services that show an icon show the logo.
+    #[test]
+    fn notifications_show_the_logo() {
+        let sent = |url: &str| {
+            let fake = Arc::new(FakeTransport::new());
+            deliver(Mercurio::with_transport(fake.clone()), &mut |_| {}, url, Level::Warning, "title\nbody").unwrap();
+            fake.last_request().unwrap()
+        };
+        let ntfy = sent("ntfy://localhost/topic");
+        assert!(ntfy.headers.iter().any(|(k, v)| k == "X-Icon" && v == ICON_URL), "{:?}", ntfy.headers);
+        let discord = sent("discord://1/token?format=markdown&footer=yes");
+        let discord: serde_json::Value = serde_json::from_slice(&discord.body).unwrap();
+        assert_eq!(
+            (&discord["avatar_url"], &discord["embeds"][0]["footer"]["icon_url"]),
+            (&ICON_URL.into(), &ICON_URL.into())
+        );
+    }
+
+    /// A failed delivery reports its error once, not also as a warning. Its level is a warning: the collection's
+    /// level does not count it.
+    #[test]
+    fn a_failure_is_reported_once() {
+        let fake = Arc::new(FakeTransport::new());
+        fake.respond(500, "failed");
+        let mut warnings = Vec::new();
+        let client = Mercurio::with_transport(fake);
+        assert!(deliver(client, &mut |w| warnings.push(w), "json://localhost/hook", Level::Failure, "title").is_err());
+        assert_eq!(warnings, Vec::<String>::new());
+        let levels = [Logged::Notified { text: String::new() }, Logged::Undelivered { error: String::new() }];
+        assert_eq!(levels.map(|l| log::Message::level(&l)), [Level::Success, Level::Warning]);
+    }
+
     #[test]
     fn invalid_configuration_sends_nothing() {
         let fake = Arc::new(FakeTransport::new());
