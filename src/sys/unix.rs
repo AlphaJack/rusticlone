@@ -167,11 +167,12 @@ mod tests {
     /// Where every Unix keeps what is the system's, and that its terminals read ANSI codes.
     #[test]
     fn unix_answers_the_same_way() {
-        use std::path::{Path, PathBuf};
+        use std::path::Path;
         let usr = Path::new("/usr");
         assert_eq!(super::system_config_dir("app"), Some(Path::new("/etc").join("app")));
         assert_eq!(super::system_bin_dir(), usr.join("local").join("bin"));
-        assert_eq!(super::system_bins(), [usr.join("bin"), PathBuf::from("/bin"), usr.join("sbin")]);
+        #[cfg(any(feature = "desktop", feature = "self-update"))]
+        assert_eq!(super::system_bins(), [usr.join("bin"), std::path::PathBuf::from("/bin"), usr.join("sbin")]);
         assert!(super::ansi());
         let base = etcetera::base_strategy::Xdg::new().unwrap();
         let state = etcetera::BaseStrategy::state_dir(&base).unwrap();
