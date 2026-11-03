@@ -141,10 +141,41 @@ mod tests {
 
     /// Runs on the same volume wait for each other on a spinning disk.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "reads the device as the kernel gives it")]
     fn paths_on_a_volume_share_its_device() {
         let root = std::path::Path::new("/");
-        assert!(device(root).is_some());
+        let dev = std::os::unix::fs::MetadataExt::dev(&fs::metadata(root).unwrap());
+        assert_eq!(device(root), Some(dev));
         assert_eq!(device(&root.join("not yet").join("created")), device(root));
+    }
+
+    /// The space left on a disk, as `df` counts it in KiB. Files written meanwhile change it a little.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "asks df, and removes its folder")]
+    fn free_space_is_what_df_says() {
+        let dir = test_dir("free-space");
+        let missing = dir.join("not yet");
+        let (existing, free) = super::free_space(&missing).unwrap();
+        assert_eq!(existing, dir);
+        let df = std::process::Command::new("df").arg("-Pk").arg(&dir).output().unwrap();
+        let text = String::from_utf8(df.stdout).unwrap();
+        let available: u64 = text.lines().nth(1).unwrap().split_whitespace().nth(3).unwrap().parse().unwrap();
+        assert!(free.abs_diff(available * 1024) < 256 << 20, "{free} against {text}");
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// Where every Unix keeps what is the system's, and that its terminals read ANSI codes.
+    #[test]
+    fn unix_answers_the_same_way() {
+        use std::path::{Path, PathBuf};
+        let usr = Path::new("/usr");
+        assert_eq!(super::system_config_dir("app"), Some(Path::new("/etc").join("app")));
+        assert_eq!(super::system_bin_dir(), usr.join("local").join("bin"));
+        assert_eq!(super::system_bins(), [usr.join("bin"), PathBuf::from("/bin"), usr.join("sbin")]);
+        assert!(super::ansi());
+        let base = etcetera::base_strategy::Xdg::new().unwrap();
+        let state = etcetera::BaseStrategy::state_dir(&base).unwrap();
+        assert_eq!(super::user_state_dir(&base, "app"), state.join("app"));
     }
 }
 
