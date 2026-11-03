@@ -523,4 +523,19 @@ mod tests {
             assert_eq!(serde_json::from_str::<StepResult>(&json).unwrap(), line, "{json}");
         }
     }
+
+    /// Each level has its own color, and the spinner turns a frame at a time. Colors stay off, and the frame is
+    /// put back, for the other tests.
+    #[test]
+    fn levels_have_their_colors_and_the_spinner_turns() {
+        let codes = [Level::Success, Level::Warning, Level::Failure].map(|level| Tone::from(level).code());
+        assert_eq!(codes, ["32", "33", "31"]);
+        assert_eq!(Tone::Muted.code(), "2");
+        let start = FRAME.load(Ordering::Relaxed);
+        FRAME.store(6, Ordering::Relaxed);
+        assert_eq!(Tone::Running.dot(), SPINNER[2]);
+        turn();
+        assert_eq!(Tone::Running.dot(), SPINNER[3]);
+        FRAME.store(start, Ordering::Relaxed);
+    }
 }
