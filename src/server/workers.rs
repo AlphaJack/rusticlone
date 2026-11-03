@@ -171,3 +171,48 @@ impl App {
         live.inspect(|l| l.cancel_step(step)).is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The server waits for its runs while any of them works.
+    #[test]
+    fn the_workers_are_busy_until_each_run_ends() {
+        let workers = Workers::default();
+        assert!(!workers.busy());
+        let (one, two) = (workers.start(), workers.start());
+        drop(one);
+        assert!(workers.busy());
+        drop(two);
+        assert!(!workers.busy());
+    }
+
+    #[test]
+    fn a_run_the_page_started_shows_its_first_failure() {
+        let failed = |error: &str| StepResult::Error { error: error.into() };
+        let mut report = RunResults::new("Docs");
+        report.push(StepResult::BackedUp { repo: "Docs".into(), snapshots: vec![], new_repository: false });
+        report.push(failed("unreachable"));
+        report.push(failed("locked"));
+        assert_eq!(shown_failure(&report, Trigger::Web), Some(&failed("unreachable")));
+        assert_eq!(shown_failure(&report, Trigger::Schedule), None);
+        assert_eq!(shown_failure(&RunResults::new("Docs"), Trigger::Web), None);
+    }
+
+    /// The schedule asks again by itself, and a run that ended has nothing left to do.
+    #[test]
+    fn only_a_run_the_page_started_and_the_stop_interrupted_is_queued_again() {
+        let interrupted = Some(Status::Interrupted);
+        assert!(queued_again(true, Trigger::Web, interrupted));
+        for (stopping, trigger, status) in [
+            (false, Trigger::Web, interrupted),
+            (true, Trigger::Schedule, interrupted),
+            (true, Trigger::Cli, interrupted),
+            (true, Trigger::Web, Some(Status::Succeeded)),
+            (true, Trigger::Web, None),
+        ] {
+            assert!(!queued_again(stopping, trigger, status), "{stopping} {trigger:?} {status:?}");
+        }
+    }
+}
