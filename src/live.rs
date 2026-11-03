@@ -259,3 +259,65 @@ impl RunHandle for Live {
         self.cancel.load(Ordering::Relaxed) || step.is_some_and(|s| self.cancelled_steps.lock().contains(&s))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{request::Request, state::Store};
+
+    /// Runs that record each collection they tell of a change.
+    fn runs() -> (Arc<Runs>, Arc<Mutex<Vec<String>>>) {
+        let told = Arc::new(Mutex::new(Vec::new()));
+        let record = Arc::clone(&told);
+        (Runs::new(move |collection| record.lock().push(collection.to_owned())), told)
+    }
+
+    fn listing(repo: &str) -> Doing {
+        Doing::WaitingForListing { repo: repo.into() }
+    }
+
+    /// What a queued run waits for is told once, until it changes or ends.
+    #[test]
+    fn a_wait_is_told_once() {
+        let (runs, told) = runs();
+        runs.wait("Docs", 1, Some(listing("Docs")));
+        runs.wait("Docs", 1, Some(listing("Docs")));
+        assert_eq!(runs.waiting("Docs", 1), Some(listing("Docs")));
+        runs.wait("Docs", 1, None);
+        assert_eq!(runs.waiting("Docs", 1), None);
+        assert_eq!(*told.lock(), ["Docs", "Docs"]);
+    }
+
+    /// A run is listed while its guard lives. Its activities are one per step, its waits add up, and a cancelled run
+    /// shows as cancelling. Each change is told.
+    #[test]
+    fn a_running_run_shows_what_it_does() {
+        let store = Store::at(crate::sys::test_dir("live-test")).unwrap();
+        let (runs, told) = runs();
+        let guard = Guard::start(&runs, RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli));
+        let live = &guard.live;
+        let ids: Vec<i64> = runs.all().iter().map(|l| l.id).collect();
+        assert_eq!(ids, [live.id]);
+        live.steps(&[StepRecord::queued("snapshot".into(), Vec::new())]);
+        live.waited(Some(0), 3);
+        assert_eq!(live.record().steps[0].waited, 3);
+        live.set_activity(Some(0), Some(listing("Docs")), None);
+        live.set_activity(Some(1), Some(listing("Docs-usb")), None);
+        live.set_activity(Some(1), Some(listing("Docs-usb")), None);
+        let doing = |live: &Live| live.activities().iter().map(|a| a.step).collect::<Vec<_>>();
+        assert_eq!(doing(live), [Some(0), Some(1)]);
+        live.clear_activity(Some(0));
+        assert_eq!(doing(live), [Some(1)]);
+        assert!(!live.running().elsewhere && !live.running().cancelling);
+        #[cfg(feature = "server")]
+        {
+            live.cancel();
+            assert!(live.running().cancelling);
+        }
+        let changes = if cfg!(feature = "server") { 6 } else { 5 };
+        assert_eq!(told.lock().len(), changes, "{:?}", told.lock());
+        drop(guard);
+        assert!(runs.all().is_empty());
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+}
