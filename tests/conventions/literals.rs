@@ -10,7 +10,7 @@
 
 use std::{fs, path::Path};
 
-use super::root;
+use super::{is_test, root};
 
 use proc_macro2::{TokenStream, TokenTree};
 use syn::visit::{self, Visit};
@@ -23,15 +23,6 @@ fn is_text(literal: &str) -> bool {
     let filled = |w: &str| w.len() > 2 && w.starts_with('{') && w.ends_with('}');
     let words: Vec<&str> = literal.split(' ').collect();
     words.windows(2).any(|pair| pair.iter().all(|w| word(w) || filled(w)) && pair.iter().any(|w| word(w)))
-}
-
-/// `#[test]`, or `#[cfg(test)]`.
-fn is_test(attrs: &[syn::Attribute]) -> bool {
-    attrs.iter().any(|a| match &a.meta {
-        syn::Meta::Path(path) => path.is_ident("test"),
-        syn::Meta::List(list) => list.path.is_ident("cfg") && list.tokens.to_string() == "test",
-        syn::Meta::NameValue(_) => false,
-    })
 }
 
 /// Literals outside the places they belong.
