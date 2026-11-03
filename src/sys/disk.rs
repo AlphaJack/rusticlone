@@ -26,18 +26,22 @@ pub(crate) fn presence(path: &std::path::Path) -> Presence {
         return Presence::Present;
     }
     let Some([mounts, fstab]) = super::os::mount_tables() else { return Presence::Missing };
-    // Both files write a space as `\040`.
-    let points = |file: &std::path::Path| -> Vec<PathBuf> {
-        let text = std::fs::read_to_string(file).unwrap_or_default();
-        let lines = text.lines().filter(|l| !l.trim_start().starts_with('#'));
-        lines.filter_map(|l| l.split_whitespace().nth(1)).map(|p| p.replace("\\040", " ").into()).collect()
-    };
-    let mounted = points(&mounts);
-    let expected = points(&fstab).into_iter().filter(|m| m != std::path::Path::new("/") && path.starts_with(m));
-    match expected.max_by_key(|m| m.components().count()) {
-        Some(mount) if !mounted.contains(&mount) => Presence::Unmounted,
-        _ => Presence::Missing,
-    }
+    let read = |file: &std::path::Path| std::fs::read_to_string(file).unwrap_or_default();
+    if unmounted(path, &read(&mounts), &read(&fstab)) { Presence::Unmounted } else { Presence::Missing }
+}
+
+/// Whether `fstab` mounts a device at `path` or above it, other than `/`, that `mounts` lacks. The innermost such
+/// mount point counts.
+fn unmounted(path: &std::path::Path, mounts: &str, fstab: &str) -> bool {
+    let mounted = points(mounts);
+    let expected = points(fstab).into_iter().filter(|m| m != std::path::Path::new("/") && path.starts_with(m));
+    expected.max_by_key(|m| m.components().count()).is_some_and(|mount| !mounted.contains(&mount))
+}
+
+/// The mount points a table such as `/proc/mounts` or `/etc/fstab` lists, which write a space as `\040`.
+fn points(table: &str) -> Vec<PathBuf> {
+    let lines = table.lines().filter(|l| !l.trim_start().starts_with('#'));
+    lines.filter_map(|l| l.split_whitespace().nth(1)).map(|p| p.replace("\\040", " ").into()).collect()
 }
 
 /// Whether `path` may be on a spinning disk, where concurrent runs slow each other down. True unless
