@@ -293,4 +293,43 @@ mod tests {
         assert_eq!(drawn, "├── ● 1 file skipped\n└── after\n");
         assert_eq!(section_lines("Docs", "check", &[]), ["Docs: check"]);
     }
+
+    /// A running step shows what it does now, a step that ended its results, and a step without either
+    /// its label only.
+    #[test]
+    fn a_run_shows_what_each_step_does_or_did() {
+        use crate::{
+            live::{Guard, Runs},
+            request::{Request, Trigger},
+            result::{Doing, StepResult},
+            state::{RunLog, StepRecord, Store},
+        };
+        let store = Store::at(crate::sys::test_dir("board-lines")).unwrap();
+        let run = Guard::start(&Runs::new(|_| {}), RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli));
+        let step = |label: &str, repo: Option<&str>, status, results: &[StepResult]| StepRecord {
+            repo: repo.map(Into::into),
+            status,
+            results: results.iter().map(Into::into).collect(),
+            ..StepRecord::queued(label.into(), Vec::new())
+        };
+        let copied = StepResult::Copied { target: "Docs-usb".into(), snapshots: 2 };
+        run.live.steps(&[
+            step("backup", None, Status::Running, &[]),
+            step("copy to Docs-usb", Some("Docs-usb"), Status::Succeeded, &[copied]),
+            step("forget", None, Status::Running, &[]),
+            step("prune", None, Status::Queued, &[]),
+        ]);
+        run.live.set_activity(Some(0), Some(Doing::Path { path: "/docs".into() }), None);
+        // Not running: what it did shows instead.
+        run.live.set_activity(Some(1), Some(Doing::Path { path: "/old".into() }), None);
+        let drawn = lines(&run.live);
+        insta::assert_debug_snapshot!(drawn.lines);
+        // What the run showed is left out of its report.
+        let mut report = RunResults::new("Docs");
+        report.push(StepResult::Copied { target: "Docs-usb".into(), snapshots: 2 });
+        report.push(StepResult::InSync { target: "Docs-usb".into() });
+        BOARD.shown.lock().extend(drawn.shown);
+        leave_out(&mut report);
+        assert_eq!(report.results, [StepResult::InSync { target: "Docs-usb".into() }]);
+    }
 }
