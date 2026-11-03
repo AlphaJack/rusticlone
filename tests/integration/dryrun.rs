@@ -111,7 +111,10 @@ fn a_dry_run_creates_only_targets_never_seen() {
         .assert_result("would-copy", serde_json::json!({"target": "Docs-remote", "create": true}));
     sb.run(&["copy", "--all"]).assert_exit(0);
     sb.remove("remote");
-    sb.run(&["copy", "--dry-run", "--all"]).assert_exit(1).assert_no_result("would-copy", serde_json::json!({}));
+    sb.run(&["copy", "--dry-run", "--all"])
+        .assert_exit(1)
+        .assert_no_result("would-copy", serde_json::json!({}))
+        .assert_output("Docs-remote is unavailable or deleted");
     sb.run(&["recreate", "--repo", "Docs-remote", "--dry-run"])
         .assert_result("would-copy", serde_json::json!({"target": "Docs-remote", "create": true}));
 }
