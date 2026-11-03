@@ -499,11 +499,27 @@ fn normalize(path: &Path) -> PathBuf {
     out
 }
 
-/// Canonicalizes the existing part of `path` and appends the rest unchanged.
+/// Canonicalizes the existing part of `path` and appends the rest unchanged. A link whose target is gone, as after
+/// the loss of the disk it led to, leads where it led when rustic recorded it.
 fn resolve(path: &Path) -> PathBuf {
+    resolve_within(path, LINKS)
+}
+
+/// How many links a path may go through, as Linux's `ELOOP` limit: more is a loop.
+const LINKS: usize = 40;
+
+fn resolve_within(path: &Path, links: usize) -> PathBuf {
     let path = normalize(path);
     let existing = path.ancestors().find_map(|a| {
-        let (real, rest) = (dunce::canonicalize(a).ok()?, path.strip_prefix(a).ok()?);
+        let rest = path.strip_prefix(a).ok()?;
+        let real = match dunce::canonicalize(a) {
+            Ok(real) => real,
+            Err(_) if links > 0 => {
+                let target = fs::read_link(a).ok()?;
+                resolve_within(&a.parent().unwrap_or(a).join(target), links - 1)
+            }
+            Err(_) => return None,
+        };
         Some(if rest.as_os_str().is_empty() { real } else { real.join(rest) })
     });
     existing.unwrap_or(path)
