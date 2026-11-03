@@ -344,3 +344,78 @@ pub(super) async fn download(
     )
         .into_response())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rustic::Node;
+
+    fn node(name: &str, kind: NodeKind, size: u64) -> Node {
+        Node { name: name.into(), kind, size, mtime: None }
+    }
+
+    /// A snapshot of one absolute directory opens there, as the tree names it. One of several, or one asked for a
+    /// path, opens where asked.
+    #[test]
+    fn a_snapshot_opens_in_its_one_directory() {
+        let docs = std::env::temp_dir().join("docs").display().to_string();
+        let one = [docs.clone()];
+        assert_eq!(opened("", &one), rustic::in_tree(&docs));
+        assert_eq!(opened("/home", &one), "/home");
+        assert_eq!(opened("", &["/a".to_owned(), "/b".to_owned()]), "");
+        assert_eq!(opened("", &["docs".to_owned()]), "", "a relative path is not in the tree as it is");
+    }
+
+    /// The crumbs lead to each directory above, from the root.
+    #[test]
+    fn crumbs_lead_to_each_directory_above() {
+        let crumbs = crumbs("/home//me/");
+        let expected = [("/", ""), ("home", "/home"), ("me", "/home/me")].map(|(a, b)| (a.to_owned(), b.to_owned()));
+        assert_eq!(crumbs, expected);
+    }
+
+    /// Directories come first, each by name, and only files have a size.
+    #[test]
+    fn directories_are_listed_first_and_files_with_their_size() {
+        let nodes = vec![
+            node("b.txt", NodeKind::File, 3),
+            node("z", NodeKind::Dir, 0),
+            node("a.txt", NodeKind::File, 5),
+            node("c", NodeKind::Dir, 0),
+        ];
+        let listed: Vec<(String, String, bool)> =
+            entries("/docs/", nodes).into_iter().map(|e| (e.name, e.path, e.size.is_some())).collect();
+        let expected = [
+            ("c", "/docs/c", false),
+            ("z", "/docs/z", false),
+            ("a.txt", "/docs/a.txt", true),
+            ("b.txt", "/docs/b.txt", true),
+        ];
+        assert_eq!(listed, expected.map(|(n, p, s)| (n.to_owned(), p.to_owned(), s)));
+    }
+
+    /// A download is saved under the last part of its path, the snapshot's name without one, and nothing a quoted
+    /// header name cannot hold.
+    #[test]
+    fn a_download_is_named_after_what_it_holds() {
+        assert_eq!(file_name("/home/me/docs/", "Docs-12345678", true), "docs.zip");
+        assert_eq!(file_name("", "Docs-12345678", true), "Docs-12345678.zip");
+        assert_eq!(file_name("/a/b.txt", "Docs-12345678", false), "b.txt");
+        assert_eq!(file_name("/a/my \"file\\é.txt", "x", false), "my__file__.txt");
+    }
+
+    /// A snapshot weighs as many entries as it lists, at most half the cache, so that a large one is still kept.
+    #[test]
+    fn a_snapshot_weighs_its_entries() {
+        let key = ("Docs".to_owned(), "1".repeat(64).parse().unwrap());
+        let dirs = |n: usize| {
+            Arc::new(Dirs::from([
+                ("/".to_owned(), vec![node("a", NodeKind::File, 0); n]),
+                ("/b".to_owned(), vec![node("c", NodeKind::File, 0)]),
+            ]))
+        };
+        assert_eq!(Entries.weight(&key, &dirs(2)), 3);
+        let large = usize::try_from(BROWSED_ENTRIES).unwrap();
+        assert_eq!(Entries.weight(&key, &dirs(large)), BROWSED_ENTRIES / 2);
+    }
+}
