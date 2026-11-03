@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeMap, fs, path::Path, time::SystemTime};
 
-use crate::common::{Sandbox, docs_with_remote};
+use crate::common::{KEEP, Sandbox, docs_with_remote};
 
 /// Each file below the sources, the repositories and the state, but its locks, with its size and
 /// modification time.
@@ -114,4 +114,18 @@ fn a_dry_run_creates_only_targets_never_seen() {
     sb.run(&["copy", "--dry-run", "--all"]).assert_exit(1).assert_no_result("would-copy", serde_json::json!({}));
     sb.run(&["recreate", "--repo", "Docs-remote", "--dry-run"])
         .assert_result("would-copy", serde_json::json!({"target": "Docs-remote", "create": true}));
+}
+
+/// A dry run has nothing to forget in a target it would create.
+#[test]
+fn a_dry_run_forgets_nothing_in_a_target_it_would_create() {
+    let sb = Sandbox::new();
+    sb.backup_profile("Docs", &[&["docs"]], &[], KEEP);
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.backup_profile("Docs", &[&["docs"]], &["Docs-remote"], KEEP);
+    sb.target("Docs-remote", "Docs", KEEP);
+    sb.run(&["backup", "--dry-run", "--all"])
+        .assert_exit(0)
+        .assert_result("would-forget", serde_json::json!({"repo": "Docs-remote", "snapshots": 0}));
 }
