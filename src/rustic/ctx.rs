@@ -130,3 +130,59 @@ impl Ctx {
         self.calls.lock().clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A run that records what it is told.
+    #[derive(Default)]
+    struct Told {
+        lines: Mutex<Vec<(Origin, String)>>,
+        calls: Mutex<Vec<Call>>,
+    }
+
+    impl RunHandle for Told {
+        fn log(&self, origin: Origin, line: &str) {
+            self.lines.lock().push((origin, line.to_owned()));
+        }
+
+        fn cancelled(&self, _: Option<usize>) -> bool {
+            false
+        }
+
+        fn called(&self, calls: &[Call]) {
+            calls.clone_into(&mut self.calls.lock());
+        }
+    }
+
+    fn call(args: &str) -> Call {
+        let started = "2026-10-16T12:00:00Z".parse().unwrap();
+        Call { step: None, args: args.into(), bin: None, dir: None, started, secs: 0.0, exit: None }
+    }
+
+    /// Calls and lines belong to the step the context is at. Each call is told to the run as it starts and ends.
+    #[test]
+    fn calls_and_lines_belong_to_the_current_step() {
+        let told = Arc::new(Told::default());
+        let cx = Ctx::new(told.clone());
+        assert!(format!("{cx:?}").starts_with("Ctx { in_run: true, step: "), "{cx:?}");
+        cx.at_step(Some(2));
+        cx.log(Some(0), "reading");
+        assert_eq!(*told.lines.lock(), [(Origin { step: Some(2), call: Some(0) }, "reading".to_owned())]);
+        assert_eq!([cx.call(call("backup")), cx.call(call("forget"))], [0, 1]);
+        cx.ended(0, 2.5, "0".into());
+        let calls = told.calls.lock().clone();
+        let ended: Vec<_> = calls.iter().map(|c| (c.step, c.secs, c.exit.clone())).collect();
+        assert_eq!(ended, [(Some(2), 2.5, Some("0".into())), (Some(2), 0.0, None)]);
+    }
+
+    /// Released locks are no longer held. The others stay.
+    #[test]
+    fn released_locks_are_no_longer_held() {
+        let cx = Ctx::default();
+        cx.hold(&[3, 4, 5]);
+        cx.release(&[4]);
+        assert_eq!(cx.held(), [3, 5]);
+    }
+}
