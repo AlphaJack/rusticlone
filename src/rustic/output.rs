@@ -322,6 +322,34 @@ mod tests {
         Output { success, stdout: String::new(), command: command.into(), code: Some(i32::from(!success)), stderr: log }
     }
 
+    /// Progress as far as known: the size done of the total, and the time left once rustic knows it.
+    #[test]
+    fn progress_says_how_far_it_is() {
+        let (done, total) = (1_288_490_189, 3_113_851_290);
+        let progress = Progress {
+            percent_done: 0.43,
+            bytes_done: Some(done),
+            total_bytes: Some(total),
+            seconds_remaining: Some(180),
+        };
+        let size = format!("{} of {}", fmt::human_size(done), fmt::human_size(total));
+        let left = format!("about {} left", fmt::human_duration(180));
+        assert_eq!(progress.summary(), format!("43% ({size}, {left})"));
+        let unknown = Progress { seconds_remaining: Some(0), ..progress };
+        assert_eq!(unknown.detail(), size);
+        assert_eq!(Progress { percent_done: 0.5, ..Progress::default() }.summary(), "50%");
+    }
+
+    /// A line that starts another entry, or rustic's final error, does not continue the warning before it.
+    #[test]
+    fn a_warning_ends_where_another_entry_starts() {
+        let mut log = Log::default();
+        for line in ["[WARN] cannot read /a", "caused by: denied", "error: failed", "after the error"] {
+            log.line(line);
+        }
+        assert_eq!(log.warnings, ["cannot read /a\ncaused by: denied"]);
+    }
+
     /// Rustic 0.11.4 with a pack of the previous snapshot deleted. This is not a skipped item.
     #[test]
     fn unreadable_parent_is_not_a_skipped_item() {
