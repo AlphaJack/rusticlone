@@ -31,14 +31,95 @@ struct Step {
 
 static COMMAND: Mutex<Option<Command>> = Mutex::new(None);
 
+impl Command {
+    fn new(label: &str) -> Self {
+        Self { label: label.to_owned(), done: Vec::new(), step: None, failed: false }
+    }
+
+    /// Starts a step that shows `now` while it runs.
+    fn start(&mut self, now: &str) {
+        self.step = Some(Step { now: now.to_owned(), did: None, logged: Vec::new() });
+    }
+
+    /// Ends the step that runs. It shows what it did as it showed, else the first message it logged, else `did`.
+    /// A step that failed with `error` shows it.
+    fn end(&mut self, error: Option<String>, did: &str) {
+        let Some(Step { now, did: shown, mut logged }) = self.step.take() else { return };
+        let ended = match (error, shown) {
+            (Some(e), _) => {
+                self.failed = true;
+                branch(Level::Failure, &format!("{now}: {e}"))
+            }
+            (None, Some(shown)) => branch(Level::Success, &shown),
+            (None, None) if !logged.is_empty() => logged.remove(0),
+            (None, None) => branch(Level::Success, did),
+        };
+        self.done.push(Tree { below: ended.below.into_iter().chain(logged).collect(), ..ended });
+    }
+
+    /// Puts what this command logs in the step that runs, else in its run.
+    fn log(&mut self, level: Level, text: &str) {
+        let branch = branch(level, text);
+        match self.step.as_mut() {
+            Some(step) => step.logged.push(branch),
+            None => self.done.push(branch),
+        }
+    }
+
+    fn show(&mut self, shown: Shown<'_>) {
+        if let Some(step) = self.step.as_mut() {
+            match shown {
+                Shown::Now(text) => text.clone_into(&mut step.now),
+                Shown::Did(text) => step.did = Some(text.to_owned()),
+            }
+        }
+    }
+
+    /// Its rows: the ended steps, then the one that runs, with what it logged.
+    fn rows(&self) -> Vec<String> {
+        let mut branches = self.done.clone();
+        if let Some(step) = &self.step {
+            let line = format!("{} {}", Tone::Running.dot(), step.now);
+            branches.push(Tree { line, below: step.logged.clone() });
+        }
+        lines(&self.label, &branches)
+    }
+
+    /// Its rows while `question` waits for its answer, as the line of the step that runs.
+    fn asking(&self, question: &str) -> Vec<String> {
+        let mut branches = self.done.clone();
+        branches.push(Tree::leaf(format!("{} {question} [y/N]", Tone::Running.dot())));
+        lines(&self.label, &branches)
+    }
+
+    /// The command's level once it returned `result`. An error that no step showed is shown last.
+    fn finish(&mut self, result: anyhow::Result<Level>) -> Level {
+        match result {
+            Ok(level) => level,
+            Err(e) => {
+                if !self.failed {
+                    self.done.push(branch(Level::Failure, &format!("{e:#}")));
+                }
+                Level::Failure
+            }
+        }
+    }
+}
+
 /// Does this command, `label`, with `f`, drawn in a terminal with each [`step`] that `f` does. There, an error
 /// is shown in the run instead of returned, as the command's failure.
-#[expect(clippy::disallowed_methods, reason = "a spinner turns with time, which no event tells")]
 pub(in crate::cli) fn command(label: &str, f: impl FnOnce() -> anyhow::Result<Level>) -> anyhow::Result<Level> {
     if !log::is_live() {
         return f();
     }
-    *COMMAND.lock() = Some(Command { label: label.to_owned(), done: Vec::new(), step: None, failed: false });
+    live(label, f)
+}
+
+/// [`command`] in a terminal.
+#[cfg_attr(test, mutants::skip)] // Draws in a terminal, which tests have none of.
+#[expect(clippy::disallowed_methods, reason = "a spinner turns with time, which no event tells")]
+fn live(label: &str, f: impl FnOnce() -> anyhow::Result<Level>) -> anyhow::Result<Level> {
+    *COMMAND.lock() = Some(Command::new(label));
     log::capture(Some(Hooks { logged, shown, ask }));
     let spinner = std::thread::spawn(|| {
         while COMMAND.lock().is_some() && !clock::interrupted() {
@@ -51,15 +132,7 @@ pub(in crate::cli) fn command(label: &str, f: impl FnOnce() -> anyhow::Result<Le
     log::capture(None);
     let Some(mut command) = COMMAND.lock().take() else { return result };
     _ = spinner.join();
-    let level = match result {
-        Ok(level) => level,
-        Err(e) => {
-            if !command.failed {
-                command.done.push(branch(Level::Failure, &format!("{e:#}")));
-            }
-            Level::Failure
-        }
-    };
+    let level = command.finish(result);
     log::runs(Vec::new(), &lines(&command.label, &command.done));
     Ok(level)
 }
@@ -67,71 +140,42 @@ pub(in crate::cli) fn command(label: &str, f: impl FnOnce() -> anyhow::Result<Le
 /// Does `f` as a step of this [`command`]: `now` while it runs. Once it ends, what it did: as it showed with
 /// [`log::did`], else the first message it logged, else `did`.
 pub(in crate::cli) fn step<T>(now: &str, did: &str, f: impl FnOnce() -> anyhow::Result<T>) -> anyhow::Result<T> {
-    if let Some(command) = COMMAND.lock().as_mut() {
-        command.step = Some(Step { now: now.to_owned(), did: None, logged: Vec::new() });
-    }
-    draw();
+    with(|command| command.start(now));
     let result = f();
-    if let Some(command) = COMMAND.lock().as_mut()
-        && let Some(Step { now, did: shown, mut logged }) = command.step.take()
-    {
-        let ended = match (&result, shown) {
-            (Err(e), _) => {
-                command.failed = true;
-                branch(Level::Failure, &format!("{now}: {e:#}"))
-            }
-            (Ok(_), Some(shown)) => branch(Level::Success, &shown),
-            (Ok(_), None) if !logged.is_empty() => logged.remove(0),
-            (Ok(_), None) => branch(Level::Success, did),
-        };
-        command.done.push(Tree { below: ended.below.into_iter().chain(logged).collect(), ..ended });
-    }
-    draw();
+    with(|command| command.end(result.as_ref().err().map(|e| format!("{e:#}")), did));
     result
 }
 
-/// Puts what this command logs in the step that runs, else in its run.
-fn logged(level: Level, text: &str) {
+/// Changes the command that runs in a terminal, and draws it again.
+#[cfg_attr(test, mutants::skip)] // Only a command in a terminal is changed, and tests have none.
+fn with(f: impl FnOnce(&mut Command)) {
     if let Some(command) = COMMAND.lock().as_mut() {
-        let branch = branch(level, text);
-        match command.step.as_mut() {
-            Some(step) => step.logged.push(branch),
-            None => command.done.push(branch),
-        }
+        f(command);
     }
     draw();
 }
 
+#[cfg_attr(test, mutants::skip)] // Only a command in a terminal logs here, and tests have none.
+fn logged(level: Level, text: &str) {
+    with(|command| command.log(level, text));
+}
+
+#[cfg_attr(test, mutants::skip)] // Only a command in a terminal shows here, and tests have none.
 fn shown(shown: Shown<'_>) {
-    if let Some(step) = COMMAND.lock().as_mut().and_then(|c| c.step.as_mut()) {
-        match shown {
-            Shown::Now(text) => text.clone_into(&mut step.now),
-            Shown::Did(text) => step.did = Some(text.to_owned()),
-        }
-    }
-    draw();
+    with(|command| command.show(shown));
 }
 
 /// Asks `question` as the line of the step that runs, where the answer is typed.
+#[cfg_attr(test, mutants::skip)] // Waits for an answer in a terminal, which tests have none of.
 fn ask(question: &str) -> std::io::Result<bool> {
-    let rows = COMMAND.lock().as_ref().map(|command| {
-        let mut branches = command.done.clone();
-        branches.push(Tree::leaf(format!("{} {question} [y/N]", Tone::Running.dot())));
-        lines(&command.label, &branches)
-    });
+    let rows = COMMAND.lock().as_ref().map(|command| command.asking(question));
     let answer = log::prompt(rows.unwrap_or_default())?;
     Ok(answer.trim().eq_ignore_ascii_case("y"))
 }
 
+#[cfg_attr(test, mutants::skip)] // Draws in a terminal, which tests have none of.
 fn draw() {
-    let rows = COMMAND.lock().as_ref().map(|command| {
-        let mut branches = command.done.clone();
-        if let Some(step) = &command.step {
-            let line = format!("{} {}", Tone::Running.dot(), step.now);
-            branches.push(Tree { line, below: step.logged.clone() });
-        }
-        lines(&command.label, &branches)
-    });
+    let rows = COMMAND.lock().as_ref().map(Command::rows);
     if let Some(rows) = rows {
         log::runs(rows, &[]);
     }
