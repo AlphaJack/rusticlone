@@ -255,3 +255,29 @@ fn a_source_that_is_now_a_link_is_restored_by_its_written_path() {
     sb.run(&["restore", "--all"]).assert_exit(0).assert_result("restored", json!({"repo": "Docs"}));
     assert_eq!(fs::read_to_string(sb.path("source/docs/a.txt")).unwrap(), "a");
 }
+
+/// A source reached through a link whose folder is gone, as after the loss of the disk it led to, is restored
+/// where the link led when the backup recorded it, so that the link leads to it again.
+#[cfg(unix)]
+#[test]
+fn a_source_behind_a_link_whose_folder_is_gone_is_restored() {
+    let sb = Sandbox::new();
+    sb.write("real/a.txt", "a");
+    std::os::unix::fs::symlink(sb.path("source/real"), sb.path("source/docs")).unwrap();
+    sb.backup_profile("Docs", &[&["docs"]], &[], "");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("source/real");
+    sb.run(&["restore", "--all"]).assert_exit(0).assert_result("restored", json!({"repo": "Docs"}));
+    assert_eq!(fs::read_to_string(sb.path("source/docs/a.txt")).unwrap(), "a", "through the link");
+}
+
+/// Links that lead to each other are given up on, as the system does, rather than followed forever.
+#[cfg(unix)]
+#[test]
+fn a_source_behind_a_link_loop_is_given_up_on() {
+    let sb = Sandbox::new();
+    std::os::unix::fs::symlink(sb.path("source/b"), sb.path("source/a")).unwrap();
+    std::os::unix::fs::symlink(sb.path("source/a"), sb.path("source/b")).unwrap();
+    sb.backup_profile("Docs", &[&["a"]], &[], "");
+    sb.run(&["restore", "--all", "--dry-run"]).assert_exit(1);
+}
