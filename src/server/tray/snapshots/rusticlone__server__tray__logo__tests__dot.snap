@@ -1,0 +1,18 @@
+---
+source: src/server/tray/logo.rs
+expression: "corner(&failing, FAILURE)"
+---
+.00.00.00.00.00.00*5a*c1*f8*f8*c1*5a.00.00
+.00.00.00.00.00*8c*ff*ff*ff*ff*ff*ff*8c.00
+.30.00.00.00*5a*ff*ff*ff*ff*ff*ff*ff*ff*5a
+.a0.00.00.00*c1*ff*ff*ff*ff*ff*ff*ff*ff*c1
+.cf.00.00.00*f8*ff*ff*ff*ff*ff*ff*ff*ff*f8
+.ff.00.00.00*f8*ff*ff*ff*ff*ff*ff*ff*ff*f8
+.ff.7f.16.00*c1*ff*ff*ff*ff*ff*ff*ff*ff*c1
+.ff.ff.76.00*5a*ff*ff*ff*ff*ff*ff*ff*ff*5a
+.ff.ff.e1.05.00*8c*ff*ff*ff*ff*ff*ff*8c.00
+.cc.c0.d0.9b.00.00*5a*c1*f8*f8*c1*5a.00.00
+.00.00.00.30.9b.05.00.00.00.00.00.00.00.00
+.00.00.00.00.d0.e1.76.16.00.00.00.00.00.00
+.00.00.00.00.c0.ff.ff.80.00.00.00.00.00.00
+.ff.ff.ff.ff.ff.ff.ff.ff.ff.cf.9f.30.00.00
