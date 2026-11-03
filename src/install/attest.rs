@@ -133,6 +133,37 @@ impl CryptoProvider for Ring {
 mod tests {
     use super::check;
 
+    /// Each scheme that ring signs with is checked with ring's algorithm for it: a signature of the data passes, the
+    /// same of other data fails.
+    #[test]
+    fn each_scheme_checks_its_own_signatures() {
+        use ring::{
+            rand::SystemRandom,
+            signature::{self, EcdsaKeyPair, Ed25519KeyPair, KeyPair},
+        };
+        use sigstore_verify::crypto::{CryptoProvider, SigningScheme as Scheme};
+        let (rng, data) = (SystemRandom::new(), b"attested");
+        let checks = |scheme: Scheme, key: &[u8], sig: &[u8]| {
+            assert!(super::Ring.verify_raw(scheme, key, data, sig).is_ok(), "{scheme:?}");
+            assert!(super::Ring.verify_raw(scheme, key, b"other", sig).is_err(), "{scheme:?} of other data");
+        };
+        for (scheme, algorithm) in [
+            (Scheme::EcdsaP256Sha256, &signature::ECDSA_P256_SHA256_ASN1_SIGNING),
+            (Scheme::EcdsaP384Sha384, &signature::ECDSA_P384_SHA384_ASN1_SIGNING),
+        ] {
+            let pair = EcdsaKeyPair::from_pkcs8(
+                algorithm,
+                EcdsaKeyPair::generate_pkcs8(algorithm, &rng).unwrap().as_ref(),
+                &rng,
+            )
+            .unwrap();
+            checks(scheme, pair.public_key().as_ref(), pair.sign(&rng, data).unwrap().as_ref());
+        }
+        let pair = Ed25519KeyPair::from_pkcs8(Ed25519KeyPair::generate_pkcs8(&rng).unwrap().as_ref()).unwrap();
+        checks(Scheme::Ed25519, pair.public_key().as_ref(), pair.sign(data).as_ref());
+        assert!(super::Ring.verify_prehashed(Scheme::Ed25519, b"", b"", b"").is_err(), "over a digest");
+    }
+
     /// A release of uv, attested by its own workflow.
     const UV: &[u8] = include_bytes!("../../tests/fixtures/attestations-uv.json");
     const UV_HEX: &str = "7906c79adb21c81abd559841ba76bb1d9af9d791acac7a041b2972e03ae16538";
