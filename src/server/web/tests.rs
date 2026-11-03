@@ -452,3 +452,46 @@ fn the_overview_says_what_needs_attention() {
     assert_eq!(page.texts(".notice").len(), 1);
     assert!(page.texts("p").iter().any(|p| p.contains("/profiles")));
 }
+
+/// A run whose process stopped shows no step running. Its rustic commands are one per line. A waiting run can be
+/// stopped from its row, not from its log.
+#[test]
+fn a_log_shows_what_runs_and_its_commands() {
+    use crate::rustic::Call;
+    let started = ts("2026-10-16T03:00:00Z");
+    let call = |args: &str| Call {
+        step: Some(0),
+        args: args.into(),
+        bin: None,
+        dir: None,
+        started,
+        secs: 1.0,
+        exit: Some("0".into()),
+    };
+    let snapshot = StepRecord {
+        status: Status::Running,
+        started: Some(started),
+        ..StepRecord::queued("snapshot to Docs".into(), Vec::new())
+    };
+    let record = RunRecord {
+        id: started.as_millisecond(),
+        collection: "Docs".into(),
+        label: "backup".into(),
+        kind: RunKind::Backup,
+        scope: None,
+        trigger: Trigger::Schedule,
+        pid: 1,
+        started,
+        finished: None,
+        status: Status::Running,
+        results: Vec::new(),
+        calls: vec![call("-P Docs backup"), call("-P Docs forget")],
+        steps: vec![snapshot],
+    };
+    let row = RunRow::new("Docs", "Docs", &record, None);
+    let log = LogView::build(&row, Some(record.clone()), (LogLines::default(), 0, false));
+    assert!(log.steps[0].since.is_none());
+    assert_eq!(log.commands(), "rustic -P Docs backup\nrustic -P Docs forget");
+    let waiting = RunRow { stoppable: true, since: None, ..row };
+    assert!(!LogView::build(&waiting, Some(record), (LogLines::default(), 0, false)).stoppable);
+}
