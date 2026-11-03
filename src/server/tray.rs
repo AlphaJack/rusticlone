@@ -52,7 +52,14 @@ struct Row {
 /// web UI, as the desktop entry does. Not as root, nor under another program, such as the tests.
 fn attended(open: bool) -> bool {
     use std::io::IsTerminal;
-    !sys::is_root() && (open || std::io::stdout().is_terminal() || managed())
+    attended_by(sys::is_root(), open, std::io::stdout().is_terminal(), managed())
+}
+
+/// [`attended`], from whether it runs as root, to open the web UI, from a terminal, or by the session's service
+/// manager.
+#[expect(clippy::fn_params_excessive_bools, reason = "each is a yes or no that the system gives")]
+fn attended_by(root: bool, open: bool, terminal: bool, managed: bool) -> bool {
+    !root && (open || terminal || managed)
 }
 
 /// Runs `serve` beside the tray icon, which shows only for a server its user runs: see [`attended`].
