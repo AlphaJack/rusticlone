@@ -224,3 +224,34 @@ fn a_restore_says_when_some_sources_have_no_snapshot() {
     sb.run(&["restore", "--all"]).assert_exit(2).assert_result("some-sources", some);
     assert!(sb.path("source/docs/a.txt").exists());
 }
+
+/// A source reached through a link is restored where the link leads, which the backup recorded: the paths as the
+/// profile writes them are only looked for when no snapshot has the paths they lead to.
+#[cfg(unix)]
+#[test]
+fn a_source_behind_a_link_is_restored_where_it_leads() {
+    let sb = Sandbox::new();
+    sb.write("real/a.txt", "a");
+    std::os::unix::fs::symlink(sb.path("source/real"), sb.path("source/docs")).unwrap();
+    sb.backup_profile("Docs", &[&["docs"]], &[], "");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("source/real/a.txt");
+    sb.run(&["restore", "--all"]).assert_exit(0).assert_result("restored", json!({"repo": "Docs"}));
+    assert_eq!(fs::read_to_string(sb.path("source/real/a.txt")).unwrap(), "a");
+}
+
+/// Backed up where the source was a folder, restored where it is now a link that leads elsewhere, as on another
+/// computer: no snapshot has the paths the link leads to, so the paths as the profile writes them are looked for.
+#[cfg(unix)]
+#[test]
+fn a_source_that_is_now_a_link_is_restored_by_its_written_path() {
+    let sb = Sandbox::new();
+    sb.write("docs/a.txt", "a");
+    sb.backup_profile("Docs", &[&["docs"]], &[], "");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("source/docs");
+    fs::create_dir_all(sb.path("source/elsewhere")).unwrap();
+    std::os::unix::fs::symlink(sb.path("source/elsewhere"), sb.path("source/docs")).unwrap();
+    sb.run(&["restore", "--all"]).assert_exit(0).assert_result("restored", json!({"repo": "Docs"}));
+    assert_eq!(fs::read_to_string(sb.path("source/docs/a.txt")).unwrap(), "a");
+}
