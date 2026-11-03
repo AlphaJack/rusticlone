@@ -10,6 +10,8 @@ mod unix;
 #[cfg(all(test, windows))]
 mod windows;
 
+use std::path::Path;
+
 /// Who keeps an executable where it is, and updates it there: shown as how to update it with that.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, crate::i18n::Fluent)]
 #[fluent(prefix = "update-with")]
@@ -40,7 +42,7 @@ fn image() -> String {
 }
 
 /// Whether a package manager keeps `exe` where it is: see [`keeper`].
-pub(crate) fn managed(exe: &std::path::Path) -> bool {
+pub(crate) fn managed(exe: &Path) -> bool {
     keeper(exe).is_some()
 }
 
@@ -49,9 +51,7 @@ pub(crate) fn managed(exe: &std::path::Path) -> bool {
 /// `lib` beside `choco.exe`); Nix in its read-only store; the system in its packages' folders and in any that
 /// is not the user's; a container's image any. The macOS app's copy of one is kept by the same. `None` for the
 /// user's own copy.
-#[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
-pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
-    use std::path::Path;
+pub(crate) fn keeper(exe: &Path) -> Option<Keeper> {
     match crate::sys::container() {
         Some(crate::sys::Container::Docker) => return Some(Keeper::Docker),
         Some(crate::sys::Container::Podman) => return Some(Keeper::Podman),
@@ -61,6 +61,13 @@ pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
     if let Some(source) = super::app::app_source(exe) {
         return Some(keeper(&source).unwrap_or(Keeper::Homebrew));
     }
+    folders(exe)
+}
+
+/// The package manager whose folders hold `exe`, by their names and by what is beside them, or the system's own
+/// folders, which a user cannot write.
+#[expect(clippy::disallowed_methods, reason = "looks for package managers' folders")]
+fn folders(exe: &Path) -> Option<Keeper> {
     // Where a link leads, as Homebrew's `bin` to its `Cellar`: macOS names the executable as it was started.
     let exe = &exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
