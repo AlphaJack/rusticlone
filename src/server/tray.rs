@@ -41,7 +41,7 @@ static REDRAW: tokio::sync::Notify = tokio::sync::Notify::const_new();
 const SETTLE: Duration = Duration::from_secs(1);
 
 /// A line in the menu: a collection, or why there is none.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 struct Row {
     label: String,
     level: Level,
@@ -200,5 +200,21 @@ mod tests {
             let id: &str = switch.into();
             assert!(id.parse::<Switch>().ok() == Some(switch), "{id}");
         }
+    }
+
+    /// Each collection's health opens its page, and a profile that cannot be read follows, greyed out.
+    /// Without any collection, the line says why and opens the setup.
+    #[test]
+    fn each_collection_is_a_line_that_opens_its_page() {
+        let row = |label: &str, level, url: Option<&str>| Row { label: label.into(), level, url: url.map(Into::into) };
+        let health = vec![("Docs".into(), Level::Success), ("broken.toml".into(), Level::Failure)];
+        let lines = [
+            row("Docs: healthy", Level::Success, Some("http://web/collections/Docs")),
+            row("broken.toml: failing", Level::Failure, None),
+        ];
+        assert_eq!(rows("http://web", health, vec!["Docs".into()], None), lines);
+        let new = "No collection found: open Rusticlone to create your first one";
+        let setup = [row(new, Level::Warning, Some("http://web/setup"))];
+        assert_eq!(rows("http://web", vec![], vec![], Some(Unconfigured::New)), setup);
     }
 }
