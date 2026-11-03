@@ -1,10 +1,13 @@
 name: Mutants
 
-# Lists the mutations of the library that no test catches.
+# Lists the mutations of the library that no test catches: weekly, or on a PR's changed lines when it gets the
+# `mutants` label. Adding the label again runs it again.
 on:
   schedule:
     - cron: "0 19 * * 5"
   workflow_dispatch:
+  pull_request:
+    types: [labeled]
 
 permissions:
   contents: read
@@ -24,6 +27,7 @@ jobs:
   # Builds the dependencies once, for every shard to restore rather than build.
   build:
     name: build tests
+    if: github.event_name != 'pull_request' || github.event.label.name == 'mutants'
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -38,7 +42,7 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: mutants
-          save-if: true
+          save-if: ${{ github.event_name != 'pull_request' }}
       - name: Install cargo-nextest
         uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
@@ -47,7 +51,7 @@ jobs:
         run: cargo nextest run --workspace --locked --all-features --no-run
 
   mutants:
-    name: mutants (${{ matrix.shard }}/40)
+    name: mutants (${{ matrix.shard }}/${{ strategy.job-total }})
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 350
@@ -55,12 +59,15 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]
+        # A PR's diff is small: one shard.
+        shard: ${{ fromJSON(github.event_name == 'pull_request' && '[0]' || '[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39]') }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The PR's base, to diff against.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
@@ -79,10 +86,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: cargo binstall --no-confirm --disable-strategies compile "rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr("v")')"
+      - name: Diff against the PR's base
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git diff "$BASE...HEAD" > "$RUNNER_TEMP/pr.diff"
+          echo "IN_DIFF=--in-diff=$RUNNER_TEMP/pr.diff" >> "$GITHUB_ENV"
       - name: Mutate the library
         env:
           SHARD: ${{ matrix.shard }}
-        run: cargo mutants -vV --in-place --test-tool nextest --shard "$SHARD/40" --no-shuffle
+          SHARDS: ${{ strategy.job-total }}
+        run: cargo mutants -vV --in-place --test-tool nextest --shard "$SHARD/$SHARDS" --no-shuffle ${IN_DIFF:+"$IN_DIFF"}
       - name: Upload what the tests missed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
