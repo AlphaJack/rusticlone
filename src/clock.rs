@@ -1,4 +1,4 @@
-//! The current time, and waits that end early on an interrupt or a [`wake`]. Tests use a clock that
+//! The current time, and waits that end early on an interrupt or a [`Wakes::wake`]. Tests use a clock that
 //! moves only when waited on.
 
 #![expect(clippy::disallowed_methods, reason = "reads the system clock")]
@@ -25,7 +25,7 @@ impl Clock for System {
     }
 
     fn wait(&self, for_: Duration, stop: &dyn Fn() -> bool) {
-        sleep(for_, stop);
+        WAKES.sleep(for_, stop);
     }
 }
 
@@ -34,7 +34,7 @@ static INTERRUPTED: AtomicBool = AtomicBool::new(false);
 /// Stops every rustic call and run, on SIGINT or SIGTERM.
 pub(crate) fn interrupt() {
     INTERRUPTED.store(true, Ordering::Relaxed);
-    wake();
+    WAKES.wake();
 }
 
 pub(crate) fn interrupted() -> bool {
@@ -60,31 +60,43 @@ pub(crate) fn next_change<T>(f: impl FnOnce() -> T) -> (T, Option<Timestamp>) {
     (done, NEXT_CHANGE.replace(outer))
 }
 
-static WAKES: Mutex<u64> = Mutex::new(0);
-static WOKEN: Condvar = Condvar::new();
-
-/// Makes every [`wait`] in this process check its condition again: a run was cancelled, the process
-/// is stopping, a lock was freed, or another process changed the state.
-pub(crate) fn wake() {
-    *WAKES.lock() += 1;
-    WOKEN.notify_all();
+/// Counts wakes, so that a wait that read the count before checking its condition misses none.
+pub(crate) struct Wakes {
+    count: Mutex<u64>,
+    woken: Condvar,
 }
 
-/// Read before checking a condition, and passed to [`wait`] so that no wake is missed.
-pub(crate) fn wakes() -> u64 {
-    *WAKES.lock()
-}
+/// This process's: a run was cancelled, the process is stopping, a lock was freed, or another process changed
+/// the state.
+pub(crate) static WAKES: Wakes = Wakes::new();
 
-/// Waits until [`wake`] is called after `seen` wakes.
-pub(crate) fn wait(seen: u64) {
-    let mut wakes = WAKES.lock();
-    WOKEN.wait_while(&mut wakes, |n| *n == seen);
-}
+impl Wakes {
+    const fn new() -> Self {
+        Self { count: Mutex::new(0), woken: Condvar::new() }
+    }
 
-/// Waits for `for_`, or until `stop` returns true when woken.
-pub(crate) fn sleep(for_: Duration, stop: &dyn Fn() -> bool) {
-    let (mut wakes, until) = (WAKES.lock(), Instant::now() + for_);
-    while !stop() && !WOKEN.wait_until(&mut wakes, until).timed_out() {}
+    /// Makes every wait on these wakes check its condition again.
+    pub(crate) fn wake(&self) {
+        *self.count.lock() += 1;
+        self.woken.notify_all();
+    }
+
+    /// Read before checking a condition, and passed to [`Self::wait`] so that no wake is missed.
+    pub(crate) fn seen(&self) -> u64 {
+        *self.count.lock()
+    }
+
+    /// Waits until a wake comes after `seen` wakes.
+    pub(crate) fn wait(&self, seen: u64) {
+        let mut count = self.count.lock();
+        self.woken.wait_while(&mut count, |n| *n == seen);
+    }
+
+    /// Waits for `for_`, or until `stop` returns true when woken.
+    pub(crate) fn sleep(&self, for_: Duration, stop: &dyn Fn() -> bool) {
+        let (mut count, until) = (self.count.lock(), Instant::now() + for_);
+        while !stop() && !self.woken.wait_until(&mut count, until).timed_out() {}
+    }
 }
 
 /// Moves only when waited on.

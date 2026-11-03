@@ -91,7 +91,7 @@ const SPIN: Duration = Duration::from_millis(250);
 #[cfg_attr(test, mutants::skip)] // Turns the spinners with time until the runs end, in a thread of its own.
 fn spin(runs: &Weak<Runs>) {
     while runs.strong_count() > 0 && !clock::interrupted() {
-        clock::sleep(SPIN, &clock::interrupted);
+        clock::WAKES.sleep(SPIN, &clock::interrupted);
         log::turn();
         draw();
     }
