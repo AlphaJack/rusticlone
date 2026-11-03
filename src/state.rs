@@ -127,6 +127,9 @@ tables! {
     RUNS: (&str, i64) => &str = "runs";
     /// Queued and running runs, so that reading the queue does not read every run.
     UNFINISHED: (&str, i64) => () = "unfinished";
+    /// The lowest id that the next run of each collection may take, so that no two runs share one, also when two
+    /// processes start one in the same millisecond.
+    RUN_IDS: &str => i64 = "run_ids";
     /// By collection and repository.
     INVENTORIES: (&str, &str) => &str = "inventories";
     /// Web UI sessions: the session hash, its expiry, and the hash of the token used to log in.
