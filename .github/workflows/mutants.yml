@@ -44,7 +44,7 @@ jobs:
         with:
           tool: cargo-nextest
       - name: Build the tests
-        run: cargo nextest run --workspace --locked --no-run
+        run: cargo nextest run --workspace --locked --all-features --no-run
 
   mutants:
     name: mutants (${{ matrix.shard }}/40)
