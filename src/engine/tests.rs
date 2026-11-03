@@ -437,6 +437,36 @@ fn a_repository_narrows_the_collection_named_with_it() {
     let usb = |c: &str| Selection::Repo(c.into(), "Docs-usb".into());
     assert_eq!(selections(&[]), [usb("Docs"), usb("Pics")]);
     assert_eq!(selections(&["Docs"]), [usb("Docs")]);
+    assert_eq!(selections(&["Docs", "Pics"]), [usb("Docs"), usb("Pics")]);
+    // A repository of another collection leaves the named one whole.
+    engine.named = Named { collections: vec!["Docs".into()], repos: vec!["Pics".into()] };
+    let both = [Selection::Collection("Docs".into()), Selection::Repo("Pics".into(), "Pics".into())];
+    assert_eq!(engine.selections().unwrap(), both);
+    // Only the named collections are loaded.
+    engine.named = Named { collections: vec!["Pics".into()], repos: Vec::new() };
+    let names: Vec<String> = engine.collections().iter().map(|c| c.name().to_owned()).collect();
+    assert_eq!(names, ["Pics"]);
+}
+
+/// A copy of every collection leaves out those that cannot copy, which a named one fails on. A copy target is
+/// unusable as broken only if its profile is.
+#[test]
+fn a_copy_of_every_collection_leaves_out_those_without_targets() {
+    use crate::request::{RestoreOptions, RunKind, Selection};
+    // A collection of its own, without copy targets.
+    let lone = DOCS
+        .replace("backup/docs", "backup/lone")
+        .replace("src/docs", "src/lone")
+        .replace("[copy]\ntargets = [\"Docs-usb\"]\n", "");
+    assert!(!lone.contains("[copy]"));
+    let mut engine = engine_of("copy-all", &Replay::new(), &[("Docs", DOCS), ("Docs-usb", USB), ("Lone", &lone)]);
+    let none = RestoreOptions::default();
+    let copies = engine.requests(&Selection::All, RunKind::Copy, &none).unwrap();
+    let names: Vec<&str> = copies.iter().map(|(name, _)| name.as_str()).collect();
+    assert_eq!(names, ["Docs"]);
+    assert!(engine.requests(&Selection::Collection("Lone".into()), RunKind::Copy, &none).is_err());
+    engine.broken = vec![("Docs-usb".into(), "unreadable".into())];
+    assert!(engine.unusable("Docs-usb").broken && !engine.unusable("Docs-nas").broken);
 }
 
 /// Metrics name an issue's kind as `/status` does.
