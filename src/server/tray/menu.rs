@@ -81,4 +81,43 @@ mod tests {
         assert_eq!(level(&[]), Level::Success);
         assert_eq!(level(&[row(Level::Warning), row(Level::Failure), row(Level::Success)]), Level::Failure);
     }
+
+    /// The version, the web UI, a page per collection, each switch as it stands, and quit, in that order.
+    #[test]
+    fn the_menu_lists_the_web_ui_the_collections_the_switches_and_quit() {
+        let row = |label: &str, url: Option<&str>| Row {
+            label: label.into(),
+            level: Level::Success,
+            url: url.map(Into::into),
+        };
+        let rows = [row("docs: healthy", Some("http://web/docs")), row("broken.toml", None)];
+        let switches = [(Switch::AtLogin, Some(true)), (Switch::AtLogin, Some(false)), (Switch::AtLogin, None)];
+        let entry = |label: &str, click| Item::Entry { label: label.into(), click };
+        let open = |url: &str| Some(Click::Open(url.into()));
+        let check = |enabled, checked| Item::Check {
+            label: "Start at login".into(),
+            enabled,
+            checked,
+            click: Click::Toggle(Switch::AtLogin),
+        };
+        let expected = [
+            entry(&format!("Rusticlone {}", env!("CARGO_PKG_VERSION")), None),
+            entry("Open Rusticlone", open("http://web/login")),
+            Item::Separator,
+            entry("docs: healthy", open("http://web/docs")),
+            entry("broken.toml", None),
+            Item::Separator,
+            check(true, true),
+            check(true, false),
+            check(false, false),
+            Item::Separator,
+            entry("Quit (pause automatic backups)", Some(Click::Quit)),
+        ];
+        assert_eq!(items("http://web/login", &rows, &switches), expected);
+    }
+
+    #[test]
+    fn the_tooltip_says_the_health() {
+        assert_eq!(tooltip(Level::Warning), "Rusticlone: degraded");
+    }
 }
