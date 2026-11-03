@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mutants-${{ github.event.pull_request.number || 'main' }}
+  group: mutants
   cancel-in-progress: false
 
 env:
