@@ -191,6 +191,16 @@ mod tests {
         assert_eq!(in_tree("/home/me/docs"), "/home/me/docs");
     }
 
+    /// A change is a symbol, then the path, whose escapes rustic writes as Rust does. Totals name each count, and
+    /// leave out the zeros.
+    #[test]
+    fn a_diff_line_reads_as_rustic_wrote_it() {
+        let report = "+    \"docs/a\\u{301}.txt\"\ncompared \"docs\"\nFiles   : 0 =, 1 +, 0 -\nNodeType: 2 changed\nDirs    : 0 =, 0 +\n";
+        let diff = diff(report);
+        assert_eq!(diff.changes, [("added".to_owned(), "/docs/a\u{301}.txt".to_owned())]);
+        assert_eq!(diff.totals, ["files: 1 added", "2 type changed"]);
+    }
+
     #[test]
     fn what_changed() {
         for (_, report) in crate::rustic::fixtures("diff.stdout") {
