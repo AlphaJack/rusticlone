@@ -76,9 +76,14 @@ impl FromRequestParts<Arc<App>> for Here {
         // Cloudflare Tunnel, ngrok, Tailscale Serve and Funnel, Caddy and Traefik all send it.
         let forwarded = parts.headers.contains_key("x-forwarded-for");
         let host = parts.headers.get(header::HOST).and_then(|h| h.to_str().ok()).unwrap_or_default();
-        let local = peer.is_some_and(|p| p.0.ip().is_loopback()) && addressed_locally(host);
-        Ok(Self(cfg!(feature = "desktop") && session && local && !forwarded))
+        Ok(Self(here_by(session, peer.is_some_and(|p| p.0.ip().is_loopback()), host, forwarded)))
     }
+}
+
+/// Logged in from the login page, from a browser on this computer that asked for it by a local name, and not
+/// through a proxy. Without the desktop, nothing is opened for anyone.
+fn here_by(session: bool, loopback: bool, host: &str, forwarded: bool) -> bool {
+    cfg!(feature = "desktop") && session && loopback && addressed_locally(host) && !forwarded
 }
 
 /// Whether the browser asked for this server by a name that only this computer reaches: `localhost` or a
