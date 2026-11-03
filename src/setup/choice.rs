@@ -177,3 +177,42 @@ impl Kind {
         (self.group() == Group::Rclone).then(|| crate::i18n::t!("field-rclone-hint"))
     }
 }
+
+#[cfg(all(test, feature = "server"))]
+mod tests {
+    use super::*;
+
+    /// The form offers the kinds rustic supports here, in rows: those on a mounted disk, those rustic reaches
+    /// itself, then rclone's. A primary must have a repository; a copy may have none, which comes first.
+    #[test]
+    fn the_form_offers_the_kinds_rustic_supports_by_row() {
+        for role in [Role::Primary, Role::Target] {
+            let rows = role.rows();
+            assert_eq!(
+                rows.iter().map(|(g, _)| *g).collect::<Vec<_>>(),
+                [Group::Mounted, Group::Direct, Group::Rclone]
+            );
+            for (group, kinds) in &rows {
+                assert!(kinds.iter().all(|k| k.group() == *group), "{role} {group:?}: {kinds:?}");
+                let named: Vec<String> =
+                    kinds.iter().filter(|k| **k != Kind::None).map(|k| k.to_string().to_lowercase()).collect();
+                assert!(named.is_sorted(), "{role} {group:?}: {named:?}");
+            }
+            let all: Vec<Kind> = rows.into_iter().flat_map(|(_, kinds)| kinds).collect();
+            assert_eq!(all.contains(&Kind::Sftp), super::super::os::SFTP, "{role}: sftp where rustic has it");
+            assert_eq!(all.contains(&Kind::None), role == Role::Target);
+        }
+        assert_eq!(Role::Target.rows()[0].1.first(), Some(&Kind::None), "no copy, first");
+    }
+
+    /// A mounted disk needs no scheme, rclone's remotes say where to sign in first, and rustic's own need neither.
+    #[test]
+    fn each_kind_is_reached_its_way() {
+        assert_eq!(
+            [Kind::Local, Kind::S3, Kind::Gdrive].map(Kind::group),
+            [Group::Mounted, Group::Direct, Group::Rclone]
+        );
+        assert_eq!((Kind::Gdrive.docs(), Kind::S3.docs()), (Some(RCLONE_DOCS), None));
+        assert!(Kind::Rclone.hint().is_some_and(|h| !h.is_empty()) && Kind::Local.hint().is_none());
+    }
+}
