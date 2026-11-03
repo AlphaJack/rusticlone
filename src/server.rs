@@ -547,6 +547,7 @@ mod tests {
     /// The web UI's login page, with the token in its fragment, which no request sends. Without a server to open,
     /// nothing opens.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "removes the test's folder")]
     fn the_login_url_keeps_the_token_out_of_requests() {
         let dir = crate::sys::test_dir("login-url");
         let tokens = super::login_tokens(&dir).unwrap();
