@@ -523,4 +523,24 @@ mod tests {
             assert_eq!(serde_json::from_str::<StepResult>(&json).unwrap(), line, "{json}");
         }
     }
+
+    /// With colors, each level has its own, success is left plain, and the spinner turns.
+    #[test]
+    fn levels_are_painted_and_the_spinner_turns() {
+        _ = MODE.set(Mode { color: true, ..Mode::default() });
+        assert_eq!(paint(Level::Success, "ok"), "ok");
+        let painted = [Level::Warning, Level::Failure].map(|level| paint(level, "x"));
+        assert_eq!(painted, ["\x1b[33mx\x1b[0m", "\x1b[31mx\x1b[0m"]);
+        assert_eq!(Tone::Muted.dot(), "\x1b[2m●\x1b[0m");
+        let frames: Vec<String> = (0..5)
+            .map(|_| {
+                let dot = Tone::Running.dot();
+                turn();
+                dot
+            })
+            .collect();
+        let at = SPINNER.iter().position(|s| frames[0].contains(s)).unwrap();
+        let expected: Vec<String> = (at..at + 5).map(|i| format!("\x1b[2m{}\x1b[0m", SPINNER[i % 4])).collect();
+        assert_eq!(frames, expected);
+    }
 }

@@ -1,0 +1,11 @@
+---
+source: src/cli/board.rs
+expression: drawn.lines
+---
+[
+    "Docs: backup collection",
+    "├── ◐ backup: /docs",
+    "├── ● copy to Docs-usb: Docs-usb: copied 2 snapshots",
+    "├── ◐ forget",
+    "└── ● prune",
+]
