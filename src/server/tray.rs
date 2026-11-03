@@ -29,6 +29,7 @@ use strum::IntoEnumIterator as _;
 
 use super::{App, web::Route};
 use crate::{
+    engine::Unconfigured,
     log::{self, Level, Logged, Message as _},
     sys,
 };
@@ -82,19 +83,12 @@ enum Switch {
 
 impl Switch {
     /// Each switch with its state. Auto-update is left out when the package manager updates rusticlone.
+    #[cfg_attr(test, mutants::skip)] // Asks the service manager and reads the settings file.
     fn states() -> Vec<(Self, Option<bool>)> {
         Self::iter().filter(|&s| s.shown()).map(|s| (s, s.state())).collect()
     }
 
-    /// Root's server starts with the computer, as a system service; Windows's always at the user's login.
-    fn label(self) -> String {
-        match self {
-            Self::AtLogin => self.to_string(),
-            #[cfg(feature = "self-update")]
-            Self::AutoUpdate => self.to_string(),
-        }
-    }
-
+    #[cfg_attr(test, mutants::skip)] // Tells how this executable was installed.
     fn shown(self) -> bool {
         match self {
             Self::AtLogin => true,
@@ -104,6 +98,7 @@ impl Switch {
     }
 
     /// `None` when it cannot be switched: a server that is not installed does not start at login.
+    #[cfg_attr(test, mutants::skip)] // Asks the service manager and reads the settings file.
     fn state(self) -> Option<bool> {
         match self {
             Self::AtLogin => crate::install::autostart::at_login(),
@@ -113,6 +108,7 @@ impl Switch {
     }
 
     /// Flips it, then has the menu drawn again.
+    #[cfg_attr(test, mutants::skip)] // Changes the service manager's units or the settings file.
     fn toggle(self) {
         let on = self.state() != Some(true);
         let done = match self {
@@ -129,10 +125,28 @@ impl Switch {
     }
 }
 
+/// The menu's lines: each collection's health, which opens its page, in the order of the pages; the
+/// profiles that cannot be read follow, greyed out. Without any, why, which opens the setup.
+fn rows(base: &str, health: Vec<(String, Level)>, pages: Vec<String>, unconfigured: Option<Unconfigured>) -> Vec<Row> {
+    let pages = pages.into_iter().map(Some).chain(std::iter::repeat(None));
+    let rows = health.into_iter().zip(pages).map(|((title, level), name)| Row {
+        label: format!("{title}: {}", level.word()),
+        level,
+        url: name.map(|n| format!("{base}{}", Route::Collection(&n))),
+    });
+    let unconfigured = unconfigured.map(|u| Row {
+        label: u.to_string(),
+        level: u.level(),
+        url: Some(format!("{base}{}", Route::Setup)),
+    });
+    rows.chain(unconfigured).collect()
+}
+
 impl Tray {
     /// Shows the health whenever pages are told it may have changed. `url`: the web UI; `login`: the
     /// same, logged in.
     #[expect(clippy::disallowed_methods, reason = "a burst of changes settles before the icon is drawn again")]
+    #[cfg_attr(test, mutants::skip)] // Waits for the pages' changes, and draws the icon on the desktop.
     pub(super) async fn follow(mut self, app: Arc<App>, url: String, login: String) {
         let base = url.trim_end_matches('/').to_owned();
         let mut changes = app.pages.changes.subscribe();
@@ -140,20 +154,9 @@ impl Tray {
         loop {
             let (engine, base) = (app.engine(), base.clone());
             let rows: Vec<Row> = tokio::task::spawn_blocking(move || {
-                // Listed first, in the same order; the profiles that cannot be read follow.
-                let collections = engine.collections();
-                let pages = collections.iter().map(|c| Some(c.name())).chain(std::iter::repeat(None));
-                let rows = engine.status().into_iter().zip(pages).map(|(c, name)| Row {
-                    label: format!("{}: {}", c.title, c.level.word()),
-                    level: c.level,
-                    url: name.map(|n| format!("{base}{}", Route::Collection(n))),
-                });
-                let unconfigured = engine.unconfigured().map(|u| Row {
-                    label: u.to_string(),
-                    level: u.level(),
-                    url: Some(format!("{base}{}", Route::Setup)),
-                });
-                rows.chain(unconfigured).collect()
+                let health = engine.status().into_iter().map(|c| (c.title, c.level)).collect();
+                let pages = engine.collections().iter().map(|c| c.name().to_owned()).collect();
+                rows(&base, health, pages, engine.unconfigured())
             })
             .await
             .unwrap_or_default();
