@@ -76,6 +76,12 @@ pub(crate) fn is_root() -> bool {
     }
 }
 
+/// `text` as Windows's calls take it: UTF-16, ending with a NUL.
+pub(crate) fn wide(text: impl AsRef<std::ffi::OsStr>) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+    text.as_ref().encode_wide().chain([0]).collect()
+}
+
 /// The volume of `path`: runs on the same volume share its disk.
 pub(crate) fn device(path: &Path) -> Option<u64> {
     volume_root(path).map(|root| fnv1a(root.as_bytes()))
@@ -87,10 +93,9 @@ pub(crate) fn device(path: &Path) -> Option<u64> {
 #[expect(unsafe_code, reason = "GetDiskFreeSpaceExW fills the integer it is given")]
 #[expect(clippy::disallowed_methods, reason = "finds the nearest existing ancestor of `path`")]
 pub(crate) fn free_space(path: &Path) -> Option<(&Path, u64)> {
-    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
     let existing = path.ancestors().find(|p| p.is_dir())?;
-    let wide: Vec<u16> = existing.as_os_str().encode_wide().chain([0]).collect();
+    let wide = wide(existing);
     let mut free = 0u64;
     // SAFETY: a NUL-terminated path, and the one count asked for.
     let read = unsafe { GetDiskFreeSpaceExW(wide.as_ptr(), &raw mut free, std::ptr::null_mut(), std::ptr::null_mut()) };
@@ -102,12 +107,11 @@ pub(crate) fn free_space(path: &Path) -> Option<(&Path, u64)> {
 #[expect(unsafe_code, reason = "GetVolumePathNameW fills a buffer of the length given")]
 #[expect(clippy::disallowed_methods, reason = "finds the nearest existing ancestor of `path`")]
 fn volume_root(path: &Path) -> Option<String> {
-    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::GetVolumePathNameW;
     /// `MAX_PATH`, with its NUL.
     const VOLUME_PATH: usize = 261;
     let existing = path.ancestors().find(|p| p.exists())?;
-    let wide: Vec<u16> = existing.as_os_str().encode_wide().chain([0]).collect();
+    let wide = wide(existing);
     let mut root = [0u16; VOLUME_PATH];
     // SAFETY: a NUL-terminated path, and a buffer of the length given.
     if unsafe { GetVolumePathNameW(wide.as_ptr(), root.as_mut_ptr(), u32::try_from(root.len()).ok()?) } == 0 {
@@ -146,7 +150,7 @@ pub(super) fn solid_state(path: &Path) -> Option<bool> {
         v if v.len() == 2 && v.ends_with(':') => format!(r"\\.\{v}"),
         _ => return None,
     };
-    let volume: Vec<u16> = volume.encode_utf16().chain([0]).collect();
+    let volume = wide(volume);
     // SAFETY: a NUL-terminated name; no access asked, which a query of properties needs none for.
     let handle = unsafe {
         CreateFileW(volume.as_ptr(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, null(), OPEN_EXISTING, 0, null_mut())

@@ -214,6 +214,11 @@ pub(super) struct ProgressView {
 }
 
 impl RunRow {
+    /// Runs waiting for an earlier run first, then the newest first.
+    pub(super) fn order(&self) -> std::cmp::Reverse<(bool, i64)> {
+        std::cmp::Reverse((self.waiting, self.id))
+    }
+
     /// `live`: the run, if it still runs.
     #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a float cast saturates")]
     pub(super) fn new(collection: &str, title: &str, r: &RunRecord, live: Option<&Running>) -> Self {
@@ -318,7 +323,7 @@ pub(super) fn collection_run_rows(engine: &Engine, collection: &str, limit: usiz
         (runs.iter().filter(|r| r.status != Status::Queued || engine.store.alive(r)), engine.title(collection));
     let mut rows: Vec<RunRow> =
         runs.map(|r| RunRow::new(collection, &title, r, running.iter().find(|l| l.id == r.id))).collect();
-    rows.sort_by_key(|r| std::cmp::Reverse((r.waiting, r.id)));
+    rows.sort_by_key(RunRow::order);
     let queue = engine.store.queue(Some(collection));
     for row in &mut rows {
         if let Some(lock) = &row.holds.waiting_for {

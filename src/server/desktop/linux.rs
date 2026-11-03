@@ -48,8 +48,9 @@ fn over_dbus(target: &str, page: bool) -> std::io::Result<()> {
 
 /// `path` as a URI's path: each byte but a letter, a digit, `/` and `-._~` percent-encoded.
 fn encoded(path: &str) -> String {
-    let kept = |b: u8| b.is_ascii_alphanumeric() || b"/-._~".contains(&b);
-    path.bytes().map(|b| if kept(b) { char::from(b).to_string() } else { format!("%{b:02X}") }).collect()
+    path.bytes()
+        .map(|b| if crate::fmt::unreserved(b) { char::from(b).to_string() } else { format!("%{b:02X}") })
+        .collect()
 }
 
 #[cfg(test)]

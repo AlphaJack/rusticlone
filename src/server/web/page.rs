@@ -44,9 +44,7 @@ impl Base {
     /// Empty unless it is a plain path on this host, so that no link can lead elsewhere.
     pub(super) fn new(prefix: &str) -> Self {
         let prefix = prefix.trim_end_matches('/');
-        let valid = prefix.starts_with('/')
-            && !prefix.starts_with("//")
-            && prefix.bytes().all(|b| b.is_ascii_alphanumeric() || b"/-._~".contains(&b));
+        let valid = prefix.starts_with('/') && !prefix.starts_with("//") && prefix.bytes().all(crate::fmt::unreserved);
         Self(if valid { prefix.to_owned() } else { String::new() })
     }
 

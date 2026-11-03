@@ -26,7 +26,7 @@ pub(crate) use report::{CollectionOverview, Last, RepoOverview, StatusReport};
 #[cfg(feature = "server")]
 pub(crate) use report::{Issue, RepoStatus, Unconfigured};
 pub(crate) use schedule::Schedule;
-use snapshots::{each, newest, newest_by_source, pick, shrunk};
+use snapshots::{each, known, newest, newest_by_source, pick, shrunk};
 
 use std::{
     collections::{BTreeMap, BTreeSet},

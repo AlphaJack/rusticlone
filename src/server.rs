@@ -499,7 +499,7 @@ async fn reload_profiles(app: &Arc<App>, build: &Build, reload: &Reload) {
 /// Lists the collections the state does not know, as `Refresh all` does, so that their pages show it.
 fn list_unknown(app: &Arc<App>) {
     for j in app.engine().unknown() {
-        app.list_repos(j.name(), j.repos().map(|p| p.name.clone()).collect());
+        app.list_repos(j.name(), j.repo_names());
     }
 }
 

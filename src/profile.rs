@@ -113,6 +113,11 @@ impl Sources {
         self.learned.read().is_some()
     }
 
+    /// Whether its paths must be learned, and are not yet.
+    pub(crate) fn unlearned(&self) -> bool {
+        self.unknown() && !self.learned()
+    }
+
     pub(crate) fn learn(&self, paths: Vec<String>) {
         *self.learned.write() = Some(paths);
     }
@@ -135,13 +140,18 @@ impl RusticProfile {
 
     /// [`Self::groups`], or only that of entry `source`.
     pub(crate) fn groups_of(&self, source: Option<usize>) -> Vec<Vec<String>> {
-        self.groups().enumerate().filter(|(i, _)| source.is_none_or(|s| s == *i)).map(|(_, g)| g).collect()
+        self.entries(source, Sources::paths)
     }
 
     /// [`Self::groups_of`] as the profile writes them: see [`Sources::written_paths`].
     pub(crate) fn written_groups_of(&self, source: Option<usize>) -> Vec<Vec<String>> {
-        let groups = self.sources.iter().map(Sources::written_paths).enumerate();
-        groups.filter(|(i, _)| source.is_none_or(|s| s == *i)).map(|(_, g)| g).collect()
+        self.entries(source, Sources::written_paths)
+    }
+
+    /// `paths` of each entry, or only of entry `source`.
+    fn entries(&self, source: Option<usize>, paths: fn(&Sources) -> Vec<String>) -> Vec<Vec<String>> {
+        let entries = self.sources.iter().enumerate();
+        entries.filter(|(i, _)| source.is_none_or(|s| s == *i)).map(|(_, entry)| paths(entry)).collect()
     }
 
     /// Whether every backup makes a snapshot, so that the newest snapshot dates the last backup.
@@ -448,19 +458,7 @@ fn snapshot_paths(sources: &[String], dir: &Path) -> Vec<String> {
         paths.dedup();
         return paths;
     }
-    let normalized: Vec<PathBuf> = sources.iter().map(|s| normalize(Path::new(s))).collect();
-    // Rustic keeps paths relative unless one is absolute or outside its working directory.
-    let absolute = normalized.iter().any(|p| p.is_absolute() || p.starts_with(".."));
-    let mut paths: Vec<String> = normalized
-        .into_iter()
-        .map(|path| {
-            let path = if absolute { resolve(&dir.join(&path)) } else { path };
-            path.to_string_lossy().into_owned()
-        })
-        .collect();
-    paths.sort_unstable();
-    paths.dedup();
-    paths
+    recorded(sources, dir, resolve)
 }
 
 /// [`snapshot_paths`] without following this computer's links.
@@ -468,10 +466,16 @@ fn snapshot_paths_written(sources: &[String], dir: &Path) -> Vec<String> {
     if sources.iter().any(|s| sys::foreign_path(s)) {
         return snapshot_paths(sources, dir);
     }
+    recorded(sources, dir, normalize)
+}
+
+/// This computer's `sources` as rustic records them, sorted. Rustic keeps them relative unless one is absolute or
+/// outside its working directory `dir`: then each is joined to it and made absolute by `absolute`.
+fn recorded(sources: &[String], dir: &Path, absolute: fn(&Path) -> PathBuf) -> Vec<String> {
     let normalized: Vec<PathBuf> = sources.iter().map(|s| normalize(Path::new(s))).collect();
-    let absolute = normalized.iter().any(|p| p.is_absolute() || p.starts_with(".."));
+    let anchored = normalized.iter().any(|p| p.is_absolute() || p.starts_with(".."));
     let mut paths: Vec<String> = (normalized.into_iter())
-        .map(|path| if absolute { normalize(&dir.join(path)) } else { path }.to_string_lossy().into_owned())
+        .map(|path| if anchored { absolute(&dir.join(path)) } else { path }.to_string_lossy().into_owned())
         .collect();
     paths.sort_unstable();
     paths.dedup();

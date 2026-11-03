@@ -15,7 +15,6 @@ use super::{
     render_str,
 };
 use crate::{
-    engine::Collection,
     request::RunKind,
     setup::{self, Choice, Every, Keep, Kind, Question, Role, Setup},
 };
@@ -169,7 +168,7 @@ fn recreate_form(app: &App, collection: String, repo: &str) -> Result<RecreateFo
     let j = engine.collection(&collection).ok_or(Missing::Collection)?;
     let repo = j.repo(repo).ok_or(Missing::Repository)?.name.clone();
     let primary = repo == collection;
-    let sources = repos(&j).into_iter().filter(|name| *name != repo && *name != collection).collect::<Vec<_>>();
+    let sources = j.repo_names().into_iter().filter(|name| *name != repo && *name != collection).collect::<Vec<_>>();
     let default = match (primary, sources.is_empty()) {
         (true, true) => Hint::CreatedEmpty,
         (true, false) => Hint::NewestTarget,
@@ -202,7 +201,7 @@ fn restore_form(app: &App, collection: String, q: RunForm) -> Result<RestoreForm
     Ok(RestoreFormView {
         dry_run,
         from: q.repo,
-        repos: repos(&j),
+        repos: j.repo_names(),
         collection,
         short: crate::rustic::short_id(&q.snapshot).to_owned(),
         snapshot: q.snapshot,
@@ -210,8 +209,4 @@ fn restore_form(app: &App, collection: String, q: RunForm) -> Result<RestoreForm
         path: q.path,
         source: q.source,
     })
-}
-
-fn repos(j: &Collection<'_>) -> Vec<String> {
-    j.repos().map(|p| p.name.clone()).collect()
 }

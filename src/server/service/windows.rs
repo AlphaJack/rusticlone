@@ -160,8 +160,7 @@ mod manager {
         use windows_sys::Win32::System::EventLog::{
             DeregisterEventSource, EVENTLOG_ERROR_TYPE, RegisterEventSourceW, ReportEventW,
         };
-        let (source, text): (Vec<u16>, Vec<u16>) =
-            (NAME.encode_utf16().chain([0]).collect(), error.encode_utf16().chain([0]).collect());
+        let (source, text) = (crate::sys::wide(NAME), crate::sys::wide(error));
         // SAFETY: NUL-terminated strings, one of them passed, and the source closed after.
         unsafe {
             let log = RegisterEventSourceW(std::ptr::null(), source.as_ptr());

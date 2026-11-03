@@ -368,7 +368,7 @@ pub(super) fn index_main(app: &App) -> IndexMain {
 impl IndexMain {
     pub(super) fn build(inputs: Vec<CollectionInput>) -> Self {
         let mut runs: Vec<RunRow> = inputs.iter().filter(|i| i.configured).flat_map(|i| i.runs.clone()).collect();
-        runs.sort_by_key(|r| std::cmp::Reverse((r.waiting, r.id)));
+        runs.sort_by_key(RunRow::order);
         runs.truncate(RECENT_RUNS);
         let collections: Vec<CollectionView> = inputs.into_iter().map(CollectionView::build).collect();
         let actions = collections.iter().any(|j| j.configured);

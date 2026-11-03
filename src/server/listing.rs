@@ -44,7 +44,7 @@ impl App {
     /// Lists every repository that `selection` names again.
     pub(super) fn refresh(self: &Arc<Self>, selection: &Selection) -> Result<()> {
         for (j, repo) in self.engine().named(selection)? {
-            let repos = repo.map_or_else(|| j.repos().map(|p| p.name.clone()).collect(), |p| vec![p.name.clone()]);
+            let repos = repo.map_or_else(|| j.repo_names(), |p| vec![p.name.clone()]);
             self.list_repos(j.name(), repos);
         }
         Ok(())

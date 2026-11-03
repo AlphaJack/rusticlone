@@ -49,7 +49,7 @@ impl Engine {
 
     /// [`Self::learn_from_repository`] from each repository in turn, as a restore may find the primary lost.
     pub(super) fn learn_from_repositories(&self, run: &Run<'_>) {
-        let unlearned = || run.collection.primary.sources.iter().any(|s| s.unknown() && !s.learned());
+        let unlearned = || run.collection.primary.sources.iter().any(Sources::unlearned);
         for repo in run.collection.repos().take_while(|_| unlearned()) {
             _ = self.learn_from_repository(run, repo);
         }
@@ -60,7 +60,7 @@ impl Engine {
     /// which is the profile's. Learned only when there are enough of them.
     fn learn_from_repository(&self, run: &Run<'_>, p: &RusticProfile) -> Result<()> {
         let primary = run.collection.primary;
-        let unknown: Vec<&Sources> = primary.sources.iter().filter(|s| s.unknown() && !s.learned()).collect();
+        let unknown: Vec<&Sources> = primary.sources.iter().filter(|s| s.unlearned()).collect();
         if unknown.is_empty() {
             return Ok(());
         }
@@ -70,10 +70,7 @@ impl Engine {
             .filter(|(name, _)| !self.rustic_profiles.contains_key(name))
             .filter_map(|(name, dir)| profile::load(&name, &dir, &self.rustic.config(&name, &dir).ok()?).ok())
             .collect();
-        let known: BTreeSet<String> = (self.rustic_profiles.values().chain(&unread).flat_map(|q| &q.sources))
-            .filter(|s| !s.unknown())
-            .map(|s| rustic::source_key(&s.paths()))
-            .collect();
+        let known = known(self.rustic_profiles.values().chain(&unread).flat_map(|q| &q.sources));
         let groups = self.rustic.snapshots(&run.cx, p, std::iter::empty::<Vec<String>>(), &primary.group_by)?;
         let theirs = (groups.iter().flat_map(|g| &g.snapshots))
             .filter(|sn| !known.contains(&sn.source()) && unknown.iter().any(|s| s.host == sn.hostname));
@@ -217,4 +214,9 @@ pub(super) fn each<I: Sync, T: Send>(items: &[I], f: impl Fn(&I) -> T + Sync) ->
         let threads: Vec<_> = items.iter().map(|item| scope.spawn(|| f(item))).collect();
         threads.into_iter().map(|t| t.join().unwrap_or_else(|panic| std::panic::resume_unwind(panic))).collect()
     })
+}
+
+/// The source keys of `sources` whose paths are known, as rustic records them: not those a hook creates.
+pub(super) fn known<'a>(sources: impl IntoIterator<Item = &'a Sources>) -> BTreeSet<String> {
+    sources.into_iter().filter(|s| !s.unknown()).map(|s| rustic::source_key(&s.paths())).collect()
 }
