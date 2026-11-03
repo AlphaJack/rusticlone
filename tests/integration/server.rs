@@ -775,3 +775,51 @@ fn uninstall_deletes_the_state() {
     assert!(!sb.path("store").exists());
     assert!(sb.profile_path("Docs").is_file() && sb.path("local/Docs/config").is_file());
 }
+
+/// A run of the server is stopped by its id, which says so. Stopping nothing says nothing.
+#[test]
+fn a_run_is_stopped_by_its_id() {
+    let sb = Sandbox::new();
+    slow_profile(&sb, "Slow", 30, "");
+    let server = sb.server(&[]);
+    let cancelled = json!({"event": {"kind": "cancelled-from-web"}});
+    assert_eq!(server.delete("/collections/Slow/runs").code, 200);
+    assert!(!server.logged(&cancelled), "nothing was stopped: {}", server.output());
+    server.post_form("/collections/Slow/runs", "kind=backup");
+    wait_for(20, "the backup", || server.collection("Slow")["running"][0]["activities"][0]["on"][0] == "Slow");
+    let id = server.collection("Slow")["running"][0]["id"].clone();
+    assert_eq!(server.delete(&format!("/collections/Slow/runs/{id}")).code, 200);
+    wait_for(20, "it to stop", || server.collection("Slow")["running"] == json!([]));
+    assert!(server.logged(&cancelled), "{}", server.output());
+}
+
+/// Of the commands waiting behind the server's backup, only the one stopped stops. The record of one whose process
+/// is gone cannot be stopped: nothing waits there.
+#[test]
+fn only_the_waiting_command_stopped_stops() {
+    let sb = Sandbox::new();
+    slow_profile(&sb, "Slow", 30, "[copy]\ntargets = ['Slow-remote']\n");
+    sb.target("Slow-remote", "Slow", "");
+    let server = sb.server(&[]);
+    server.post_form("/collections/Slow/runs", "kind=backup");
+    wait_for(20, "the backup", || server.collection("Slow")["running"][0]["activities"][0]["on"][0] == "Slow");
+    let (backup, mut copy) =
+        (sb.spawn(&["backup", "--collection", "Slow"], &[]), sb.spawn(&["copy", "--collection", "Slow"], &[]));
+    let queued = |kind: &str| {
+        let store = sb.store();
+        let waiting =
+            store.unfinished(Some("Slow")).into_iter().filter(|r| r.status == Status::Queued && store.alive(r));
+        waiting.filter(|r| serde_json::json!(r.kind) == kind).map(|r| r.id).next()
+    };
+    wait_for(10, "both to wait", || queued("backup").is_some() && queued("copy").is_some());
+    let id = queued("backup").unwrap();
+    assert_eq!(server.delete(&format!("/collections/Slow/runs/{id}")).code, 200);
+    assert!(json_has(
+        &String::from_utf8_lossy(&backup.wait_with_output().unwrap().stdout),
+        &json!({"event": {"kind": "dequeued"}})
+    ));
+    let left = queued("copy").expect("the copy still waits");
+    copy.kill().unwrap();
+    _ = copy.wait();
+    assert_eq!(server.delete(&format!("/collections/Slow/runs/{left}")).code, 422, "its process is gone");
+}
