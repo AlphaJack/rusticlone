@@ -642,10 +642,112 @@ mod tests {
         let size = fs::metadata(store.log_path("Docs", run.record.id)).unwrap().len();
         assert!(size < LOG_CAP + (LOG_CAP_LINES as u64 + 1) * 1024, "{size}");
         let (tail, _) = store.run_log_tail("Docs", run.record.id, None);
+        // Read from its end, its first line may be cut.
+        assert_eq!(tail[0].text, LogNote::Cut { size: fmt::human_size(size - LOG_TAIL) }.to_string());
         assert_eq!(tail.last().unwrap().text, "the end");
         let file = fs::read_to_string(store.log_path("Docs", run.record.id)).unwrap();
         let left_out = LogNote::LeftOut { lines: 5001 - LOG_CAP_LINES as u64 }.to_string();
         assert!(file.contains(&left_out));
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A queued run that its process drops leaves the queue. A started one stays.
+    #[test]
+    fn a_dropped_queued_run_leaves_the_queue() {
+        let store = store("dropped-queued-test");
+        let queued = RunLog::queued(&store, "Docs", Request::Backup, Trigger::Cli).unwrap();
+        let mut started = RunLog::queued(&store, "Docs", Request::Backup, Trigger::Cli).unwrap();
+        started.start();
+        drop(queued);
+        let ids: Vec<i64> = store.unfinished(Some("Docs")).iter().map(|r| r.id).collect();
+        assert_eq!(ids, [started.record.id]);
+        drop(started);
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A run that holds a lock shows before it logs, so that the runs waiting for the lock name it. Waiting
+    /// alone, it stays hidden.
+    #[test]
+    fn a_run_shows_what_it_holds_before_it_logs() {
+        let store = store("holds-test");
+        let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
+        run.steps(&[StepRecord { status: Status::Running, ..StepRecord::queued("snapshot".into(), Vec::new()) }]);
+        assert!(run.holds(Some(0), Holds { using: Vec::new(), waiting_for: Some("Docs".into()) }));
+        assert!(store.runs("Docs", usize::MAX).is_empty());
+        assert!(run.holds(Some(0), Holds { using: vec!["Docs".into()], waiting_for: None }));
+        let holding: Vec<i64> = store.holding("Docs").iter().map(|r| r.id).collect();
+        assert_eq!(holding, [run.record.id]);
+        assert!(store.holding("Photos").is_empty());
+        drop(run);
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A step's waits add up. A request replaced shows in the record. The log is its version, then its lines.
+    #[test]
+    fn a_run_keeps_its_waits_its_request_and_its_lines() {
+        let store = store("run-record-test");
+        let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
+        run.steps(&[StepRecord::queued("check".into(), Vec::new())]);
+        run.waited(Some(0), 2);
+        run.waited(Some(0), 3);
+        assert_eq!(run.record.steps[0].waited, 5);
+        run.set_request(Request::Check(vec![("Docs".into(), Some(Reading::Subset { n: 1, of: 10 }))]));
+        assert_eq!((run.record.kind, run.request.kind()), (RunKind::Check, RunKind::Check));
+        run.line(Origin::default(), "first");
+        run.finish(Status::Succeeded, &[], Vec::new()).unwrap();
+        let log = fs::read_to_string(store.log_path("Docs", run.record.id)).unwrap();
+        let lines: Vec<&str> = log.lines().collect();
+        assert_eq!(lines.len(), 2, "{log}");
+        assert_eq!(lines[0], serde_json::json!({ "version": LogLine::MIGRATIONS.len() }).to_string());
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A new run's id comes after a stored run's, even one with an id from a later time.
+    #[test]
+    fn a_new_id_comes_after_the_stored_runs() {
+        let store = store("id-after-stored-test");
+        let mut later = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
+        later.record.id = 4_000_000_000_000;
+        later.line(Origin::default(), "x");
+        assert_eq!(RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli).record.id, 4_000_000_000_001);
+        drop(later);
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// The runs read stay parsed, but for those removed since.
+    #[test]
+    fn removed_runs_leave_the_parsed_ones() {
+        let store = store("parsed-runs-test");
+        let queued = RunLog::queued(&store, "Docs", Request::Backup, Trigger::Cli).unwrap();
+        let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
+        run.line(Origin::default(), "x");
+        assert_eq!(store.runs("Docs", usize::MAX).len(), 2);
+        assert!(store.dequeue("Docs", queued.record.id).unwrap());
+        assert_eq!(store.runs("Docs", usize::MAX).len(), 1);
+        let kept: Vec<i64> = store.parsed.runs.lock()["Docs"].keys().copied().collect();
+        assert_eq!(kept, [run.record.id]);
+        drop((queued, run));
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// Stored runs that this version cannot read are counted.
+    #[cfg(feature = "server")]
+    #[test]
+    fn unreadable_runs_are_counted() {
+        let store = store("unreadable-runs-test");
+        let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
+        run.line(Origin::default(), "x");
+        store
+            .write(Shown::Nothing, |w| {
+                let mut runs = w.open_table(RUNS)?;
+                for id in [1, 2] {
+                    runs.insert(("Docs", id), "not a run")?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(store.unreadable_runs(), 2);
+        drop(run);
         fs::remove_dir_all(&store.dir).unwrap();
     }
 }
