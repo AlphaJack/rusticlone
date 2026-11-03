@@ -46,6 +46,7 @@ fn points(table: &str) -> Vec<PathBuf> {
 
 /// Whether `path` may be on a spinning disk, where concurrent runs slow each other down. True unless
 /// the system reports a solid-state disk: btrfs, tmpfs and shares are unknown.
+#[cfg_attr(test, mutants::skip)] // Asks the disk, which a test has no say in.
 pub(crate) fn spinning(path: &std::path::Path) -> bool {
     solid_state(path) != Some(true)
 }
@@ -59,6 +60,42 @@ pub(crate) fn mount_point(path: &std::path::Path) -> Option<&std::path::Path> {
 /// Whether `path` is on a network or FUSE file system (NFS, SMB, rclone, sshfs). Rustic treats it
 /// as local, but its listings may lag what was just written.
 #[expect(clippy::disallowed_methods, reason = "checks the file system of `path`")]
+#[cfg_attr(test, mutants::skip)] // Asks the file system, and no test runs on a share.
 pub(crate) fn on_network_mount(path: &std::path::Path) -> bool {
     path.ancestors().find(|p| p.exists()).is_some_and(network_fs)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+
+    /// A table's mount points, without its comments, with `\040` as a space.
+    #[test]
+    fn a_mount_table_lists_its_points() {
+        let table = "# comment\n/dev/sda1 / ext4 rw 0 0\n  # indented\nserver:/share /mnt/My\\040Disk nfs rw 0 0\n";
+        assert_eq!(points(table), [PathBuf::from("/"), PathBuf::from("/mnt/My Disk")]);
+    }
+
+    /// A path is unmounted where `fstab` mounts a device above it that is not mounted. The innermost mount point
+    /// counts, and `/` is always there.
+    #[test]
+    fn a_path_below_a_mount_that_is_not_there_is_unmounted() {
+        let fstab = "/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n/dev/c /data/usb ext4 rw 0 0\n";
+        let path = Path::new("/data/usb/docs");
+        assert!(unmounted(path, "/dev/a / ext4 rw 0 0\n/dev/b /data ext4 rw 0 0\n", fstab), "/data/usb is missing");
+        assert!(!unmounted(path, "/dev/c /data/usb ext4 rw 0 0\n", fstab), "the innermost is there");
+        assert!(!unmounted(Path::new("/home/me"), "", fstab), "only / is above it");
+        assert!(!unmounted(Path::new("/database"), "", fstab), "a name that starts like a mount point is not below it");
+    }
+
+    /// A folder's mount point is the topmost of its ancestors on its device.
+    #[test]
+    fn a_folder_s_mount_point_is_on_its_device() {
+        let dir = crate::sys::test_dir("mount-point");
+        let mount = mount_point(&dir).unwrap();
+        assert!(dir.starts_with(mount) && device(mount) == device(&dir));
+        assert!(mount.parent().is_none_or(|above| device(above) != device(&dir)), "the topmost on it");
+    }
 }
