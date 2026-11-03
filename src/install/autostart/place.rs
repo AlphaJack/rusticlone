@@ -68,29 +68,13 @@ pub(super) fn place(placed: &Path) -> Result<()> {
         // Replaced whole, so that a copy that runs keeps its file.
         let partial = placed.with_extension("partial");
         std::fs::copy(&exe, &partial).with_context(|| Error::Write { path: partial.display().to_string() })?;
-        replace(&partial, placed).with_context(|| Error::Replace { path: to.clone() })?;
+        sys::replace(&partial, placed).with_context(|| Error::Replace { path: to.clone() })?;
         log::event(None, &Logged::Copied { version, to });
     }
     if crate::install::managed(placed) {
         return Ok(());
     }
     path::put(dir)
-}
-
-/// Moves `from` over `to`. Windows keeps an executable locked a moment after its process exits, while the
-/// system or an antivirus still holds it: retried meanwhile.
-fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
-    const RETRY: std::time::Duration = std::time::Duration::from_millis(100);
-    const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(10);
-    let deadline = std::time::Instant::now() + TIMEOUT;
-    loop {
-        match std::fs::rename(from, to) {
-            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied && std::time::Instant::now() < deadline => {
-                std::thread::sleep(RETRY);
-            }
-            done => return done,
-        }
-    }
 }
 
 #[cfg(all(test, unix))]
