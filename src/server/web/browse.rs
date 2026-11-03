@@ -112,11 +112,7 @@ pub(super) async fn browse(
                 Some(snapshot) => snapshot,
                 None => e.rustic.snapshot(&Ctx::default(), p, &id)?,
             };
-            // A snapshot of one directory opens in that directory.
-            let path = match (q.path.is_empty(), snapshot.paths.as_slice()) {
-                (true, [only]) if std::path::Path::new(only).is_absolute() => rustic::in_tree(only),
-                _ => q.path.clone(),
-            };
+            let path = opened(&q.path, &snapshot.paths);
             let dirs = app.browsed.get(e, p, &id);
             let nodes = dirs.and_then(|dirs| {
                 let dir = dirs.get(path.trim_matches('/')).ok_or_else(|| Fault::NoDirectory { path: path.clone() })?;
@@ -127,29 +123,9 @@ pub(super) async fn browse(
             return Err(Error::NotFound(Missing::Repository));
         };
         let (snapshot, path, nodes) = result.map_err(|e| Error::NotFound(Missing::Named(format!("{e:#}"))))?;
-        let mut crumbs = vec![("/".to_owned(), String::new())];
-        let mut at = String::new();
-        for part in path.split('/').filter(|p| !p.is_empty()) {
-            at = format!("{at}/{part}");
-            crumbs.push((part.to_owned(), at.clone()));
-        }
+        let crumbs = crumbs(&path);
         let (entries, error) = match nodes {
-            Ok(mut nodes) => {
-                nodes.sort_by(|a, b| {
-                    (b.kind == NodeKind::Dir).cmp(&(a.kind == NodeKind::Dir)).then(a.name.cmp(&b.name))
-                });
-                let entries = nodes
-                    .into_iter()
-                    .map(|n| Entry {
-                        path: format!("{}/{}", path.trim_end_matches('/'), n.name),
-                        kind: n.kind,
-                        size: (n.kind != NodeKind::Dir).then_some(Size(Some(n.size))),
-                        modified: n.mtime.map(fmt::local).unwrap_or_default(),
-                        name: n.name,
-                    })
-                    .collect();
-                (entries, None)
-            }
+            Ok(nodes) => (entries(&path, nodes), None),
             Err(e) => (Vec::new(), Some(format!("{e:#}"))),
         };
         let browse = BrowseMain {
@@ -167,6 +143,47 @@ pub(super) async fn browse(
         Ok(layout(&title, None, access, &base, render_str(&browse, &base)))
     })
     .await
+}
+
+/// Where a snapshot opens: at `asked`, else in its one directory, as the tree names it.
+fn opened(asked: &str, paths: &[String]) -> String {
+    match (asked.is_empty(), paths) {
+        (true, [only]) if std::path::Path::new(only).is_absolute() => rustic::in_tree(only),
+        _ => asked.to_owned(),
+    }
+}
+
+/// Each part of `path`, after the root, with the path it links to.
+fn crumbs(path: &str) -> Vec<(String, String)> {
+    let mut crumbs = vec![("/".to_owned(), String::new())];
+    let mut at = String::new();
+    for part in path.split('/').filter(|p| !p.is_empty()) {
+        at = format!("{at}/{part}");
+        crumbs.push((part.to_owned(), at.clone()));
+    }
+    crumbs
+}
+
+/// The entries of the directory `path`: directories first, each sorted by name, and the size of files only.
+fn entries(path: &str, mut nodes: Vec<rustic::Node>) -> Vec<Entry> {
+    nodes.sort_by(|a, b| (b.kind == NodeKind::Dir).cmp(&(a.kind == NodeKind::Dir)).then(a.name.cmp(&b.name)));
+    (nodes.into_iter())
+        .map(|n| Entry {
+            path: format!("{}/{}", path.trim_end_matches('/'), n.name),
+            kind: n.kind,
+            size: (n.kind != NodeKind::Dir).then_some(Size(Some(n.size))),
+            modified: n.mtime.map(fmt::local).unwrap_or_default(),
+            name: n.name,
+        })
+        .collect()
+}
+
+/// The name a download is saved as: the last part of `path`, else `whole` for the snapshot, `.zip` when zipped,
+/// with `_` for what a header's quoted name cannot hold.
+fn file_name(path: &str, whole: &str, zip: bool) -> String {
+    let base = path.rsplit('/').find(|p| !p.is_empty()).unwrap_or(whole);
+    let name = if zip { format!("{base}.zip") } else { base.to_owned() };
+    name.chars().map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' { c } else { '_' }).collect()
 }
 
 #[derive(Deserialize)]
@@ -266,6 +283,7 @@ pub(super) async fn diff(
 struct Dump(tokio::process::Child);
 
 impl Drop for Dump {
+    #[cfg_attr(test, mutants::skip)] // Kills a process.
     fn drop(&mut self) {
         // `None` once it exited and was reaped.
         if let Some(pid) = self.0.id() {
@@ -315,14 +333,7 @@ pub(super) async fn download(
         }
     });
     let body = Body::from_stream(data.chain(end));
-    let base = q
-        .path
-        .rsplit('/')
-        .find(|p| !p.is_empty())
-        .map_or_else(|| format!("{collection}-{}", id.short()), str::to_owned);
-    let name = if zip { format!("{base}.zip") } else { base };
-    let name: String =
-        name.chars().map(|c| if c.is_ascii_graphic() && c != '"' && c != '\\' { c } else { '_' }).collect();
+    let name = file_name(&q.path, &format!("{collection}-{}", id.short()), zip);
     let mime = if zip { "application/zip" } else { "application/octet-stream" };
     Ok((
         [
