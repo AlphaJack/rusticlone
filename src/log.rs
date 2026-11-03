@@ -239,12 +239,18 @@ impl Block {
 }
 
 /// Shows the runs of this process as `runs`, below the printed lines, and prints `ended` above them.
+#[cfg_attr(test, mutants::skip)] // Draws in a terminal, which tests have none of.
 pub(crate) fn runs(runs: Vec<String>, ended: &[String]) {
     let mut block = BLOCK.lock();
-    if block.runs != runs || !ended.is_empty() {
+    if redraws(&block.runs, &runs, ended) {
         block.runs = runs;
         block.redraw(ended);
     }
+}
+
+/// Whether the runs drawn as `shown` are drawn again: they changed, or lines are printed above them.
+fn redraws(shown: &[String], runs: &[String], ended: &[String]) -> bool {
+    shown != runs || !ended.is_empty()
 }
 
 /// Runs `f` with the runs erased and not redrawn, as while a question waits for its answer.
@@ -267,6 +273,7 @@ pub(crate) fn capture(hooks: Option<Hooks>) {
 
 /// What the step of a command that runs does now. Nothing outside one.
 #[cfg(feature = "self-update")]
+#[cfg_attr(test, mutants::skip)] // Shown only in a command's tree in a terminal, which tests have none of.
 pub(crate) fn now(text: &str) {
     let hooks = *HOOKS.lock();
     if let Some(hooks) = hooks {
@@ -276,6 +283,7 @@ pub(crate) fn now(text: &str) {
 
 /// What the step of a command that runs did, its line once it ends. Nothing outside one.
 #[cfg(any(feature = "desktop", feature = "self-update"))]
+#[cfg_attr(test, mutants::skip)] // Shown only in a command's tree in a terminal, which tests have none of.
 pub(crate) fn did(text: &str) {
     let hooks = *HOOKS.lock();
     if let Some(hooks) = hooks {
@@ -344,10 +352,15 @@ pub(crate) fn init(json: bool, verbose: bool) {
 
 /// `text` in the color of `level`, where colors are shown.
 pub(crate) fn paint(level: Level, text: &str) -> String {
+    painted(mode().color, level, text)
+}
+
+/// `text` in the color of `level` if `color`. Success keeps the terminal's own color.
+fn painted(color: bool, level: Level, text: &str) -> String {
     if level == Level::Success {
         return text.to_owned();
     }
-    style(Tone::from(level).code(), text)
+    styled(color, Tone::from(level).code(), text)
 }
 
 /// `text` in bold, where colors are shown.
@@ -356,7 +369,11 @@ pub(crate) fn bold(text: &str) -> String {
 }
 
 fn style(code: &str, text: &str) -> String {
-    if mode().color { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_owned() }
+    styled(mode().color, code, text)
+}
+
+fn styled(color: bool, code: &str, text: &str) -> String {
+    if color { format!("\x1b[{code}m{text}\x1b[0m") } else { text.to_owned() }
 }
 
 fn mode() -> Mode {
@@ -368,25 +385,49 @@ pub(crate) fn is_json() -> bool {
 }
 
 /// Text on a terminal, redrawn in place.
+#[cfg_attr(test, mutants::skip)] // True only on a terminal, which tests have none of.
 pub(crate) fn is_live() -> bool {
     mode().live
 }
 
-/// `name`: the collection, or for rustic's own lines, the profile. `extra` fields appear in JSON only.
-fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: Value) {
-    let mode = mode();
-    // Progress is a live line in a terminal, and JSON elsewhere: as text lines, it would flood logs.
+/// Where a line goes.
+#[derive(Debug, PartialEq)]
+enum Out {
+    /// Rustic's own log.
+    Stderr,
+    /// A line of its own, outside a terminal.
+    Stdout,
+    /// The status line below the runs.
+    Status,
+    /// What this process logs, in the tree of a command that draws one, else above the runs.
+    Tree,
+    /// Above the runs.
+    Above,
+}
+
+/// Where a line of `target` goes, or nowhere. Progress is a live line in a terminal, and JSON elsewhere: as text
+/// lines, it would flood logs.
+fn route(mode: Mode, target: &str) -> Option<Out> {
     if (target == "rustic" && mode.quiet) || (target == "progress" && !mode.json && !mode.live) {
-        return;
+        return None;
     }
-    #[cfg(any(feature = "desktop", feature = "self-update"))]
-    if mode.live
-        && target == crate::NAME
-        && let Some(hooks) = *HOOKS.lock()
-    {
-        return (hooks.logged)(level, message);
-    }
-    let line = if mode.json {
+    Some(if target == "rustic" {
+        Out::Stderr
+    } else if !mode.live {
+        Out::Stdout
+    } else if target == "progress" {
+        Out::Status
+    } else if target == crate::NAME {
+        Out::Tree
+    } else {
+        Out::Above
+    })
+}
+
+/// The line that `mode` writes. `name`: the collection, or for rustic's own lines, the profile. `extra` fields
+/// appear in JSON only.
+fn line(mode: Mode, target: &str, level: Level, name: Option<&str>, message: &str, extra: Value) -> String {
+    if mode.json {
         // The level names log processors expect.
         let level = match level {
             Level::Success => "INFO",
@@ -400,28 +441,38 @@ fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: V
         if let (Value::Object(v), Value::Object(extra)) = (&mut v, extra) {
             v.extend(extra);
         }
-        v.to_string()
-    } else {
-        // A line of its own starts with a capital.
-        let message = if name.is_none() { crate::fmt::capitalized(message) } else { message.to_owned() };
-        let message = if level == Level::Success { message } else { paint(level, &message) };
-        match name {
-            Some(profile) if target == "rustic" => format!("[{profile}] {message}"),
-            Some(collection) => format!("{collection}: {message}"),
-            None => message,
-        }
-    };
+        return v.to_string();
+    }
+    // A line of its own starts with a capital.
+    let message = if name.is_none() { crate::fmt::capitalized(message) } else { message.to_owned() };
+    let message = painted(mode.color, level, &message);
+    match name {
+        Some(profile) if target == "rustic" => format!("[{profile}] {message}"),
+        Some(collection) => format!("{collection}: {message}"),
+        None => message,
+    }
+}
+
+fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: Value) {
+    let mode = mode();
+    let Some(out) = route(mode, target) else { return };
+    #[cfg(any(feature = "desktop", feature = "self-update"))]
+    if out == Out::Tree
+        && let Some(hooks) = *HOOKS.lock()
+    {
+        return (hooks.logged)(level, message);
+    }
+    let line = line(mode, target, level, name, message, extra);
     // A closed pipe must not stop a backup.
-    if target == "rustic" {
-        _ = writeln!(stderr().lock(), "{line}");
-    } else if !mode.live {
-        _ = writeln!(stdout().lock(), "{line}");
-    } else if target == "progress" {
-        let mut block = BLOCK.lock();
-        block.status = Some(line);
-        block.redraw(&[]);
-    } else {
-        BLOCK.lock().redraw(&[line]);
+    match out {
+        Out::Stderr => _ = writeln!(stderr().lock(), "{line}"),
+        Out::Stdout => _ = writeln!(stdout().lock(), "{line}"),
+        Out::Status => {
+            let mut block = BLOCK.lock();
+            block.status = Some(line);
+            block.redraw(&[]);
+        }
+        Out::Tree | Out::Above => BLOCK.lock().redraw(&[line]),
     }
 }
 
