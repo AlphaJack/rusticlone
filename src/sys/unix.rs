@@ -10,6 +10,9 @@ pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
     Some(PathBuf::from("/etc").join(app))
 }
 
+/// Whether `\` separates the parts of a path, as `/` does. Here it is a character of a name.
+pub(crate) const BACKSLASH_SEPARATES: bool = false;
+
 /// The drive letter of a Windows path such as `C:\Users`, and what follows it.
 pub(crate) fn windows_drive(path: &str) -> Option<(char, &str)> {
     let mut chars = path.chars();

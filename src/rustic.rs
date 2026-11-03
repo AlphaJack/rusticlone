@@ -34,6 +34,7 @@ pub(crate) use contents::{Diff, Dirs, Found, NodeKind, in_tree};
 #[cfg(feature = "server")]
 use contents::{diff, dirs, found};
 pub(crate) use ctx::{Ctx, Origin, RunHandle, Stop};
+pub(crate) use os::parts;
 #[cfg(feature = "server")]
 pub(crate) use output::Ended;
 pub(crate) use output::{Failure, Output, Progress, Pruned};

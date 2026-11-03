@@ -2,7 +2,7 @@
 
 use std::{
     fs,
-    path::{Component, Path, PathBuf},
+    path::{Path, PathBuf},
 };
 
 use anyhow::Result;
@@ -347,17 +347,7 @@ impl Engine {
 
 /// `/home/me/docs` becomes `home/me/docs`, `C:\Users\me` becomes `C/Users/me`, on any system.
 fn below_root(path: &str) -> PathBuf {
-    let mut out = PathBuf::new();
-    for c in Path::new(crate::rustic::tree_path(path).as_ref()).components() {
-        match c {
-            Component::Normal(part) => out.push(part),
-            Component::Prefix(prefix) => {
-                out.extend(prefix.as_os_str().to_string_lossy().split(['\\', '/', ':', '?']).filter(|p| !p.is_empty()));
-            }
-            Component::RootDir | Component::CurDir | Component::ParentDir => {}
-        }
-    }
-    out
+    crate::rustic::parts(Path::new(crate::rustic::tree_path(path).as_ref())).into_iter().collect()
 }
 
 /// The directories missing above and at a path, which rustic's dry-run restore creates as its destination

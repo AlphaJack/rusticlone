@@ -1,9 +1,6 @@
 //! Snapshot contents as rustic lists them, for browsing.
 
-use std::{
-    collections::BTreeMap,
-    path::{Component, Path},
-};
+use std::{collections::BTreeMap, path::Path};
 
 use jiff::Timestamp;
 
@@ -85,20 +82,7 @@ fn quoted(line: &str) -> Option<(&str, String)> {
 
 /// Where a snapshot's source is in its tree: `/home/me` there too, `C:\Users\me` at `/C/Users/me`.
 pub(crate) fn in_tree(path: &str) -> String {
-    let mut tree = String::new();
-    for c in Path::new(path).components() {
-        match c {
-            Component::Normal(part) => tree += &format!("/{}", part.to_string_lossy()),
-            Component::Prefix(prefix) => {
-                for part in prefix.as_os_str().to_string_lossy().split(['\\', '/', ':', '?']).filter(|p| !p.is_empty())
-                {
-                    tree += &format!("/{part}");
-                }
-            }
-            Component::RootDir | Component::CurDir | Component::ParentDir => {}
-        }
-    }
-    tree
+    super::parts(Path::new(path)).iter().map(|part| format!("/{part}")).collect()
 }
 
 /// Snapshots that contain the same matching files.

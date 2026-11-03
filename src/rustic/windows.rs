@@ -12,6 +12,24 @@ pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
     path.into()
 }
 
+/// The names of `path` below its root, as a snapshot's tree has them: the drive's first, so `C:\Users\me` is `C`,
+/// `Users` and `me`.
+pub(crate) fn parts(path: &std::path::Path) -> Vec<String> {
+    use std::path::Component;
+    let mut out = Vec::new();
+    for c in path.components() {
+        match c {
+            Component::Normal(part) => out.push(part.to_string_lossy().into_owned()),
+            Component::Prefix(prefix) => out.extend(
+                (prefix.as_os_str().to_string_lossy().split(['\\', '/', ':', '?']).filter(|p| !p.is_empty()))
+                    .map(ToOwned::to_owned),
+            ),
+            Component::RootDir | Component::CurDir | Component::ParentDir => {}
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::tree_path;

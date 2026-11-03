@@ -332,7 +332,7 @@ pub(crate) fn load(name: &str, dir: &Path, config: &Config) -> Result<RusticProf
         return Err(Error::SlashedDrive { location: repository.to_owned() });
     }
     if let Some(repository) = value(config, &["repository", "repository"]).and_then(Value::as_str)
-        && let Some(scheme) = backslash_after_scheme(repository, std::path::MAIN_SEPARATOR == '\\')
+        && let Some(scheme) = backslash_after_scheme(repository, sys::BACKSLASH_SEPARATES)
     {
         let (location, scheme) = (repository.to_owned(), scheme.to_owned());
         return Err(Error::BackslashAfterScheme { location, scheme });

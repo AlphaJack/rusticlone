@@ -15,6 +15,18 @@ pub(crate) fn tree_path(path: &str) -> std::borrow::Cow<'_, str> {
     }
 }
 
+/// The names of `path` below its root, as a snapshot's tree has them. A Unix path has no drive.
+pub(crate) fn parts(path: &std::path::Path) -> Vec<String> {
+    let name = |c| {
+        if let std::path::Component::Normal(part) = c {
+            Some(std::ffi::OsStr::to_string_lossy(part).into_owned())
+        } else {
+            None
+        }
+    };
+    path.components().filter_map(name).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::tree_path;
