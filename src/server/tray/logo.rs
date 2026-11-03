@@ -85,4 +85,31 @@ mod tests {
         assert_eq!(center(&pixels(Level::Failure, ink(false), true))[3], 0);
         assert_eq!(dot(Level::Success), None);
     }
+
+    /// The top right corner, a row per line: each pixel's opacity in hex, after `*` in the dot's color or `.` in
+    /// the logo's ink.
+    fn corner(pixels: &[u8], dot: Rgb) -> String {
+        let row = |y: u32| -> String {
+            (SIDE - 14..SIDE)
+                .map(|x| {
+                    let p = &pixels[4 * (y * SIDE + x) as usize..][..4];
+                    format!("{}{:02x}", if p[..3] == dot { '*' } else { '.' }, p[3])
+                })
+                .collect()
+        };
+        (0..14).map(row).collect::<Vec<_>>().join("\n")
+    }
+
+    /// The dot and the gap cut around it are antialiased, and the rest of the logo is as it is without a dot.
+    #[test]
+    fn the_dot_is_cut_smoothly_into_the_logo() {
+        let well = pixels(Level::Success, ink(false), false);
+        assert!(well.chunks(4).zip(LOGO).all(|(p, &opacity)| p[3] == opacity), "the logo's own opacity");
+        let failing = pixels(Level::Failure, ink(false), false);
+        insta::assert_snapshot!("dot", corner(&failing, FAILURE));
+        insta::assert_snapshot!("cut", corner(&pixels(Level::Failure, ink(false), true), FAILURE));
+        let away = |i: &usize| i % SIDE as usize + 14 < SIDE as usize || i / SIDE as usize >= 14;
+        let unchanged = (0..LOGO.len()).filter(away).all(|i| failing[4 * i..][..4] == well[4 * i..][..4]);
+        assert!(unchanged, "only the corner changes");
+    }
 }
