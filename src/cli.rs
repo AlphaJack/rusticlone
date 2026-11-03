@@ -244,9 +244,7 @@ fn real_main(cli: Cli) -> Result<Level> {
             let options = RestoreOptions { at, snapshot, path, to, missing, ..none };
             let engine = engine()?;
             let level = run(&engine, RunKind::Restore, &options, source.as_deref())?;
-            if !dry_run {
-                keep_profiles(&engine)?;
-            }
+            keep_profiles(&engine, dry_run)?;
             Ok(level)
         }
     }
@@ -260,14 +258,13 @@ enum Ask {
 
 /// After a restore with profiles from the working directory, as in a disaster recovery, offers to copy
 /// those of the restored collections where rusticlone and its server read them.
+#[cfg_attr(test, mutants::skip)] // Copies only once a person says yes in a terminal, which tests have none of.
 #[expect(clippy::disallowed_methods, reason = "copies the profiles")]
-fn keep_profiles(engine: &Engine) -> Result<()> {
+fn keep_profiles(engine: &Engine, dry_run: bool) -> Result<()> {
     let (Ok(cwd), Some(dir)) = (std::env::current_dir(), profile::own_dir()) else { return Ok(()) };
     let collections = engine.collections();
-    let files: Vec<String> = (collections.iter().flat_map(Collection::repos))
-        .filter(|p| p.dir == cwd && cwd != dir)
-        .map(|p| format!("{}.toml", p.name))
-        .collect();
+    let repos = collections.iter().flat_map(Collection::repos).map(|p| (p.name.as_str(), p.dir.as_path()));
+    let files = to_keep(dry_run, repos, &cwd, &dir);
     if files.is_empty()
         || !log::confirm(&Ask::Keep { files: files.join(", "), dir: dir.display().to_string() }.to_string())?
     {
@@ -278,6 +275,20 @@ fn keep_profiles(engine: &Engine) -> Result<()> {
         std::io::copy(&mut std::fs::File::open(cwd.join(&file))?, &mut std::fs::File::create_new(dir.join(&file))?)?;
     }
     Ok(())
+}
+
+/// The files of the profiles that [`keep_profiles`] offers to copy to `dir`: those of `repos`, as (name, folder), read
+/// from `cwd`. None in a dry run, or when `cwd` is where rusticlone reads them.
+fn to_keep<'a>(
+    dry_run: bool,
+    repos: impl Iterator<Item = (&'a str, &'a std::path::Path)>,
+    cwd: &std::path::Path,
+    dir: &std::path::Path,
+) -> Vec<String> {
+    if dry_run || cwd == dir {
+        return Vec::new();
+    }
+    repos.filter(|(_, at)| *at == cwd).map(|(name, _)| format!("{name}.toml")).collect()
 }
 
 /// Runs what is due in each named collection. Requests that run elsewhere are skipped: the next
