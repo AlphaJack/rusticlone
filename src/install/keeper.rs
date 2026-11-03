@@ -61,6 +61,12 @@ pub(crate) fn keeper(exe: &std::path::Path) -> Option<Keeper> {
     if let Some(source) = super::app::app_source(exe) {
         return Some(keeper(&source).unwrap_or(Keeper::Homebrew));
     }
+    folders(exe)
+}
+
+/// The package manager whose folders hold `exe`, by their names and by what is beside them, or the system's own
+/// folders, which a user cannot write.
+fn folders(exe: &Path) -> Option<Keeper> {
     // Where a link leads, as Homebrew's `bin` to its `Cellar`: macOS names the executable as it was started.
     let exe = &exe.canonicalize().unwrap_or_else(|_| exe.to_path_buf());
     let named = |dir: &Path, name: &str| dir.file_name().is_some_and(|n| n.eq_ignore_ascii_case(name));
