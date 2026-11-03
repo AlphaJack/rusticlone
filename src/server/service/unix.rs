@@ -48,12 +48,6 @@ pub(super) fn report(phase: Phase) {
     _ = sd_notify::notify(&[state]);
 }
 
-/// Windows's alone.
-#[cfg(feature = "self-update")]
-pub(super) fn running() -> bool {
-    false
-}
-
 /// Windows's alone: systemd and launchd run the server as any process.
 pub(super) fn as_service() -> bool {
     false

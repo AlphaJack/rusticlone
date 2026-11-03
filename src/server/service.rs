@@ -16,18 +16,14 @@ use windows as imp;
 
 pub(super) use imp::Hangups;
 
-/// Whether the Windows service manager started this process.
-#[cfg(feature = "self-update")]
-pub(super) fn running() -> bool {
-    imp::running()
-}
-
 /// Whether the server runs as the system service: an administrator's, on Windows.
+#[cfg_attr(test, mutants::skip)] // Asks the Windows service manager.
 pub(super) fn as_service() -> bool {
     imp::as_service()
 }
 
 /// Runs `serve` as the system service.
+#[cfg_attr(test, mutants::skip)] // Hands this process to the Windows service manager.
 pub(super) fn run_service(serve: Box<dyn FnOnce() -> anyhow::Result<()> + Send>) -> anyhow::Result<()> {
     imp::run_service(serve)
 }
