@@ -488,7 +488,9 @@ fn web_failure_shows_on_every_page() {
     // The overview is open, not the collection's page.
     let mut events = server.events("v=999999", &[]);
     events.wait_for(10, "the page", |seen| seen.contains("<h1>"));
-    server.post_form("/collections/Docs/runs", "kind=backup");
+    // The notice names the collection whose run started.
+    let started = server.post_form("/collections/Docs/runs", "kind=backup").body;
+    assert!(started.contains("Docs: "), "{started}");
     events.wait_for(60, "the failure", |seen| seen.contains("event: flash") && seen.contains("flash failure"));
 }
 

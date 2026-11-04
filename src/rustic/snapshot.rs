@@ -236,6 +236,7 @@ mod tests {
         let sum = newest_summary(&snapshots).unwrap();
         let totals = (sum.total_files_processed, sum.total_bytes_processed, sum.data_added_packed);
         assert_eq!(totals, (28, 280, 2800));
+        assert!((sum.backup_duration - 3.0).abs() < f64::EPSILON, "{}", sum.backup_duration);
         assert!(newest_summary(&[]).is_none());
     }
 }
