@@ -329,6 +329,17 @@ mod tests {
         s.parse().unwrap()
     }
 
+    /// With fewer subsets, those owed beyond the new count no longer exist: the next check reads one that does.
+    #[test]
+    fn fewer_subsets_drop_those_owed_beyond_them() {
+        let repo = "Docs".to_owned();
+        let mut state = Ledger::default();
+        state.checks.entry(repo.clone()).or_default().owed.extend([2, 7]);
+        state.apply(&Event::CheckTaken { repo: repo.clone(), of: 5 });
+        assert_eq!(state.checks[&repo].taken, 2);
+        assert!(state.checks[&repo].owed.is_empty());
+    }
+
     /// A failed subset is read again before the next one, and the check fails until that subset passes,
     /// whatever other subsets do.
     #[test]
