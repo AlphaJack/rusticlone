@@ -432,6 +432,24 @@ pub(crate) struct CollectionOverview {
 mod tests {
     use super::*;
 
+    /// A running run's single activity, as the first shape stored it, is the first of its activities. None is none.
+    #[test]
+    fn an_activity_becomes_the_first_of_the_activities() {
+        let mut report =
+            serde_json::json!({"collections": [{"running": [{"activity": {"step": 0}}, {"activity": null}]}]});
+        activities(&mut report);
+        let runs = serde_json::json!([{"activities": [{"step": 0}]}, {"activities": []}]);
+        assert_eq!(report["collections"][0]["running"], runs);
+    }
+
+    /// Only a missing disk access says where to fix it: in the system's settings.
+    #[cfg(feature = "server")]
+    #[test]
+    fn disk_access_says_where_to_fix_it() {
+        assert!(Issue::NoDiskAccess { source: "/Users/me".into() }.fix_url().is_some_and(|u| u.starts_with("x-apple")));
+        assert_eq!(Issue::Unreadable { error: "denied".into() }.fix_url(), None);
+    }
+
     fn at(time: &str) -> Timestamp {
         time.parse().unwrap()
     }
