@@ -19,9 +19,9 @@ async fn bus() -> zbus::Result<zbus::Connection> {
 }
 
 /// Calls systemd's manager like `systemctl` would, and reads the answer as `T`.
-fn manager<T>(method: &str, args: &(impl serde::Serialize + zbus::zvariant::DynamicType)) -> Result<T>
+fn manager<T>(method: &str, args: &(impl serde::Serialize + zbus::DynamicType)) -> Result<T>
 where
-    T: for<'d> zbus::zvariant::DynamicDeserialize<'d>,
+    T: for<'d> zbus::wire::DynamicDeserialize<'d>,
 {
     let call = async {
         let systemd = "org.freedesktop.systemd1";
@@ -56,7 +56,7 @@ fn disable(service: &str) -> Result<()> {
 
 /// Asks systemd to start, restart or stop `service`, without waiting for it.
 fn job(method: &str, service: &str) -> Result<()> {
-    manager::<zbus::zvariant::OwnedObjectPath>(method, &(service, "replace")).map(drop)
+    manager::<zbus::OwnedObjectPath>(method, &(service, "replace")).map(drop)
 }
 
 /// The unit file's state, as `systemctl is-enabled` prints it, or `None` when systemd has no such unit.

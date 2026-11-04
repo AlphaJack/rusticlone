@@ -6,9 +6,9 @@ unmaintained = "all"
 ignore = [
   { id = "RUSTSEC-2026-0374", reason = "compile-time only in askama_derive; no replacement released" },
   { id = "RUSTSEC-2024-0370", reason = "in the GTK of tray-icon on Linux where rusticlone has no tray icon" },
-  { id = "RUSTSEC-2026-0370", reason = "needs ksni to move to zbus 6" },
-  { id = "RUSTSEC-2026-0371", reason = "needs ksni to move to zbus 6" },
-  { id = "RUSTSEC-2026-0372", reason = "needs ksni to move to zbus 6" },
+  { id = "RUSTSEC-2026-0370", reason = "zbus 5, which only ksni still uses" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus 5, which only ksni still uses" },
+  { id = "RUSTSEC-2026-0372", reason = "zbus 5, which only ksni still uses" },
 ]
 
 [licenses]

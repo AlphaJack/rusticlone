@@ -138,7 +138,7 @@ syn = { version = "3.0.0", features = ["full", "visit"] }
 # A D-Bus with fake systemd and logind for the install's tests.
 [target."cfg(target_os = \"linux\")".dev-dependencies]
 tokio = { version = "1.54.1", features = ["rt"] }
-zbus = { version = "5.19.0", default-features = false, features = ["tokio"] }
+zbus = { version = "6.0.0", default-features = false, features = ["tokio", "service"] }
 
 [target."cfg(unix)".dependencies]
 libc = "0.2.191"
@@ -147,8 +147,8 @@ sd-notify = { version = "0.5.0", optional = true }
 [target."cfg(target_os = \"linux\")".dependencies]
 # The tray icon, over D-Bus.
 ksni = { version = "0.3.7", optional = true }
-# Whether the panel is light or dark, from the desktop portal: the bus that ksni uses.
-zbus = { version = "5.19.0", default-features = false, features = ["tokio"], optional = true }
+# Whether the panel is light or dark, from the desktop portal.
+zbus = { version = "6.0.0", default-features = false, features = ["tokio"], optional = true }
 nix = { version = "0.31.3", features = ["time"], optional = true }
 
 # The tray icon in macOS's menu bar and Windows's taskbar.
