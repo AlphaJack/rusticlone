@@ -865,3 +865,23 @@ fn the_first_of_two_at_once_is_the_newest() {
     let ids: Vec<&str> = newest.values().map(|s| s.id.as_str()).collect();
     assert_eq!(ids, ["00000001"]);
 }
+
+/// What a step holds shows while it holds it, and no longer once it lets go.
+#[test]
+fn a_step_shows_what_it_holds_until_it_lets_go() {
+    use crate::{live::Guard, result::Status, state::RunLog};
+    let engine = engine("held", &Replay::new());
+    let collections = engine.collections();
+    let runs = Runs::new(|_| {});
+    let guard = Guard::start(&runs, RunLog::new(&engine.store, "Docs", Request::Backup, Trigger::Cli));
+    guard
+        .live
+        .steps(&[StepRecord { status: Status::Running, ..StepRecord::queued("snapshot to Docs".into(), Vec::new()) }]);
+    let run = super::Run::new(&collections[0], Some(guard.live.clone()));
+    let step = run.for_step(0);
+    let using = || guard.live.record().steps[0].holds.using.clone();
+    let held = engine.lock(&step, false, &[(collections[0].primary, super::holds::Use::Read)]).unwrap();
+    assert_eq!(using(), ["download", "repo:Docs"]);
+    drop(held);
+    assert_eq!(using(), Vec::<String>::new());
+}
