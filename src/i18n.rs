@@ -186,7 +186,7 @@ fn requested(var: impl Fn(&str) -> Option<String>) -> Option<Vec<LanguageIdentif
 
 /// Message `id` with `args`, which the macros check.
 pub(crate) fn text<const N: usize>(id: &str, args: [(&'static str, FluentValue<'static>); N]) -> String {
-    Language::current().0.text(id, (N > 0).then(|| args.into_iter().collect::<FluentArgs<'_>>()).as_ref())
+    Language::current().0.text(id, Some(&args.into_iter().collect()))
 }
 
 /// Message `id`, if the catalog has it: for ids made at run time, which tests check.
