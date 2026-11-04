@@ -48,6 +48,7 @@ pub(crate) enum Container {
 
 /// The container this process runs in: see [`Container`].
 #[cfg(any(feature = "desktop", feature = "self-update"))]
+#[cfg_attr(test, mutants::skip)] // Looks for files at the root of this computer, which tests cannot place.
 #[expect(clippy::disallowed_methods, reason = "looks for the containers' files")]
 pub(crate) fn container() -> Option<Container> {
     let [docker, podman] = container_markers()?;

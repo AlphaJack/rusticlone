@@ -885,3 +885,14 @@ fn a_step_shows_what_it_holds_until_it_lets_go() {
     drop(held);
     assert_eq!(using(), Vec::<String>::new());
 }
+
+/// A backup is of the whole collection: one of a single repository is refused.
+#[test]
+fn a_backup_of_one_repository_is_refused() {
+    use crate::request::{RestoreOptions, RunKind};
+    let engine = engine("backup-repo", &Replay::new());
+    let collections = engine.collections();
+    let usb = collections[0].repo("Docs-usb");
+    assert!(collections[0].requests(RunKind::Backup, usb, &RestoreOptions::default()).is_err());
+    assert!(collections[0].requests(RunKind::Backup, None, &RestoreOptions::default()).is_ok());
+}

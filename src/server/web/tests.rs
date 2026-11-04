@@ -522,3 +522,11 @@ fn a_log_shows_what_runs_and_its_commands() {
     let waiting = RunRow { stoppable: true, since: None, ..row };
     assert!(!LogView::build(&waiting, Some(record), (LogLines::default(), 0, false)).stoppable);
 }
+
+/// A size is its bytes for sorting, shown in human units. An unknown one says so.
+#[test]
+fn a_size_sorts_by_its_bytes() {
+    let shown = crate::fmt::human_size(4096);
+    assert_eq!(super::Size(Some(4096)).to_string(), format!(r#"<data value="4096">{shown}</data>"#));
+    assert_eq!(super::Size(None).to_string(), super::label::Label::Unknown.to_string());
+}
