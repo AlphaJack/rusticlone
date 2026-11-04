@@ -25,7 +25,7 @@ fn over_dbus(target: &str, page: bool) -> std::io::Result<()> {
     let call = async {
         let bus = zbus::Connection::session().await?;
         if page {
-            let options = std::collections::BTreeMap::<&str, zbus::zvariant::Value<'_>>::new();
+            let options = std::collections::BTreeMap::<&str, zbus::Variant<'_>>::new();
             let portal = "org.freedesktop.portal.Desktop";
             let args = ("", target, options);
             bus.call_method(

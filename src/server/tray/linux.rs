@@ -9,7 +9,7 @@ use ksni::{
     Handle, Icon, MenuItem, ToolTip, TrayMethods,
     menu::{CheckmarkItem, StandardItem},
 };
-use zbus::{Connection, MatchRule, MessageStream, message::Type, zvariant::OwnedValue};
+use zbus::{Connection, MatchRule, MessageStream, OwnedVariant, message::Type};
 
 use super::{
     Row, Switch,
@@ -72,7 +72,7 @@ async fn color_scheme(bus: Option<&Connection>) -> Option<u32> {
         .call_method(Some(PORTAL), PORTAL_PATH, Some(SETTINGS), "ReadOne", &(APPEARANCE, COLOR_SCHEME))
         .await
         .ok()?;
-    u32::try_from(reply.body().deserialize::<OwnedValue>().ok()?).ok()
+    u32::try_from(reply.body().deserialize::<OwnedVariant>().ok()?).ok()
 }
 
 /// Whether the panel is dark: GNOME's bar is whatever the color scheme, and most panels are when it says nothing.
@@ -86,10 +86,10 @@ async fn watch_theme(bus: Connection) {
     let changes = async {
         let rule = MatchRule::builder()
             .msg_type(Type::Signal)
-            .interface(SETTINGS)?
-            .member("SettingChanged")?
-            .arg(0, APPEARANCE)?
-            .build();
+            .interface(SETTINGS)
+            .member("SettingChanged")
+            .arg(0, APPEARANCE)
+            .build()?;
         MessageStream::for_match_rule(rule, &bus, None).await
     };
     let Ok(mut changes) = changes.await else { return };
