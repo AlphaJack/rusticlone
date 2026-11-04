@@ -334,10 +334,13 @@ mod tests {
     fn fewer_subsets_drop_those_owed_beyond_them() {
         let repo = "Docs".to_owned();
         let mut state = Ledger::default();
-        state.checks.entry(repo.clone()).or_default().owed.extend([2, 7]);
+        let checks = state.checks.entry(repo.clone()).or_default();
+        checks.owed.extend([2, 7]);
+        checks.failed.extend([3, 7]);
         state.apply(&Event::CheckTaken { repo: repo.clone(), of: 5 });
         assert_eq!(state.checks[&repo].taken, 2);
         assert!(state.checks[&repo].owed.is_empty());
+        assert_eq!(state.checks[&repo].failed, [3].into());
     }
 
     /// A failed subset is read again before the next one, and the check fails until that subset passes,
