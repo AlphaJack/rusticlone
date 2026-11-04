@@ -955,3 +955,14 @@ fn a_check_stopped_owes_its_subset() {
         assert_eq!((checks.owed.contains(&2), checks.failed.contains(&2)), (true, !stopped), "stopped: {stopped}");
     }
 }
+
+/// A forget on a repository it cannot list fails. Only a dry run, which creates no repository, has nothing to forget.
+#[test]
+fn a_forget_on_a_repository_it_cannot_list_fails() {
+    let replay = Replay::new().ok("Docs-usb", &["cat", "config"], &recorded("cat-config.stdout"));
+    let engine = engine("forget-unlisted", &replay);
+    let collections = engine.collections();
+    let run = super::Run::new(&collections[0], None);
+    engine.forget(&run, collections[0].repo("Docs-usb").unwrap(), &[]);
+    assert_eq!(run.failures(), 1, "{:?}", run.results_of(None));
+}
