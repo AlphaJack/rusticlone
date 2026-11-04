@@ -108,7 +108,8 @@ pub(super) async fn browse(
     blocking(move || {
         let Some(result) = with_repo(&app, &collection, &repo, |e, _, p| {
             // From the stored listing, without a rustic call.
-            let snapshot = match e.store.snapshots(&collection, &p.name).into_iter().find(|s| s.id == id) {
+            let mut listed = e.store.snapshots(&collection, &p.name).into_iter().flatten();
+            let snapshot = match listed.find(|s| s.id == id) {
                 Some(snapshot) => snapshot,
                 None => e.rustic.snapshot(&Ctx::default(), p, &id)?,
             };
@@ -253,7 +254,8 @@ pub(super) async fn diff(
     Path((collection, repo, id)): Path<(String, String, SnapshotId)>,
 ) -> Response {
     blocking(move || {
-        let listed = app.engine().store.snapshots(&collection, &repo);
+        // Not listed: nothing shows it.
+        let listed = app.engine().store.snapshots(&collection, &repo).ok_or(Error::NotFound(Missing::Snapshot))?;
         let this = listed.iter().find(|s| s.id == id).ok_or(Error::NotFound(Missing::Snapshot))?;
         let before = listed.iter().filter(|s| s.source() == this.source() && s.time < this.time).max_by_key(|s| s.time);
         let diff = before.map(|b| with_repo(&app, &collection, &repo, |e, _, p| e.rustic.diff(p, &b.id, &id)));

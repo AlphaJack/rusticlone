@@ -189,7 +189,7 @@ fn restore_form(app: &App, collection: String, q: RunForm) -> Result<RestoreForm
     let engine = app.engine();
     let j = engine.collection(&collection).ok_or(Missing::Collection)?;
     let snapshot_paths = || {
-        let listed = engine.store.snapshots(&collection, &q.repo);
+        let listed = engine.store.snapshots(&collection, &q.repo)?;
         Some(listed.into_iter().find(|sn| sn.id.as_str() == q.snapshot)?.paths)
     };
     let what = match (q.path.is_empty(), q.source, q.snapshot.is_empty()) {
