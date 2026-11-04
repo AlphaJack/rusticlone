@@ -266,3 +266,35 @@ impl RunRecord {
         self.scope = request.scope(&self.collection).map(str::to_owned);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    /// The first shape's requests had tags in Rust's case: a test restore's snapshot and a re-create are read in
+    /// this version's.
+    #[test]
+    fn old_request_tags_read_as_kebab_case() {
+        let migrated = |mut request: serde_json::Value| {
+            kebab_request(&mut request);
+            request
+        };
+        assert_eq!(
+            migrated(json!({"TestRestore": [null, {"Newest": null}]})),
+            json!({"test-restore": [null, {"newest": null}]})
+        );
+        assert_eq!(
+            migrated(json!({"Recreate": {"repo": "Docs", "from": null}})),
+            json!({"re-create": {"repo": "Docs", "from": null}})
+        );
+    }
+
+    /// A stored result keeps its level.
+    #[test]
+    fn a_stored_result_keeps_its_level() {
+        let failed = StepResult::Error { error: "unreachable".into() };
+        assert_eq!(Message::level(&ResultRecord::from(&failed)), Level::Failure);
+    }
+}
