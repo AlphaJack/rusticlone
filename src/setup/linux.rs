@@ -15,3 +15,12 @@ pub(super) const fn native<'a>(windows: &'a str, macos: &'a str, other: &'a str)
     _ = (windows, macos, other);
     other
 }
+
+#[cfg(test)]
+mod tests {
+    /// A user types here what they would on other systems than Windows and macOS.
+    #[test]
+    fn a_user_types_what_other_systems_take() {
+        assert_eq!(super::native(r"D:\backup", "/Volumes/USB/backup", "/mnt/usb/backup"), "/mnt/usb/backup");
+    }
+}
