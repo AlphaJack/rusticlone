@@ -88,6 +88,18 @@ pub(crate) fn read<T: Versioned + DeserializeOwned>(mut value: Value) -> Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only an enum's tag is renamed: an object of several keys is not one. Kebab case splits at each capital
+    /// after the first.
+    #[test]
+    fn only_a_tag_is_renamed_in_kebab_case() {
+        let mut tag = serde_json::json!({"TestRestore": [1]});
+        assert_eq!(kebab(&mut tag), Some(&mut serde_json::json!([1])));
+        assert_eq!(tag, serde_json::json!({"test-restore": [1]}));
+        let mut fields = serde_json::json!({"Repo": 1, "From": 2});
+        assert_eq!(kebab(&mut fields), None);
+        assert_eq!(fields, serde_json::json!({"Repo": 1, "From": 2}));
+    }
     use serde_json::json;
 
     #[derive(Debug, PartialEq, Serialize, serde::Deserialize)]

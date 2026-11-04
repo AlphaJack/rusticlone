@@ -456,6 +456,17 @@ impl Step {
 mod tests {
     use super::*;
 
+    /// The same backup, copy or prune joins the one queued. A restore or a check runs again. A restore's dry run is
+    /// shown as a test restore.
+    #[test]
+    fn some_requests_join_and_a_dry_restore_shows_as_a_test() {
+        let restore = Request::Restore(RestoreOptions::default());
+        let joins = [Request::Backup, Request::Prune(vec!["Docs".into()]), restore.clone(), Request::Check(Vec::new())];
+        assert_eq!(joins.map(|r| r.joins()), [true, true, false, false]);
+        let dry = Request::Restore(RestoreOptions { dry_run: true, ..RestoreOptions::default() });
+        assert_eq!([restore.shown(), dry.shown()], [RunKind::Restore, RunKind::TestRestore]);
+    }
+
     #[test]
     fn step_keys_round_trip() {
         for key in [
