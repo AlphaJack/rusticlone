@@ -82,6 +82,27 @@ fn each_folder_is_its_own_entry() {
     let entries: Vec<Vec<String>> = profile::parse("Documents", text).sources.into_iter().map(|s| s.sources).collect();
     assert_eq!(entries, [["/home/me/Documents"], ["/home/me/Desktop"]], "{text}");
     assert_eq!(text.matches("# What do you want to back up?").count(), 1, "{text}");
+    assert!(text.find("# What do you want to back up?") < text.find("/home/me/Documents"), "on the first: {text}");
+}
+
+/// Each schedule says which question it answers. Required options are written even when blank, so that the
+/// example shows what to fill in, and optional ones only when filled. Notifications are set only when asked for.
+#[test]
+fn profiles_say_what_they_answer_and_what_to_fill_in() {
+    let blank = target(Kind::Sftp, &[("endpoint", "ssh://nas:22"), ("key", "/home/me/.ssh/id")]);
+    let (primary, target_text) = (&blank.profiles()[0].1, &blank.profiles()[1].1);
+    let lines: Vec<&str> = primary.lines().collect();
+    let at = lines.iter().position(|l| l.starts_with(settings::BACKUP.key)).unwrap();
+    assert!(lines[at - 1].starts_with("# "), "{primary}");
+    assert!(target_text.contains("user = \"\"") && target_text.contains("key = \"/home/me/.ssh/id\""), "{target_text}");
+    let silent = &Setup { notify: "  ".into(), ..blank.clone() }.profiles()[0].1;
+    assert!(!silent.contains(settings::NOTIFY.key), "{silent}");
+    let notified = Setup { notify: " json://localhost/hook ".into(), ..blank }.profiles();
+    assert!(
+        notified[0].1.contains(&format!("{} = \"json://localhost/hook\"", settings::NOTIFY.key)),
+        "{}",
+        notified[0].1
+    );
 }
 
 #[test]
