@@ -20,6 +20,13 @@
       "groupName": "github actions"
     },
     {
+      "description": "crate bumps are invisible to users, so they stay out of the changelog; rustic's still shows",
+      "matchDatasources": [
+        "crate"
+      ],
+      "semanticCommitType": "chore"
+    },
+    {
       "description": "dist generates release.yml; update it with `dist init` instead",
       "matchFileNames": [
         ".github/workflows/release.yml"
