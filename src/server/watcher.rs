@@ -196,6 +196,29 @@ mod tests {
         assert_eq!(changed(&locks, false, &dirs, &runs), File::Other);
     }
 
+    /// A profile's data changed: it is read again, as when one appears. A file renamed away from a profile changed the
+    /// listing only then. The log of a run in another process shows on its page. One of this process's tells it itself.
+    #[test]
+    fn a_change_asks_what_its_file_needs() {
+        use notify::event::{CreateKind, DataChange};
+        let (profiles, runs) = (Path::new("/profiles"), Path::new("/state").join("runs"));
+        let dirs = [profiles.to_owned()];
+        let data = EventKind::Modify(ModifyKind::Data(DataChange::Content));
+        let create = EventKind::Create(CreateKind::File);
+        let here = |collection: &str| if collection == "Docs" { vec![17] } else { Vec::new() };
+        let (toml, old, state) =
+            (profiles.join("Docs.toml"), profiles.join("Docs.toml.old"), Path::new("/state").join("state.redb"));
+        let (own, other, pics) =
+            (runs.join("Docs").join("17.log"), runs.join("Docs").join("18.log"), runs.join("Pics").join("17.log"));
+        assert_eq!(react(&toml, data, &dirs, &runs, here), React::Reload);
+        assert_eq!(react(&old, data, &dirs, &runs, here), React::Nothing);
+        assert_eq!(react(&old, create, &dirs, &runs, here), React::Reload);
+        assert_eq!(react(&own, data, &dirs, &runs, here), React::Nothing);
+        assert_eq!(react(&other, data, &dirs, &runs, here), React::Page("Docs"));
+        assert_eq!(react(&pics, data, &dirs, &runs, here), React::Page("Pics"));
+        assert_eq!(react(&state, data, &dirs, &runs, here), React::State);
+    }
+
     /// A change of the state shows on the pages of the collections it wrote to, and on every page when it wrote to
     /// all. What is due may have changed when it wrote to all, or when a run started or ended.
     #[test]
