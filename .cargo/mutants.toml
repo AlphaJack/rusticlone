@@ -13,9 +13,6 @@ exclude_globs = [
   "src/server/desktop/headless.rs",
 ]
 
-# `|` and `^` give the same value for flags whose bits do not overlap, as in a constant that names a set of them.
-exclude_re = [': replace \| with \^$']
-
 # Mutants dealt out one by one, so that shards finish together: in source order, those of slow files share a shard.
 sharding = "round-robin"
 
