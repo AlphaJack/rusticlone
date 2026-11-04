@@ -397,10 +397,8 @@ async fn run(build: Build, listen: &str, open: bool, tray: Option<Tray>) -> Resu
         let mut stopping = stopping;
         _ = stopping.wait_for(|s| *s).await;
     }));
-    let mut hangups = Hangups::catch();
+    let (mut hangups, mut interrupted) = (Hangups::catch(), std::pin::pin!(interrupted()));
     report(Phase::Ready);
-
-    let mut interrupted = std::pin::pin!(interrupted());
     loop {
         let scheduler = app.clone();
         let next = tokio::task::spawn_blocking(move || {
