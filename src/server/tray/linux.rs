@@ -160,7 +160,8 @@ mod tests {
     use super::*;
     use crate::log::Level;
 
-    /// A failing collection, a profile that cannot be read and a switch that is on. Clicks are kept in `clicks`.
+    /// A failing collection, a profile that cannot be read, a switch that is on and one whose state is unknown. Clicks
+    /// are kept in `clicks`.
     fn shown(clicks: &Arc<Mutex<Vec<Click>>>) -> Shown {
         let clicks = Arc::clone(clicks);
         let row = |label: &str, level, url: Option<&str>| Row { label: label.into(), level, url: url.map(Into::into) };
@@ -170,7 +171,7 @@ mod tests {
                 row("docs: failing", Level::Failure, Some("http://web/docs")),
                 row("broken", Level::Warning, None),
             ],
-            switches: vec![(Switch::AtLogin, Some(true))],
+            switches: vec![(Switch::AtLogin, Some(true)), (Switch::AtLogin, None)],
             dark: true,
             run: Arc::new(move |click| clicks.lock().push(click)),
         }
