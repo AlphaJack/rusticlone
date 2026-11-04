@@ -3,13 +3,14 @@
 use super::Phase;
 
 /// Ctrl-C, or Ctrl-Break, which unlike Ctrl-C can be sent to one process group.
-pub(super) async fn signal() {
-    match tokio::signal::windows::ctrl_break() {
-        Ok(mut ctrl_break) => tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            _ = ctrl_break.recv() => {}
-        },
-        Err(_) => _ = tokio::signal::ctrl_c().await,
+pub(super) fn signal() -> impl Future<Output = ()> {
+    let (mut ctrl_c, mut ctrl_break) =
+        (tokio::signal::windows::ctrl_c().ok(), tokio::signal::windows::ctrl_break().ok());
+    async move {
+        tokio::select! {
+            () = async { if let Some(c) = ctrl_c.as_mut() { c.recv().await; } else { std::future::pending::<()>().await } } => {}
+            () = async { if let Some(b) = ctrl_break.as_mut() { b.recv().await; } else { std::future::pending::<()>().await } } => {}
+        }
     }
 }
 

@@ -2,15 +2,22 @@
 
 use super::Phase;
 
-/// SIGINT or SIGTERM.
-pub(super) async fn signal() {
-    use tokio::signal::unix::{SignalKind, signal};
-    match signal(SignalKind::terminate()) {
-        Ok(mut term) => tokio::select! {
-            _ = tokio::signal::ctrl_c() => {}
-            _ = term.recv() => {}
-        },
-        Err(_) => _ = tokio::signal::ctrl_c().await,
+/// SIGINT or SIGTERM, caught from the call: one that comes before the wait starts still stops the server as asked,
+/// rather than killing it.
+pub(super) fn signal() -> impl Future<Output = ()> {
+    use tokio::signal::unix::{Signal, SignalKind, signal};
+    async fn next(signal: Option<&mut Signal>) {
+        match signal {
+            Some(signal) => _ = signal.recv().await,
+            None => std::future::pending().await,
+        }
+    }
+    let (mut term, mut int) = (signal(SignalKind::terminate()).ok(), signal(SignalKind::interrupt()).ok());
+    async move {
+        tokio::select! {
+            () = next(term.as_mut()) => {}
+            () = next(int.as_mut()) => {}
+        }
     }
 }
 
