@@ -175,6 +175,26 @@ fn docs_and_mail_backed_up() -> Sandbox {
     sb
 }
 
+/// A restore of every source from its newest snapshot, as on a new computer, is the collection's last backup: the
+/// next one continues from there. Not one source asked for, nor a dry run.
+#[test]
+fn a_whole_restore_counts_as_the_last_backup() {
+    let restored = |sb: &Sandbox, args: &[&str]| {
+        sb.remove("store");
+        sb.remove("source/docs");
+        sb.run(args).assert_exit(0);
+        // The backup step's last attempt, which a backup or a whole restore records.
+        !sb.run(&["collections"]).json()["collections"][0]["snapshot"].is_null()
+    };
+    let sb = docs_with_remote("");
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    let docs = sb.path("source/docs").display().to_string();
+    assert!(!restored(&sb, &["restore", "--all", "--dry-run"]), "a dry run");
+    assert!(!restored(&sb, &["restore", "--all", "--source", &docs]), "one source asked for");
+    assert!(restored(&sb, &["restore", "--all"]), "every source");
+}
+
 /// Safe at every boot: existing paths stay as they are, even if changed since; missing ones come back.
 #[test]
 fn restoring_what_is_missing_leaves_the_rest() {
