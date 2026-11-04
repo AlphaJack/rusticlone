@@ -37,15 +37,19 @@ pub(super) fn stop_on_request() {
 #[cfg(feature = "desktop")]
 pub(super) static STOP: tokio::sync::Notify = tokio::sync::Notify::const_new();
 
-/// SIGINT or SIGTERM, Ctrl-C or Ctrl-Break on Windows, or [`STOP`].
-pub(super) async fn interrupted() {
-    #[cfg(feature = "desktop")]
-    tokio::select! {
-        () = imp::signal() => {}
-        () = STOP.notified() => {}
+/// SIGINT or SIGTERM, Ctrl-C or Ctrl-Break on Windows, or [`STOP`]. Caught from the call, so the server calls it
+/// before it says it is ready: a stop asked right then is not missed.
+pub(super) fn interrupted() -> impl Future<Output = ()> {
+    let signal = imp::signal();
+    async move {
+        #[cfg(feature = "desktop")]
+        tokio::select! {
+            () = signal => {}
+            () = STOP.notified() => {}
+        }
+        #[cfg(not(feature = "desktop"))]
+        signal.await;
     }
-    #[cfg(not(feature = "desktop"))]
-    imp::signal().await;
 }
 
 #[derive(Clone, Copy)]
