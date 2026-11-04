@@ -1062,3 +1062,25 @@ fn the_next_time_is_after_now() {
     let (_, next) = engine.agenda(now);
     assert_eq!(next, None);
 }
+
+/// A run that stops creates no target: a target it cannot list then may only be out of reach for a moment.
+#[cfg(feature = "server")]
+#[test]
+fn a_stopped_copy_creates_no_target() {
+    use crate::{live::Guard, state::RunLog};
+    let replay = Replay::new().ok("Docs", &["cat", "config"], &recorded("cat-config.stdout")).ok(
+        "Docs",
+        &["snapshots", "--json"],
+        &recorded("snapshots.stdout"),
+    );
+    let engine = engine("copy-stopped", &replay);
+    let collections = engine.collections();
+    let runs = Runs::new(|_| {});
+    let guard = Guard::start(&runs, RunLog::new(&engine.store, "Docs", Request::Copy("Docs-usb".into()), Trigger::Cli));
+    guard.live.cancel();
+    let run = super::Run::new(&collections[0], Some(guard.live.clone()));
+    engine.copy_step(&run, collections[0].repo("Docs-usb").unwrap());
+    let calls = replay.calls();
+    assert!(calls.iter().any(|c| c.contains("Docs-usb snapshots")), "it tried to list it: {calls:?}");
+    assert!(!calls.iter().any(|c| c.ends_with("--init")), "{calls:?}");
+}
