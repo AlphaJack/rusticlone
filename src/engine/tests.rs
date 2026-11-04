@@ -785,3 +785,39 @@ fn a_check_that_does_not_run_owes_its_subset() {
     assert_eq!(claimed(&engine), first);
     assert_eq!(claimed(&engine), Some(Reading::Subset { n: 2, of: 3 }));
 }
+
+/// A snapshot of `bytes` from `docs`, made at `time`, with an id of its own.
+fn sized(id: u32, time: &str, bytes: u64) -> crate::rustic::Snapshot {
+    serde_json::from_value(serde_json::json!({
+        "id": format!("{id:08x}"),
+        "time": time,
+        "paths": ["/home/me/docs"],
+        "hostname": "laptop",
+        "original": null,
+        "summary": {"total_bytes_processed": bytes},
+    }))
+    .unwrap()
+}
+
+/// A source shrank when an older snapshot is more than a hundred times the newest. Exactly a hundred times is not.
+#[test]
+fn a_source_shrank_past_a_hundredth() {
+    let newest = sized(1, "2026-10-16T03:00:00Z", 1 << 20);
+    let (equal, larger) = (sized(2, "2026-10-15T03:00:00Z", 100 << 20), sized(3, "2026-10-14T03:00:00Z", 101 << 20));
+    let snapshots = [newest, equal, larger];
+    let shrunk = super::snapshots::shrunk(&snapshots);
+    let held: Vec<Vec<u32>> = shrunk
+        .iter()
+        .map(|(_, held)| held.iter().map(|s| u32::from_str_radix(s.id.as_str(), 16).unwrap()).collect())
+        .collect();
+    assert_eq!(held, [[3]]);
+}
+
+/// Of two snapshots of a source made at once, the first listed is the newest.
+#[test]
+fn the_first_of_two_at_once_is_the_newest() {
+    let snapshots = [sized(1, "2026-10-16T03:00:00Z", 1), sized(2, "2026-10-16T03:00:00Z", 2)];
+    let newest = super::snapshots::newest_by_source(&snapshots);
+    let ids: Vec<&str> = newest.values().map(|s| s.id.as_str()).collect();
+    assert_eq!(ids, ["00000001"]);
+}
