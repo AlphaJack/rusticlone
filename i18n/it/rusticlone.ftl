@@ -340,6 +340,7 @@ notification-invalid-urls = URL di notifica non valido: { $urls }
 notification-no-urls = nessun URL di notifica: imposta { $key }
 # Il titolo: `nas: Docs ora è in errore`.
 notification-title = { $host }: { $collection } ora è { level-word }
+notification-title-unnamed = { $collection } ora è { level-word }
 notification-test =
     Notifica di prova di { $name }
     { $emoji } Funziona!
@@ -459,6 +460,7 @@ button-cron-syntax = Sintassi cron
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 
 label-every-collection = Ogni raccolta
+label-this-computer = questo computer
 label-unknown = { repo-status-unknown }
 label-error = errore
 label-live = live

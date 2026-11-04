@@ -124,7 +124,7 @@ fn profiles_read_back_as_written() {
     assert_eq!(Setup { target: Kind::None, ..setup.clone() }.profiles()[0].0, "Documents.toml");
     let same = Setup { target: Kind::Local, ..setup.clone() };
     assert_eq!(same.profile_name(Role::Target), "Documents-local-copy");
-    let host = crate::sys::hostname().split('.').next().unwrap_or_default();
+    let host = crate::sys::hostname().and_then(|h| h.split('.').next()).unwrap_or_default();
     assert!(primary.contains(&format!("[backup]\nhost = \"{host}\"")), "{primary}");
     let p = profile::parse("Documents-local", primary);
     assert!(p.is_backup_profile() && p.has_keep && p.targets == ["Documents-sftp"]);

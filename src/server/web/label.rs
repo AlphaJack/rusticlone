@@ -116,6 +116,8 @@ pub(super) enum Button<'a> {
 #[derive(Clone, Copy, crate::i18n::Fluent)]
 pub(super) enum Label<'a> {
     EveryCollection,
+    /// In place of a computer's name, which the system cannot tell.
+    ThisComputer,
     Unknown,
     Error,
     /// What `app.js` shows: the live dot's states.

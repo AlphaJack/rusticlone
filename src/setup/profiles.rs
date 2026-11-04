@@ -66,7 +66,7 @@ impl Setup {
         });
         let mut backup = Table::new();
         // Without the domain that each network gives it, which would start a new snapshot group there.
-        if let Some(host) = sys::hostname().split('.').next().filter(|h| !h.is_empty()) {
+        if let Some(host) = sys::hostname().and_then(|h| h.split('.').next()).filter(|h| !h.is_empty()) {
             backup["host"] = value(host);
         }
         backup["snapshots"] = Item::ArrayOfTables(snapshots.collect());
