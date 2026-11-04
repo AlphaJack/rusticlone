@@ -44,7 +44,7 @@ jobs:
           shared-key: mutants
           save-if: ${{ github.event_name != 'pull_request' }}
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           tool: cargo-nextest
       - name: Build the tests
@@ -79,7 +79,7 @@ jobs:
           shared-key: mutants
           save-if: false
       - name: Install cargo-nextest, cargo-mutants and cargo-binstall
-        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           tool: cargo-nextest,cargo-mutants,cargo-binstall
       # The rustic pinned in Cargo.toml, which the integration tests run.
