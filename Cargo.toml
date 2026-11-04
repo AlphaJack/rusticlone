@@ -111,7 +111,7 @@ ring = "0.17.14"
 sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
 fluent = "0.17.0"
 # Picks the catalog for the languages asked for, and a page's from its Accept-Language header.
-fluent-langneg = "0.13.1"
+fluent-langneg = "0.14.0"
 unic-langid = "0.9.6"
 # The languages that macOS's and Windows's settings list, when no LANG or LC_* variable asks for one.
 sys-locale = "0.3.2"
