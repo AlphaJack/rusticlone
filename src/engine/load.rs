@@ -236,3 +236,20 @@ fn resolve_hooked(store: &Store, p: &RusticProfile) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /// A source that a hook creates takes the paths learned in an earlier run, as its profile is read.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "removes the test's state")]
+    fn a_hooked_source_takes_the_paths_learned_before() {
+        let store = crate::state::Store::at(crate::sys::test_dir("resolve-hooked")).unwrap();
+        let config = "[repository]\nrepository = '/backup'\npassword = 'x'\n[[backup.snapshots]]\nsources = ['not yet']\nhooks = { run-before = ['mount'] }\n";
+        let profile = crate::profile::parse("Docs", config);
+        let learned = ["/mnt/docs".to_owned()];
+        store.set_hooked_paths("Docs", &profile.sources[0].sources, Some(&learned)).unwrap();
+        super::resolve_hooked(&store, &profile);
+        assert_eq!(profile.sources[0].paths(), learned);
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+}
