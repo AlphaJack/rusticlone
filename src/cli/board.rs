@@ -108,6 +108,7 @@ fn title(name: &str) -> &str {
 }
 
 /// Shows `runs` as queued until they start.
+#[cfg_attr(test, mutants::skip)] // Only a terminal's board shows them, and tests have none.
 pub(super) fn queued<'a>(runs: impl IntoIterator<Item = &'a RunRecord>) {
     if BOARD.runs.get().is_some() {
         BOARD.queued.lock().extend(runs.into_iter().map(|r| ((r.collection.clone(), r.id), r.label.clone())));
@@ -116,6 +117,7 @@ pub(super) fn queued<'a>(runs: impl IntoIterator<Item = &'a RunRecord>) {
 }
 
 /// Stops showing `run` as queued: it ended, perhaps without starting.
+#[cfg_attr(test, mutants::skip)] // Only a terminal's board shows them, and tests have none.
 pub(super) fn ended(run: &RunRecord) {
     if BOARD.queued.lock().remove(&(run.collection.clone(), run.id)).is_some() {
         draw();
@@ -176,6 +178,7 @@ pub(super) fn steps<M: Message + Serialize>(
 }
 
 /// Prints `messages` below `Docs: heading`.
+#[cfg_attr(test, mutants::skip)] // Draws in a terminal, which tests have none of.
 fn section(collection: &str, heading: &str, messages: &[&dyn Message]) {
     log::runs(Vec::new(), &section_lines(collection, heading, messages));
 }
