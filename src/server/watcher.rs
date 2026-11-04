@@ -49,17 +49,13 @@ pub(super) fn watch_files(state: &Path, app: &Arc<App>, reload: &Arc<Reload>) ->
         if matches!(event.kind, EventKind::Access(_)) {
             return;
         }
-        // macOS reports a profile renamed to `Docs.toml.old` as the creation of that file only.
-        let listing_changed = !matches!(event.kind, EventKind::Modify(ModifyKind::Data(_) | ModifyKind::Metadata(_)));
+        let here = |collection: &str| app.runs.of(collection).iter().map(|l| l.id).collect();
         for path in &event.paths {
-            match changed(path, listing_changed, &dirs, &runs) {
-                File::Profile => reload.changed(path),
-                // The runs of this process tell their pages as they log.
-                File::RunLog { collection, id } if !app.runs.of(collection).iter().any(|l| Some(l.id) == id) => {
-                    app.pages.changed_of(collection);
-                }
-                File::RunLog { .. } | File::Other => {}
-                File::State => {
+            match react(path, event.kind, &dirs, &runs, here) {
+                React::Reload => reload.changed(path),
+                React::Page(collection) => app.pages.changed_of(collection),
+                React::Nothing => {}
+                React::State => {
                     let changes = app.engine().store.changes();
                     let mut seen = seen.lock();
                     let (pages, due) = shown(&seen, &changes);
@@ -130,6 +126,39 @@ fn changed<'a>(path: &'a Path, listing_changed: bool, dirs: &[PathBuf], runs: &P
         return File::RunLog { collection, id: id.and_then(|id| id.parse().ok()) };
     }
     if path.file_name().is_some_and(|f| f == "state.redb") { File::State } else { File::Other }
+}
+
+/// What the server does about a file that changed.
+#[derive(Debug, PartialEq)]
+enum React<'a> {
+    /// Reads the profiles again.
+    Reload,
+    /// Shows a run's log that another process writes, on its collection's page.
+    Page(&'a str),
+    /// Reads the state again.
+    State,
+    Nothing,
+}
+
+/// What a change of `kind` to `path` asks of the server. `here`: the ids of this process's runs of a collection,
+/// which tell their pages as they log.
+fn react<'a>(
+    path: &'a Path,
+    kind: EventKind,
+    dirs: &[PathBuf],
+    runs: &Path,
+    here: impl Fn(&str) -> Vec<i64>,
+) -> React<'a> {
+    // macOS reports a profile renamed to `Docs.toml.old` as the creation of that file only.
+    let listing_changed = !matches!(kind, EventKind::Modify(ModifyKind::Data(_) | ModifyKind::Metadata(_)));
+    match changed(path, listing_changed, dirs, runs) {
+        File::Profile => React::Reload,
+        File::RunLog { collection, id } if !here(collection).iter().any(|&run| Some(run) == id) => {
+            React::Page(collection)
+        }
+        File::RunLog { .. } | File::Other => React::Nothing,
+        File::State => React::State,
+    }
 }
 
 /// The pages that a change of the state from `seen` to `now` shows on: the collections whose writes changed, and
