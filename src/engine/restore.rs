@@ -201,7 +201,8 @@ impl Engine {
             })
         };
         let mut done = attempt(src, &picks);
-        if options.from.is_none() && !options.dry_run {
+        // A repository asked for is the only one ranked: there is no other to fall back to.
+        if !options.dry_run {
             for (next, next_picks) in ranked.filter(|(p, _)| p.name != src.name) {
                 let Err(e) = &done else { break };
                 // Only what rustic failed to read: another repository cannot help a folder this computer refuses.
