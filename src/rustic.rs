@@ -26,6 +26,8 @@ pub(crate) use bin::{TESTED, Untested};
 pub(crate) use bin::{downloaded, name, parse_version, pinned};
 pub(crate) use cli::Cli;
 use cli::shell_word;
+#[cfg(test)]
+pub(crate) use commands::PlannedSnapshot;
 use commands::ok;
 pub(crate) use commands::tree_path;
 pub(crate) use commands::{BackupPlan, Reading, RestorePlan};

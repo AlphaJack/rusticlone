@@ -1017,3 +1017,30 @@ fn hooked_sources_pick_the_newest_unexplained_snapshots() {
     assert_eq!(ids(2), Some(vec!["00000003".to_owned(), "00000002".to_owned()]));
     assert_eq!(ids(4), None, "three sources for four");
 }
+
+/// A first backup after a reinstall is held back for the sources that have snapshots of this computer, and that it
+/// would not back up or would save empty. Another computer's snapshot, or another source's, does not count.
+#[test]
+fn a_backup_is_held_back_for_the_sources_it_would_empty() {
+    use crate::rustic::{BackupPlan, PlannedSnapshot};
+    let config = "[repository]\nrepository = '/backup'\npassword = 'x'\n[backup]\nhost = 'laptop'\n\
+        [[backup.snapshots]]\nsources = ['docs']\nas-path = '/docs'\n\
+        [[backup.snapshots]]\nsources = ['mail']\nas-path = '/mail'\n";
+    let profile = profile::parse("Docs", config);
+    let snapshot = |host: &str, path: &str| -> crate::rustic::Snapshot {
+        serde_json::from_value(serde_json::json!({
+            "id": "00000001", "time": "2026-10-16T03:00:00Z", "paths": [path], "hostname": host
+        }))
+        .unwrap()
+    };
+    let paths = |kept: &[&profile::Sources]| kept.iter().flat_map(|s| s.paths()).collect::<Vec<_>>();
+    let kept = super::backup::kept(&profile.sources, &[snapshot("laptop", "/docs"), snapshot("desktop", "/mail")]);
+    assert_eq!(paths(&kept), ["/docs"]);
+    assert!(super::backup::kept(&profile.sources, &[snapshot("laptop", "/music")]).is_empty());
+    let both = super::backup::kept(&profile.sources, &[snapshot("laptop", "/docs"), snapshot("laptop", "/mail")]);
+    let planned = |path: &str, files| PlannedSnapshot { paths: vec![path.into()], files, bytes: 0 };
+    let plan = BackupPlan { snapshots: vec![planned("/docs", 3), planned("/mail", 0)], not_backed_up: Vec::new() };
+    assert_eq!(super::backup::emptied(&both, &plan), ["/mail"]);
+    let failed = BackupPlan { snapshots: Vec::new(), not_backed_up: vec![("docs,other".into(), "gone".into())] };
+    assert_eq!(super::backup::emptied(&both, &failed), ["/docs"]);
+}
