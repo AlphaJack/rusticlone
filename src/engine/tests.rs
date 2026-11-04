@@ -966,3 +966,33 @@ fn a_forget_on_a_repository_it_cannot_list_fails() {
     engine.forget(&run, collections[0].repo("Docs-usb").unwrap(), &[]);
     assert_eq!(run.failures(), 1, "{:?}", run.results_of(None));
 }
+
+/// A source that a hook creates learns from the one snapshot that no other source explains. With more of them than
+/// such sources, the order would not tell which is whose: none learns.
+#[test]
+fn a_hooked_source_learns_from_the_one_snapshot_left() {
+    let config = "[repository]\nrepository = '/backup'\npassword = 'x'\n\
+        [[backup.snapshots]]\nsources = ['docs']\nas-path = '/docs'\n\
+        [[backup.snapshots]]\nsources = ['not yet']\nhooks = { run-before = ['mount'] }\n";
+    let profile = profile::parse("Docs", config);
+    let snapshot = |id: u32, path: &str| -> crate::rustic::Snapshot {
+        serde_json::from_value(serde_json::json!({
+            "id": format!("{id:08x}"), "time": "2026-10-16T03:00:00Z", "paths": [path], "hostname": "laptop"
+        }))
+        .unwrap()
+    };
+    let (docs, mounted, other) = (snapshot(1, "/docs"), snapshot(2, "/mnt/docs"), snapshot(3, "/mnt/other"));
+    let paired = |snapshots: &[crate::rustic::Snapshot]| -> Vec<Vec<String>> {
+        super::backup::learned(&profile.sources, snapshots)
+            .into_iter()
+            .map(|(s, sn)| [s.sources.clone(), sn.paths.clone()].concat())
+            .collect()
+    };
+    assert_eq!(paired(&[docs.clone(), mounted.clone()]), [["not yet", "/mnt/docs"]]);
+    assert!(paired(&[docs.clone(), mounted, other]).is_empty(), "two left for one source");
+    let unhooked = profile::parse(
+        "Docs",
+        "[repository]\nrepository = '/backup'\npassword = 'x'\n[[backup.snapshots]]\nsources = ['/home/me/docs']\n",
+    );
+    assert!(super::backup::learned(&unhooked.sources, &[docs]).is_empty(), "no source to learn");
+}
