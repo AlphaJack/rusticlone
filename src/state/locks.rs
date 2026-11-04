@@ -143,3 +143,53 @@ impl Store {
         OpenOptions::new().create(true).truncate(false).write(true).open(self.lock_path(key))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{sync::mpsc, time::Duration};
+
+    use super::*;
+    use crate::state::tests::store;
+
+    /// A shared wait ends at once beside other shared locks, and only once an exclusive one is released.
+    #[test]
+    fn a_shared_wait_ends_once_no_exclusive_lock_is_held() {
+        let store = store("lock-blocking-test");
+        let (held, waiting) = (store.lock_file("repo").unwrap(), store.lock_file("repo").unwrap());
+        held.lock_shared().unwrap();
+        lock_blocking(&waiting, Mode::Shared).unwrap();
+        held.unlock().unwrap();
+        held.lock().unwrap();
+        let (done, ended) = mpsc::channel();
+        let waiter = thread::spawn(move || done.send(lock_blocking(&waiting, Mode::Shared).is_ok()).unwrap());
+        assert!(ended.recv_timeout(Duration::from_millis(100)).is_err(), "ended before the release");
+        held.unlock().unwrap();
+        assert!(ended.recv().unwrap());
+        waiter.join().unwrap();
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A run waits for the one ahead of it, showing the lock it waits for, and releases its locks once dropped.
+    #[test]
+    fn a_run_waits_for_the_one_ahead_then_holds_its_locks() {
+        let store = store("lock-ahead-test");
+        let (cx, ahead) = (Ctx::default(), store.lock_file("run:Docs:1").unwrap());
+        ahead.lock().unwrap();
+        let (told, waiting) = mpsc::channel();
+        let still = std::sync::atomic::AtomicBool::new(true);
+        thread::scope(|scope| {
+            let locking = scope.spawn(|| {
+                let behind = || Ok(still.load(std::sync::atomic::Ordering::Relaxed).then(|| "run:Docs:1".to_owned()));
+                store.lock(&cx, &[("Docs", Mode::Exclusive)], |busy| told.send(busy.to_owned()).unwrap(), behind)
+            });
+            assert_eq!(waiting.recv_timeout(Duration::from_secs(10)).expect("waits for the run ahead"), "Docs");
+            still.store(false, std::sync::atomic::Ordering::Relaxed);
+            ahead.unlock().unwrap();
+            let locks = locking.join().unwrap().unwrap();
+            assert_eq!(cx.held().len(), 1);
+            drop(locks);
+            assert!(cx.held().is_empty());
+        });
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+}

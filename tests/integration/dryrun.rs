@@ -30,6 +30,16 @@ fn files(sb: &Sandbox) -> BTreeMap<String, (u64, SystemTime)> {
     files
 }
 
+/// A dry run without a state reads a scratch one, removed as it ends.
+#[test]
+fn a_dry_run_without_a_state_leaves_no_scratch() {
+    let sb = docs_with_remote("");
+    assert!(!sb.path("store").join("state.redb").exists());
+    sb.run(&["backup", "--dry-run", "--all"]).assert_exit(0);
+    let scratch: Vec<_> = fs::read_dir(sb.path("tmp")).into_iter().flatten().flatten().map(|e| e.file_name()).collect();
+    assert_eq!(scratch, Vec::<std::ffi::OsString>::new());
+}
+
 #[test]
 fn dry_runs_change_no_file() {
     let sb = docs_with_remote("[forget]\nkeep-last = 1\n");
