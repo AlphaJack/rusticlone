@@ -720,6 +720,28 @@ fn leftovers(dir: &std::path::Path) -> Vec<String> {
     entries.map(|e| e.file_name().to_string_lossy().into_owned()).filter(|n| n.contains(NAME)).collect()
 }
 
+/// Under systemd, the server says when it is ready and when it stops.
+#[cfg(target_os = "linux")]
+#[test]
+fn the_server_tells_systemd_when_it_is_ready_and_stops() {
+    use std::os::unix::net::UnixDatagram;
+    fn said(socket: &UnixDatagram) -> String {
+        let mut said = [0; 256];
+        let n = socket.recv(&mut said).unwrap();
+        String::from_utf8_lossy(&said[..n]).into_owned()
+    }
+    let sb = docs_with_remote("");
+    // A socket's path is short: the sandbox's may be too long.
+    let path = std::env::temp_dir().join(format!("{NAME}-{}.sock", std::process::id()));
+    let socket = UnixDatagram::bind(&path).unwrap();
+    socket.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
+    let server = sb.server(&[("NOTIFY_SOCKET", path.to_str().unwrap())]);
+    assert_eq!(said(&socket), "READY=1");
+    drop(server);
+    assert_eq!(said(&socket), "STOPPING=1");
+    fs::remove_file(&path).unwrap();
+}
+
 /// `install` writes the unit and a drop-in that runs this executable with this `PATH`, enables it
 /// and restarts it. `uninstall` disables it and leaves nothing of it, and has nothing to do the second time.
 #[cfg(target_os = "linux")]

@@ -49,11 +49,13 @@ pub(super) fn report(phase: Phase) {
 }
 
 /// Windows's alone: systemd and launchd run the server as any process.
+#[cfg_attr(test, mutants::skip)] // Windows's alone.
 pub(super) fn as_service() -> bool {
     false
 }
 
 /// Windows's alone: [`as_service`] is never true here.
+#[cfg_attr(test, mutants::skip)] // Windows's alone.
 pub(super) fn run_service(serve: Box<dyn FnOnce() -> anyhow::Result<()> + Send>) -> anyhow::Result<()> {
     serve()
 }
