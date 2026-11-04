@@ -736,9 +736,9 @@ fn the_server_tells_systemd_when_it_is_ready_and_stops() {
     let socket = UnixDatagram::bind(&path).unwrap();
     socket.set_read_timeout(Some(Duration::from_secs(30))).unwrap();
     let server = sb.server(&[("NOTIFY_SOCKET", path.to_str().unwrap())]);
-    assert_eq!(said(&socket), "READY=1");
+    assert_eq!(said(&socket), "READY=1\n");
     drop(server);
-    assert_eq!(said(&socket), "STOPPING=1");
+    assert_eq!(said(&socket), "STOPPING=1\n");
     fs::remove_file(&path).unwrap();
 }
 
