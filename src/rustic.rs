@@ -28,7 +28,7 @@ pub(crate) use cli::Cli;
 use cli::shell_word;
 use commands::ok;
 pub(crate) use commands::tree_path;
-pub(crate) use commands::{Reading, RestorePlan};
+pub(crate) use commands::{BackupPlan, Reading, RestorePlan};
 #[cfg(feature = "server")]
 pub(crate) use contents::{Diff, Dirs, Found, Node, NodeKind, in_tree};
 #[cfg(feature = "server")]
