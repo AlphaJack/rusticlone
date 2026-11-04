@@ -38,24 +38,22 @@ pub(crate) fn system_bin_dir() -> PathBuf {
     PathBuf::from("/usr").join("local").join("bin")
 }
 
-/// What creating a file in a folder takes: writing to it and entering it.
-#[cfg(any(feature = "server", feature = "self-update"))]
-const CREATE: libc::c_int = libc::W_OK | libc::X_OK;
-
 /// Whether this process may create files in `dir`, or in the folder that creating `dir` would start from.
 /// Unix asks the kernel, which also counts read-only mounts and ACLs.
 #[cfg(any(feature = "server", feature = "self-update"))]
-#[expect(unsafe_code, reason = "faccessat reads the NUL-terminated path it is given")]
 pub(crate) fn writable(dir: &Path) -> bool {
-    use std::os::unix::ffi::OsStrExt;
+    use nix::{
+        errno::Errno,
+        fcntl::AtFlags,
+        unistd::{AccessFlags, faccessat},
+    };
+    // Writing to it and entering it.
+    let create = AccessFlags::W_OK.union(AccessFlags::X_OK);
     for dir in dir.ancestors() {
-        let Ok(path) = std::ffi::CString::new(dir.as_os_str().as_bytes()) else { return false };
-        // SAFETY: `path` is NUL-terminated and outlives the call.
-        if unsafe { libc::faccessat(libc::AT_FDCWD, path.as_ptr(), CREATE, libc::AT_EACCESS) } == 0 {
-            return true;
-        }
-        if std::io::Error::last_os_error().kind() != std::io::ErrorKind::NotFound {
-            return false;
+        match faccessat(nix::fcntl::AT_FDCWD, dir, create, AtFlags::AT_EACCESS) {
+            Ok(()) => return true,
+            Err(Errno::ENOENT) => {}
+            Err(_) => return false,
         }
     }
     false
