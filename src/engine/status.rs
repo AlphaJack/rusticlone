@@ -29,11 +29,9 @@ impl Engine {
         // Listed once, at the start, for the primary and for the targets' lag.
         let primary =
             LazyLock::new(|| self.list(&Run::new(collection, None), collection.primary).map_err(|e| format!("{e:#}")));
-        let lagged = repos.iter().any(|r| r.name != collection.name());
         std::thread::scope(|scope| {
-            if lagged {
-                scope.spawn(|| LazyLock::force(&primary));
-            }
+            // Started at once, beside the other repositories.
+            scope.spawn(|| LazyLock::force(&primary));
             each(repos, |repo| {
                 let run = Run::new(collection, None);
                 let (snapshots, stats) = std::thread::scope(|scope| {
