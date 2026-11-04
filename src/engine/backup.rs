@@ -67,10 +67,7 @@ impl Engine {
             return None;
         }
         let listed = self.list(run, collection.primary).ok()?;
-        let here = |src: &&Sources| {
-            listed.iter().any(|s| src.host == s.hostname && rustic::source_key(&src.paths()) == s.source())
-        };
-        let kept: Vec<&Sources> = collection.primary.sources.iter().filter(here).collect();
+        let kept = kept(&collection.primary.sources, &listed);
         if kept.is_empty() {
             return None;
         }
@@ -78,16 +75,7 @@ impl Engine {
             let _locks = self.lock(run, false, &[(collection.primary, Use::Read)]).ok()?;
             self.rustic.backup_plan(&run.cx, collection.primary).ok()?
         };
-        // Rustic names a failed source by its paths, joined with commas.
-        let failed = |src: &Sources| {
-            let named = |path: &String| path.split(',').any(|p| src.sources.iter().any(|s| s == p));
-            plan.not_backed_up.iter().any(|(path, _)| named(path))
-        };
-        let empty = |src: &Sources| {
-            let key = rustic::source_key(&src.paths());
-            plan.snapshots.iter().any(|s| s.files == 0 && rustic::source_key(&s.paths) == key)
-        };
-        let paths: Vec<String> = kept.into_iter().filter(|s| failed(s) || empty(s)).flat_map(Sources::paths).collect();
+        let paths = emptied(&kept, &plan);
         (!paths.is_empty()).then_some(StepResult::HeldBack { repo: collection.name().to_owned(), paths })
     }
 
@@ -288,4 +276,26 @@ pub(super) fn learned<'s, 'n>(sources: &'s [Sources], snapshots: &'n [Snapshot])
         return Vec::new();
     }
     unknown.into_iter().zip(theirs).collect()
+}
+
+/// The sources that have a snapshot of this computer in `listed`.
+pub(super) fn kept<'a>(sources: &'a [Sources], listed: &[Snapshot]) -> Vec<&'a Sources> {
+    let here = |src: &&Sources| {
+        listed.iter().any(|s| src.host == s.hostname && rustic::source_key(&src.paths()) == s.source())
+    };
+    sources.iter().filter(here).collect()
+}
+
+/// The paths of the `kept` sources that the planned backup would not back up, or would save empty.
+pub(super) fn emptied(kept: &[&Sources], plan: &rustic::BackupPlan) -> Vec<String> {
+    // Rustic names a failed source by its paths, joined with commas.
+    let failed = |src: &Sources| {
+        let named = |path: &String| path.split(',').any(|p| src.sources.iter().any(|s| s == p));
+        plan.not_backed_up.iter().any(|(path, _)| named(path))
+    };
+    let empty = |src: &Sources| {
+        let key = rustic::source_key(&src.paths());
+        plan.snapshots.iter().any(|s| s.files == 0 && rustic::source_key(&s.paths) == key)
+    };
+    kept.iter().copied().filter(|s| failed(s) || empty(s)).flat_map(Sources::paths).collect()
 }
