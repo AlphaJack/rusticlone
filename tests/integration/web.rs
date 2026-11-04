@@ -650,6 +650,19 @@ fn pages_are_in_the_accepted_language() {
     }
 }
 
+/// Behind a reverse proxy, every link starts where it serves the web UI. A page's live updates know what it shows
+/// already, by its hash, so that an unchanged page is not sent again.
+#[test]
+fn pages_link_below_the_proxy_and_know_what_they_show() {
+    let sb = docs_with_remote("");
+    let server = sb.server(&[]);
+    let page = server.get_with("/", &["X-Forwarded-Prefix: /backups"]).body;
+    let start = "hx-sse:connect=\"/backups/events?v=";
+    let (_, live) = page.split_once(start).unwrap_or_else(|| panic!("{page}"));
+    let hash = live.split("&amp;h=").nth(1).and_then(|h| h.split(['&', '"']).next()).unwrap();
+    assert!(hash.parse::<u64>().is_ok_and(|h| h != 0), "{live}");
+}
+
 /// Each check takes its subset when queued: the second reads the next subset, not the same one.
 #[test]
 fn checks_queued_in_a_row_read_different_subsets() {
