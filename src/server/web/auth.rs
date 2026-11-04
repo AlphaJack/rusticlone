@@ -213,10 +213,13 @@ impl PartialEq<str> for Token {
 struct Login<'a> {
     failed: bool,
     file: Option<&'a Path>,
+    /// The computer the token is on, by its name if the system can tell.
+    host: String,
 }
 
 fn login_form(app: &App, failed: bool, base: &Base) -> Response {
-    let main = render_str(&Login { failed, file: app.tokens.file.as_deref() }, base);
+    let host = crate::sys::hostname().map_or_else(|| super::Label::ThisComputer.to_string(), ToOwned::to_owned);
+    let main = render_str(&Login { failed, file: app.tokens.file.as_deref(), host }, base);
     let title = format!("{} | {}", Button::LogIn, super::APP_NAME);
     render(&Layout { title, live: None, logout: false, main }, base)
 }
