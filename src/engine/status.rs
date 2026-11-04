@@ -43,13 +43,11 @@ impl Engine {
                     };
                     (snapshots, crate::thread::joined(stats.join()))
                 });
-                // A target that cannot be listed is not in sync.
-                let lag = match &*primary {
-                    Ok(primary) if repo.name != collection.name() => {
-                        Some((primary, snapshots.as_ref().ok().map(|s| self.covered(collection, repo, primary, s))))
-                    }
-                    _ => None,
-                };
+                // A target that cannot be listed is not in sync. The primary has no lag.
+                let target = collection.targets.iter().any(|t| t.name == repo.name);
+                let lag = (primary.as_ref().ok().filter(|_| target)).map(|primary| {
+                    (primary, snapshots.as_ref().ok().map(|s| self.covered(collection, repo, primary, s)))
+                });
                 let info = snapshots.and_then(|snapshots| {
                     let stats = stats?;
                     Ok(RepoInfo { snapshots, stored: Some(stats.stored()), data: Some(stats.data()) })
