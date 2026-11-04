@@ -933,3 +933,25 @@ fn a_target_seen_before_is_unavailable_not_created() {
         assert_eq!((created, unavailable), (name == "never", name != "never"), "{name}: {:?}", report.results);
     }
 }
+
+/// A check that fails owes its subset: the next check reads it again. Only one that fails on its own, not as its run
+/// stops, counts as failed, until that subset passes.
+#[cfg(feature = "server")]
+#[test]
+fn a_check_stopped_owes_its_subset() {
+    use crate::{live::Guard, request::Step, rustic::Reading, state::RunLog};
+    for stopped in [true, false] {
+        let engine = engine(&format!("check-stopped-{stopped}"), &Replay::new());
+        let collections = engine.collections();
+        let runs = Runs::new(|_| {});
+        let guard = Guard::start(&runs, RunLog::new(&engine.store, "Docs", Request::Backup, Trigger::Cli));
+        if stopped {
+            guard.live.cancel();
+        }
+        let run = super::Run::new(&collections[0], Some(guard.live.clone()));
+        let check = Step::Check { repo: "Docs".into(), reading: Reading::Subset { n: 2, of: 5 } };
+        engine.maintain(&run, collections[0].primary, &check);
+        let checks = engine.store.load().checks["Docs"].clone();
+        assert_eq!((checks.owed.contains(&2), checks.failed.contains(&2)), (true, !stopped), "stopped: {stopped}");
+    }
+}
