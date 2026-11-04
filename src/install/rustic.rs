@@ -133,6 +133,13 @@ fn agreed(
 mod tests {
     use super::*;
 
+    /// This system's release is the one named for its system and architecture.
+    #[test]
+    fn this_systems_release_is_its_own() {
+        assert_eq!(target(), target_of(std::env::consts::OS, std::env::consts::ARCH));
+        assert!(target().is_some_and(|t| t.contains(std::env::consts::ARCH)), "{:?}", target());
+    }
+
     /// Each supported system and architecture has rustic's release built for it, and others have none.
     #[test]
     fn each_system_has_its_own_release() {
