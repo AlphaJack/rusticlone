@@ -896,3 +896,40 @@ fn a_backup_of_one_repository_is_refused() {
     assert!(collections[0].requests(RunKind::Backup, usb, &RestoreOptions::default()).is_err());
     assert!(collections[0].requests(RunKind::Backup, None, &RestoreOptions::default()).is_ok());
 }
+
+/// A target that a copy reached before, that was listed, or whose newest snapshot is known, is unavailable when it
+/// cannot be listed: only Re-create brings it back. One never seen is created.
+#[test]
+fn a_target_seen_before_is_unavailable_not_created() {
+    use crate::{
+        request::StepKey,
+        result::StepResult,
+        state::{Behind, Event},
+    };
+    let at = at("2026-10-16T03:00:00Z");
+    let copied = StepResult::InSync { target: "Docs-usb".into() };
+    let copy = StepKey::Copy("Docs".into(), "Docs-usb".into());
+    let seen: [(&str, Vec<Event>); 4] = [
+        ("never", Vec::new()),
+        ("copied", vec![Event::Attempted { key: copy, started: at, at, result: (&copied).into(), by: None }]),
+        (
+            "listed",
+            vec![Event::Lag { collection: "Docs".into(), target: "Docs-usb".into(), at, behind: Behind::Listed(None) }],
+        ),
+        ("newest", vec![Event::Newest { repo: "Docs-usb".into(), at }]),
+    ];
+    for (name, events) in seen {
+        let replay = Replay::new().ok("Docs", &["cat", "config"], &recorded("cat-config.stdout")).ok(
+            "Docs",
+            &["snapshots", "--json"],
+            &recorded("snapshots.stdout"),
+        );
+        let engine = engine(&format!("copy-seen-{name}"), &replay);
+        engine.store.apply(&events).unwrap();
+        let collections = engine.collections();
+        let report = asked(&engine, &collections[0], &Request::Copy("Docs-usb".into()));
+        let created = replay.calls().iter().any(|c| c.ends_with("--init"));
+        let unavailable = report.results[0].to_string().contains("Docs-usb is unavailable or deleted");
+        assert_eq!((created, unavailable), (name == "never", name != "never"), "{name}: {:?}", report.results);
+    }
+}
