@@ -170,3 +170,18 @@ fn profiles_read_back_as_written() {
     assert_eq!(profiles[1].0, "Documents-gdrive.toml");
     assert!(profiles[1].1.contains("repository = \"rclone:gdrive:backup\""), "{profiles:?}");
 }
+
+/// A user's setup notifies on their desktop, which a system service has none of. Passwords lose the spaces around
+/// them, as pasted.
+#[test]
+fn a_setup_notifies_on_the_desktop_and_trims_passwords() {
+    let desktop = super::answers::desktop();
+    if crate::sys::is_root() {
+        assert_eq!(desktop, None);
+    } else {
+        assert!(desktop.is_some_and(|url| !url.is_empty() && url.ends_with("://")), "{desktop:?}");
+    }
+    assert_eq!(Setup::default().notify, desktop.unwrap_or_default());
+    let pasted = Setup { password: " pw ".into(), target_password: "\tother\n".into(), ..Setup::default() };
+    assert_eq!([pasted.password(Role::Primary), pasted.password(Role::Target)], ["pw", "other"]);
+}
