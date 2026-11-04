@@ -387,10 +387,23 @@ fn repo_pages() {
     assert_eq!(primary.texts("tbody tr").len(), 2);
     assert!(primary.texts(".spinner").is_empty());
     assert_eq!(page("Docs-usb").texts("h1"), [format!("{} Docs-usb", synced())]);
+    // Where its own repository is.
+    assert_eq!(page("Docs-offsite").texts(".path code"), ["/srv/Docs-offsite"]);
     // Never listed: it is listed now, with nothing to show meanwhile.
     let unlisted = page("Docs-offsite");
     assert_eq!(unlisted.texts("h2 .spinner[title=listing]").len(), 1);
     assert!(unlisted.texts("tbody tr").is_empty());
+    // Its size is measured anew, after a run changed it or before it was ever measured.
+    let measuring = |change: fn(&mut Inventory)| {
+        let mut input = healthy();
+        if let Some(Listing::Listed(l)) = input.listings.get_mut("Docs") {
+            change(l);
+        }
+        Page::of(&RepoMain { repo: RepoView::build(input, "Docs") }).texts("h2 .spinner[title=listing]").len()
+    };
+    assert_eq!(measuring(|l| l.size_outdated = true), 1);
+    assert_eq!(measuring(|l| l.result.as_mut().unwrap().stored = None), 1);
+    assert_eq!(measuring(|_| {}), 0);
 }
 
 #[test]
