@@ -479,9 +479,9 @@ impl Store {
             .flatten()
     }
 
-    /// The snapshots of the last listing. Empty if it failed, or if the repository was never listed.
-    pub fn snapshots(&self, collection: &str, repo: &str) -> Vec<Snapshot> {
-        self.inventory(collection, repo).and_then(|l| l.result.ok()).map(|i| i.snapshots).unwrap_or_default()
+    /// The snapshots of the last listing. `None` if it failed, or if the repository was never listed.
+    pub fn snapshots(&self, collection: &str, repo: &str) -> Option<Vec<Snapshot>> {
+        self.inventory(collection, repo).and_then(|l| l.result.ok()).map(|i| i.snapshots)
     }
 
     /// Replaces the repository's listing for the collection.
