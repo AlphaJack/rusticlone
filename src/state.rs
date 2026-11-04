@@ -626,6 +626,20 @@ mod tests {
         Store::at(crate::sys::test_dir(name)).unwrap()
     }
 
+    /// The paths a hook's sources lead to are kept until they are no longer known. A store shows where it is.
+    #[test]
+    fn hooked_paths_are_kept_until_unknown() {
+        let store = store("hooked-paths-test");
+        let (sources, paths) = (["docs".to_owned()], ["/mnt/docs".to_owned()]);
+        assert_eq!(store.hooked_paths("Docs", &sources), None);
+        store.set_hooked_paths("Docs", &sources, Some(&paths)).unwrap();
+        assert_eq!(store.hooked_paths("Docs", &sources), Some(paths.to_vec()));
+        store.set_hooked_paths("Docs", &sources, None).unwrap();
+        assert_eq!(store.hooked_paths("Docs", &sources), None);
+        assert_eq!(format!("{store:?}"), format!("Store {{ dir: {:?}, dry_run: false, .. }}", store.dir));
+        fs::remove_dir_all(&store.dir).unwrap();
+    }
+
     #[test]
     fn checks_take_the_data_subsets_in_turn() {
         let a = store("subsets-test");
