@@ -338,7 +338,8 @@ fn a_recovery_notification_says_how_long_the_previous_level_lasted() {
     let elsewhere = "[repository]\nrepository = \"rest:http://backup/music\"\n[[backup.snapshots]]\nsources = [\"/music\"]\n[global.env]\nRUSTICLONE_NOTIFY_URLS = \"ntfy://ntfy.sh/music\"\n";
     let photos =
         "[repository]\nrepository = \"rest:http://backup/photos\"\n[[backup.snapshots]]\nsources = [\"/photos\"]\n";
-    let profiles = [("Docs", DOCS), ("Docs-usb", USB), ("Music", elsewhere), ("Photos", photos)];
+    let pics = photos.replace("photos", "pics");
+    let profiles = [("Docs", DOCS), ("Docs-usb", USB), ("Music", elsewhere), ("Photos", photos), ("Pics", &pics)];
     let engine = engine_of("notify-recovery", &Replay::new(), &profiles);
     let (key, at) = (StepKey::Snapshot("Docs".into()), engine.store.now());
     let result = StepResult::Error { error: "repository unreachable".into() };
@@ -349,7 +350,7 @@ fn a_recovery_notification_says_how_long_the_previous_level_lasted() {
         result: (&result).into(),
         by: None,
     };
-    engine.store.apply(&["Docs", "Music", "Photos"].map(failed)).unwrap();
+    engine.store.apply(&["Docs", "Music", "Photos", "Pics"].map(failed)).unwrap();
     let failing = Notified { level: Level::Failure, since: Some(at), ..Notified::default() };
     engine.store.update_notified("Docs", |_| failing.clone()).unwrap();
     let collection = &engine.collections()[0];
@@ -361,8 +362,51 @@ fn a_recovery_notification_says_how_long_the_previous_level_lasted() {
         (engine.store.now(), StepResult::BackedUp { repo: "Docs".into(), snapshots: vec![], new_repository: false });
     engine.store.apply(&[Event::Attempted { key, started: at, at, result: (&result).into(), by: None }]).unwrap();
     let text = engine.message(collection, &engine.status_of(collection), &failing);
-    let others = "🔴 1 other collection failing";
+    // Those notified at the same URLs: not Music.
+    let others = "🔴 2 other collections failing";
     assert_eq!(text, format!("{host}: Docs is now healthy\n🟢 Was failing for 2 days\n{others}\n"));
+    // Healthy before too: nothing lasted.
+    let healthy = Notified { level: Level::Success, since: Some(at), ..Notified::default() };
+    assert_eq!(
+        engine.message(collection, &engine.status_of(collection), &healthy),
+        format!("{host}: Docs is now healthy\n")
+    );
+}
+
+/// A level already notified is not sent again. Sends at the same level keep when it started.
+#[test]
+fn a_level_is_notified_once_from_when_it_started() {
+    use std::io::{Read, Write};
+
+    use crate::state::Notified;
+    let receiver = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("json://{}", receiver.local_addr().unwrap());
+    let answering = std::thread::spawn(move || {
+        for _ in 0..2 {
+            let (mut socket, _) = receiver.accept().unwrap();
+            let mut request = [0; 4096];
+            _ = socket.read(&mut request).unwrap();
+            write!(socket, "HTTP/1.1 204 Test\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        }
+    });
+    let docs = format!("{DOCS}[global.env]\n{} = \"{url}\"\n", crate::settings::NOTIFY.key);
+    let engine = engine_with("notify-once", &Replay::new(), &docs);
+    let collection = &engine.collections()[0];
+    // Notified at this level, with a failure left from an earlier one: nothing is sent, which would fail.
+    let refused = format!("{DOCS}[global.env]\n{} = \"json://127.0.0.1:1\"\n", crate::settings::NOTIFY.key);
+    let unsent = engine_with("notify-unsent", &Replay::new(), &refused);
+    let level = unsent.status_of(&unsent.collections()[0]).level;
+    let left = Notified { level, failures: 2, error: Some("refused".into()), ..Notified::default() };
+    unsent.store.update_notified("Docs", |_| left.clone()).unwrap();
+    unsent.notify(&unsent.collections()[0]);
+    let notified = unsent.store.notified("Docs");
+    assert_eq!((notified.level, notified.failures, notified.error), (level, 0, None));
+    engine.notify_now(collection, &mut |_| {}).unwrap();
+    let first = engine.store.notified("Docs").since;
+    engine.store.wait(std::time::Duration::from_hours(1), &|| false);
+    engine.notify_now(collection, &mut |_| {}).unwrap();
+    assert_eq!(engine.store.notified("Docs").since, first);
+    answering.join().unwrap();
 }
 
 /// Recorded once in `tests/fixtures/status.json`: what `/status` answers may gain keys, but every recorded
