@@ -453,14 +453,26 @@ fn line(mode: Mode, target: &str, level: Level, name: Option<&str>, message: &st
     }
 }
 
+/// Hands a line that goes to a command's tree to that command, if one draws it. Returns whether it did.
+#[cfg_attr(test, mutants::skip)] // Only a command in a terminal draws a tree, and tests have none.
+fn in_tree(out: &Out, level: Level, message: &str) -> bool {
+    #[cfg(any(feature = "desktop", feature = "self-update"))]
+    if *out == Out::Tree
+        && let Some(hooks) = *HOOKS.lock()
+    {
+        (hooks.logged)(level, message);
+        return true;
+    }
+    #[cfg(not(any(feature = "desktop", feature = "self-update")))]
+    let _ = (out, level, message);
+    false
+}
+
 fn write(target: &str, level: Level, name: Option<&str>, message: &str, extra: Value) {
     let mode = mode();
     let Some(out) = route(mode, target) else { return };
-    #[cfg(any(feature = "desktop", feature = "self-update"))]
-    if out == Out::Tree
-        && let Some(hooks) = *HOOKS.lock()
-    {
-        return (hooks.logged)(level, message);
+    if in_tree(&out, level, message) {
+        return;
     }
     let line = line(mode, target, level, name, message, extra);
     // A closed pipe must not stop a backup.
