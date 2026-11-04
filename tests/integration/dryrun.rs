@@ -3,7 +3,7 @@
 
 use std::{collections::BTreeMap, fs, path::Path, time::SystemTime};
 
-use crate::common::{KEEP, Sandbox, docs_with_remote};
+use crate::common::{KEEP, Sandbox, cmd, docs_with_remote, toml_str};
 
 /// Each file below the sources, the repositories and the state, but its locks, with its size and
 /// modification time.
@@ -153,4 +153,35 @@ fn a_dry_run_forgets_nothing_in_a_target_it_would_create() {
     sb.run(&["backup", "--dry-run", "--all"])
         .assert_exit(0)
         .assert_result("would-forget", serde_json::json!({"repo": "Docs-remote", "snapshots": 0}));
+}
+
+/// A test restore reads every snapshot, and compares with this computer only those of its folders: stdin was never a
+/// file here.
+#[test]
+fn a_test_restore_compares_only_folders() {
+    let sb = Sandbox::new();
+    let docs = sb.path("source/docs").display().to_string();
+    sb.profile(
+        "Docs",
+        &format!(
+            "[global]\nuse-profiles = ['common']\n[repository]\nrepository = '{}'\n\
+             [[backup.snapshots]]\nsources = ['-']\nstdin-command = {}\n\
+             [[backup.snapshots]]\nsources = ['{docs}']\n",
+            sb.path("local/Docs").display(),
+            toml_str(&cmd::sleep(0))
+        ),
+    );
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    let tested = sb.run(&["restore", "--all", "--dry-run"]);
+    tested.assert_exit(0);
+    let mut plans: Vec<Vec<serde_json::Value>> = tested
+        .stdout
+        .lines()
+        .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+        .filter(|l| l["event"]["kind"] == "test-restored")
+        .map(|l| l["event"]["plans"].as_array().unwrap().iter().map(|plan| plan[0].clone()).collect())
+        .collect();
+    plans.sort_by_key(Vec::len);
+    assert_eq!(plans, [vec![], vec![serde_json::json!(docs)]], "{}", tested.stdout);
 }
