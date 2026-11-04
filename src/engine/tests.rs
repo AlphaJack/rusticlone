@@ -996,3 +996,24 @@ fn a_hooked_source_learns_from_the_one_snapshot_left() {
     );
     assert!(super::backup::learned(&unhooked.sources, &[docs]).is_empty(), "no source to learn");
 }
+
+/// A new computer's hooked sources learn from the newest snapshot of as many unexplained sources, in the order rustic
+/// made them. With fewer sources than wanted, none learns.
+#[test]
+fn hooked_sources_pick_the_newest_unexplained_snapshots() {
+    let snapshot = |id: u32, time: &str, path: &str| -> crate::rustic::Snapshot {
+        serde_json::from_value(serde_json::json!({ "id": format!("{id:08x}"), "time": time, "paths": [path] })).unwrap()
+    };
+    let snapshots = [
+        snapshot(1, "2026-10-14T03:00:00Z", "/mnt/old"),
+        snapshot(2, "2026-10-16T03:00:00Z", "/mnt/b"),
+        snapshot(3, "2026-10-15T03:00:00Z", "/mnt/a"),
+        snapshot(4, "2026-10-13T03:00:00Z", "/mnt/a"),
+    ];
+    let ids = |wanted| {
+        super::snapshots::picks(&snapshots, wanted)
+            .map(|p| p.iter().map(|s| s.id.short().to_owned()).collect::<Vec<_>>())
+    };
+    assert_eq!(ids(2), Some(vec!["00000003".to_owned(), "00000002".to_owned()]));
+    assert_eq!(ids(4), None, "three sources for four");
+}
