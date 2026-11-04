@@ -1084,3 +1084,16 @@ fn a_stopped_copy_creates_no_target() {
     assert!(calls.iter().any(|c| c.contains("Docs-usb snapshots")), "it tried to list it: {calls:?}");
     assert!(!calls.iter().any(|c| c.ends_with("--init")), "{calls:?}");
 }
+
+/// A check that never started, because its run stopped first, owes its subset.
+#[test]
+fn a_check_never_started_owes_its_subset() {
+    use crate::{request::Step, rustic::Reading};
+    let engine = engine("check-never-started", &Replay::new());
+    let collections = engine.collections();
+    let run = super::Run::new(&collections[0], None);
+    let check = Step::Check { repo: "Docs".into(), reading: Reading::Subset { n: 3, of: 5 } };
+    engine.cancelled(&run, 0, &check, engine.store.now());
+    let checks = engine.store.load().checks["Docs"].clone();
+    assert_eq!((checks.owed.contains(&3), checks.failed.contains(&3)), (true, false));
+}
