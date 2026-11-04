@@ -133,6 +133,13 @@ pub struct Lag {
 mod tests {
     use super::*;
 
+    /// The next check reads a subset owed first, else the next one, which is never 0.
+    #[test]
+    fn the_next_check_reads_an_owed_subset_first() {
+        let checks = |next, owed: &[u32]| Checks { next, owed: owed.iter().copied().collect(), ..Checks::default() };
+        assert_eq!([checks(3, &[]).upcoming(), checks(3, &[2, 5]).upcoming(), checks(0, &[]).upcoming()], [3, 2, 1]);
+    }
+
     fn ended(result: &StepResult) -> Outcome {
         result.into()
     }

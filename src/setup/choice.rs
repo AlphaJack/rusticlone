@@ -182,6 +182,16 @@ impl Kind {
 mod tests {
     use super::*;
 
+    /// A primary is needed: only a target may be none, which comes first.
+    #[cfg(feature = "server")]
+    #[test]
+    fn only_a_target_may_be_none() {
+        let kinds = |role: Role| role.rows().into_iter().flat_map(|(_, kinds)| kinds).collect::<Vec<_>>();
+        assert!(!kinds(Role::Primary).contains(&Kind::None));
+        assert!(kinds(Role::Primary).contains(&Kind::Local));
+        assert_eq!(kinds(Role::Target).first(), Some(&Kind::None));
+    }
+
     /// The form offers the kinds rustic supports here, in rows: those on a mounted disk, those rustic reaches
     /// itself, then rclone's. A primary must have a repository; a copy may have none, which comes first.
     #[test]
