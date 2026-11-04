@@ -1097,3 +1097,16 @@ fn a_check_never_started_owes_its_subset() {
     let checks = engine.store.load().checks["Docs"].clone();
     assert_eq!((checks.owed.contains(&3), checks.failed.contains(&3)), (true, false));
 }
+
+/// A refresh reports each repository it cannot list, but for one not created yet, as a copy target before its
+/// first copy: its status says so already.
+#[test]
+fn a_refresh_reports_no_target_not_created_yet() {
+    let usb = USB.replace("rest:http://usb/docs", "/nowhere/usb");
+    let engine = engine_of("refresh-not-created", &Replay::new(), &[("Docs", DOCS), ("Docs-usb", &usb)]);
+    let collections = engine.collections();
+    let report = engine.refresh(&collections[0]);
+    let kinds: Vec<String> =
+        report.results.iter().map(|r| serde_json::to_value(r).unwrap()["kind"].as_str().unwrap().to_owned()).collect();
+    assert_eq!(kinds, ["primary-unavailable"], "{:?}", report.results);
+}
