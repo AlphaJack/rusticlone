@@ -266,6 +266,18 @@ pub(crate) fn fixtures(name: &str) -> Vec<(String, String)> {
 mod tests {
     use super::*;
 
+    /// A newer minor version of rustic than the one tested is said to be untested. A dry run refuses to create a
+    /// repository.
+    #[test]
+    fn rustic_says_when_it_is_untested_and_refuses_to_create_in_a_dry_run() {
+        let rustic = |version: &Version, dry_run| Rustic { runner: Replay::new(), version: version.clone(), dry_run };
+        let newer = Version { minor: TESTED.minor + 1, patch: 0, ..TESTED.clone() };
+        let patched = Version { patch: TESTED.patch + 1, ..TESTED.clone() };
+        assert!(rustic(&TESTED, false).untested().is_none() && rustic(&patched, false).untested().is_none());
+        assert_eq!(rustic(&newer, false).untested().map(|u| u.found), Some(newer));
+        assert!(rustic(&TESTED, false).creates().is_ok() && rustic(&TESTED, true).creates().is_err());
+    }
+
     #[test]
     fn shell_arguments_preserve_spaces_and_metacharacters() {
         for (word, expected) in [
