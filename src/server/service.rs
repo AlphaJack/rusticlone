@@ -29,6 +29,7 @@ pub(super) fn run_service(serve: Box<dyn FnOnce() -> anyhow::Result<()> + Send>)
 }
 
 /// Stops the server when the system asks, as when Windows ends the user's session.
+#[cfg_attr(test, mutants::skip)] // Windows's alone: the others stop on signals.
 pub(super) fn stop_on_request() {
     imp::stop_on_request();
 }
