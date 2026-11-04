@@ -15,9 +15,26 @@ use crate::{
 #[derive(Fluent)]
 #[fluent(prefix = "notification")]
 enum Line<'a> {
-    Title { host: &'static str, collection: &'a str, level: Level },
-    Lasted { emoji: &'static str, level: Level, age: String },
-    Others { emoji: &'static str, count: u64, level: Level },
+    Title {
+        host: &'static str,
+        collection: &'a str,
+        level: Level,
+    },
+    /// On a computer whose name is unknown.
+    TitleUnnamed {
+        collection: &'a str,
+        level: Level,
+    },
+    Lasted {
+        emoji: &'static str,
+        level: Level,
+        age: String,
+    },
+    Others {
+        emoji: &'static str,
+        count: u64,
+        level: Level,
+    },
 }
 
 impl Engine {
@@ -84,7 +101,11 @@ impl Engine {
         before: &Notified,
     ) -> String {
         let now = self.store.now();
-        let title = Line::Title { host: crate::sys::hostname(), collection: collection.title, level: status.level };
+        let (collection_title, level) = (collection.title, status.level);
+        let title = match crate::sys::hostname() {
+            Some(host) => Line::Title { host, collection: collection_title, level },
+            None => Line::TitleUnnamed { collection: collection_title, level },
+        };
         let mut text = format!("{title}\n");
         text.extend(
             (status.issues.iter().filter(|p| p.counts()))

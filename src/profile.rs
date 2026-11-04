@@ -393,7 +393,8 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
             };
             let written = if on_disk { snapshot_paths_written(&sources, dir) } else { paths.clone() };
             let host = s.get("host").or_else(|| get(&["backup", "host"])).and_then(Value::as_str);
-            let host = host.unwrap_or_else(|| sys::hostname()).to_owned();
+            // Unknown here, rustic records no name either.
+            let host = host.map_or_else(|| sys::hostname().unwrap_or_default().to_owned(), ToOwned::to_owned);
             let hooked = runs_before(s, &["hooks"]) || runs_before(config, &["backup", "hooks"]);
             Sources { sources, derived: paths, written, host, hooked, resolved, learned: Arc::default() }
         })

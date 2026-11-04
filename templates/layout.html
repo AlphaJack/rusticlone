@@ -23,7 +23,7 @@
 <div class="page">
 <header class="topbar">
   <a class="brand" href="{{ base }}{{ Route::Index }}"><img class="logo" src="{{ base }}{{ self::asset_url("logo.svg") }}" alt="">{{ self::APP_NAME }}</a>
-  <span class="host">{{ crate::sys::hostname() }}</span>
+  {% if let Some(host) = crate::sys::hostname() %}<span class="host">{{ host }}</span>{% endif %}
   <span class="spacer"></span>
   {% if logout %}<button class="btn" hx-post="{{ base }}{{ Route::Logout }}">{{ m::icon("logout") }}<span class="label">{{ Button::LogOut }}</span></button>{% endif %}
 </header>

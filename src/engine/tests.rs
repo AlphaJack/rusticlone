@@ -354,7 +354,7 @@ fn a_recovery_notification_says_how_long_the_previous_level_lasted() {
     let failing = Notified { level: Level::Failure, since: Some(at), ..Notified::default() };
     engine.store.update_notified("Docs", |_| failing.clone()).unwrap();
     let collection = &engine.collections()[0];
-    let host = crate::sys::hostname();
+    let host = crate::sys::hostname().unwrap();
     let text = engine.message(collection, &engine.status_of(collection), &failing);
     assert_eq!(text, format!("{host}: Docs is now failing\n🔴 Repository unreachable\n"), "no age unless recovered");
     engine.store.wait(std::time::Duration::from_hours(51), &|| false);

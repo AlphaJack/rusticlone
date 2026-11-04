@@ -32,10 +32,10 @@ pub(crate) use {disk::*, hash::*, os::*, paths::*};
 /// The longest host name, with its NUL.
 const HOSTNAME_BUFFER: usize = 256;
 
-/// Empty if the system cannot tell.
-pub(crate) fn hostname() -> &'static str {
-    static NAME: LazyLock<String> = LazyLock::new(|| read_hostname().unwrap_or_default());
-    &NAME
+/// `None` if the system cannot tell.
+pub(crate) fn hostname() -> Option<&'static str> {
+    static NAME: LazyLock<Option<String>> = LazyLock::new(|| read_hostname().filter(|name| !name.is_empty()));
+    NAME.as_deref()
 }
 
 /// A container this process runs in, as the file its tool puts there says.
