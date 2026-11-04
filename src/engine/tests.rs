@@ -1044,3 +1044,21 @@ fn a_backup_is_held_back_for_the_sources_it_would_empty() {
     let failed = BackupPlan { snapshots: Vec::new(), not_backed_up: vec![("docs,other".into(), "gone".into())] };
     assert_eq!(super::backup::emptied(&both, &failed), ["/docs"]);
 }
+
+/// What happens next is after now: a collection that turns stale right now is not next, it is stale already.
+#[cfg(feature = "server")]
+#[test]
+fn the_next_time_is_after_now() {
+    use crate::{request::StepKey, state::Event};
+    let engine = engine("agenda-after-now", &Replay::new());
+    let now = engine.store.now();
+    // Backed up a week ago: stale now, without a schedule.
+    let started = now - jiff::SignedDuration::from_hours(7 * 24);
+    let key = StepKey::Snapshot("Docs".into());
+    engine
+        .store
+        .apply(&[Event::Attempted { key, started, at: started, result: (&backed_up()).into(), by: None }])
+        .unwrap();
+    let (_, next) = engine.agenda(now);
+    assert_eq!(next, None);
+}
