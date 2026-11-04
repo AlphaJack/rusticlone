@@ -186,7 +186,9 @@ mod tests {
             still.store(false, std::sync::atomic::Ordering::Relaxed);
             ahead.unlock().unwrap();
             let locks = locking.join().unwrap().unwrap();
-            assert_eq!(cx.held().len(), 1);
+            // What this system's rustic inherits of one lock.
+            let one = super::super::os::fds(&[store.lock_file("Docs").unwrap()]).len();
+            assert_eq!(cx.held().len(), one);
             drop(locks);
             assert!(cx.held().is_empty());
         });
