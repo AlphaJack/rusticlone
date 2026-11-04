@@ -46,7 +46,7 @@ impl Role {
     /// needed, and no copy comes first.
     #[cfg(feature = "server")]
     pub(crate) fn rows(self) -> Vec<(Group, Vec<Kind>)> {
-        let offered = |k: &Kind| !(!super::os::SFTP && *k == Kind::Sftp || self == Self::Primary && *k == Kind::None);
+        let offered = |k: &Kind| !super::os::UNSUPPORTED.contains(k) && (self == Self::Target || *k != Kind::None);
         let mut kinds: Vec<Kind> = <Kind as strum::IntoEnumIterator>::iter().filter(offered).collect();
         kinds.sort_by_key(|k| (*k != Kind::None, k.to_string().to_lowercase()));
         let row = |g| (g, kinds.iter().copied().filter(|k| k.group() == g).collect());
@@ -209,7 +209,11 @@ mod tests {
                 assert!(named.is_sorted(), "{role} {group:?}: {named:?}");
             }
             let all: Vec<Kind> = rows.into_iter().flat_map(|(_, kinds)| kinds).collect();
-            assert_eq!(all.contains(&Kind::Sftp), super::super::os::SFTP, "{role}: sftp where rustic has it");
+            assert_eq!(
+                all.contains(&Kind::Sftp),
+                !super::super::os::UNSUPPORTED.contains(&Kind::Sftp),
+                "{role}: sftp where rustic has it"
+            );
             assert_eq!(all.contains(&Kind::None), role == Role::Target);
         }
         assert_eq!(Role::Target.rows()[0].1.first(), Some(&Kind::None), "no copy, first");
