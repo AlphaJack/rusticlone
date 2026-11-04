@@ -51,6 +51,7 @@ struct Row {
 
 /// Whether its user runs it: from a terminal, by the service manager of their session, or to `open` the
 /// web UI, as the desktop entry does. Not as root, nor under another program, such as the tests.
+#[cfg_attr(test, mutants::skip)] // Reads this process's terminal and session, which no test has: see `attended_by`.
 fn attended(open: bool) -> bool {
     use std::io::IsTerminal;
     attended_by(sys::is_root(), open, std::io::stdout().is_terminal(), managed())
