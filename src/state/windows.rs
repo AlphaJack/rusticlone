@@ -11,6 +11,6 @@ pub(super) fn fds(_: &[File]) -> Vec<i32> {
 /// state, which another process holds, keeps this process's other threads from reading it, and that process
 /// may be waiting for them. So on Windows each process uses the state from one thread at a time.
 pub(super) fn one_at_a_time() -> parking_lot::ReentrantMutexGuard<'static, ()> {
-    static STATE: parking_lot::ReentrantMutex<()> = parking_lot::const_reentrant_mutex(());
+    static STATE: parking_lot::ReentrantMutex<()> = parking_lot::ReentrantMutex::new(());
     STATE.lock()
 }
