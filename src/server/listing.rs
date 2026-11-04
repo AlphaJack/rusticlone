@@ -84,3 +84,17 @@ impl App {
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    /// A repository listed once is not listed again until it is done.
+    #[test]
+    fn a_repository_is_listed_once_at_a_time() {
+        let listings = super::Listings::default();
+        assert!(!listings.running("Docs", "Docs-usb"));
+        assert!(listings.start("Docs", "Docs-usb") && !listings.start("Docs", "Docs-usb"));
+        assert!(listings.running("Docs", "Docs-usb") && !listings.running("Docs", "Docs"));
+        listings.done("Docs", "Docs-usb");
+        assert!(!listings.running("Docs", "Docs-usb"));
+    }
+}

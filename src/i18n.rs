@@ -205,6 +205,13 @@ pub(crate) fn ids() -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    /// A message made at run time is found only if the catalog has it.
+    #[test]
+    fn only_a_message_of_the_catalog_is_found() {
+        assert_eq!(super::find("field-region", []), Some("Region".to_owned()));
+        assert_eq!(super::find("field-no-such-thing", []), None);
+    }
+
     #[test]
     fn language_follows_gettext() {
         let asked = |vars: &[(&str, &str)]| {
