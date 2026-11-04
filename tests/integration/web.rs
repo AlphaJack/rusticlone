@@ -859,6 +859,30 @@ fn a_fresh_state_is_filled_on_first_boot() {
     assert!(card(&server.get("/collections/Docs").body, "repos").contains(r#"<td class="right num">1</td>"#));
 }
 
+/// The page's stylesheet is served as one. The setup form shows the free space where a folder would go. Each kind of
+/// issue a collection has counts once in the metrics.
+#[test]
+fn assets_free_space_and_issues_are_served() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.remove("source/docs");
+    sb.run(&["backup", "--all"]).assert_exit(1);
+    let server = sb.server(&[]);
+    let page = server.get("/").body;
+    let (_, css) = page.split_once(r#"<link rel="stylesheet" href=""#).unwrap();
+    let css = server.get(css.split('"').next().unwrap());
+    assert!(
+        css.head.to_lowercase().contains("content-type: text/css") && css.body.contains("light-dark("),
+        "{}",
+        css.head
+    );
+    let free = server.get(&format!("/setup/free?folder={}", sb.path("local").display())).body;
+    assert!(free.ends_with(" free</span>"), "{free}");
+    let metrics = server.get("/metrics").body;
+    let issues: Vec<&str> = metrics.lines().filter(|l| l.starts_with("rusticlone_issues{")).collect();
+    assert!(!issues.is_empty() && issues.iter().all(|l| l.ends_with(" 1")), "{metrics}");
+}
+
 /// Monitors read `/metrics`: a renamed metric or label breaks their queries.
 #[test]
 fn metrics_keep_their_names() {
