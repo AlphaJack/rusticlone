@@ -68,6 +68,12 @@ pub(super) fn minor(version: &Version) -> (u64, u64) {
 #[cfg(test)]
 mod tests {
 
+    /// A downloaded rustic is kept beside rusticlone, under its own name.
+    #[test]
+    fn a_downloaded_rustic_is_beside_rusticlone() {
+        assert_eq!(downloaded().unwrap(), crate::sys::bin_dir().unwrap().join(name()));
+    }
+
     use super::*;
 
     #[test]
