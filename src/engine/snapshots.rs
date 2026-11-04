@@ -74,13 +74,7 @@ impl Engine {
         let groups = self.rustic.snapshots(&run.cx, p, std::iter::empty::<Vec<String>>(), &primary.group_by)?;
         let theirs = (groups.iter().flat_map(|g| &g.snapshots))
             .filter(|sn| !known.contains(&sn.source()) && unknown.iter().any(|s| s.host == sn.hostname));
-        let mut picks: Vec<&Snapshot> = newest_by_source(theirs).into_values().collect();
-        picks.sort_by_key(|sn| Reverse(sn.time));
-        picks.truncate(unknown.len());
-        if picks.len() < unknown.len() {
-            return Ok(());
-        }
-        picks.sort_by_key(|sn| sn.time);
+        let Some(picks) = picks(theirs, unknown.len()) else { return Ok(()) };
         for (s, sn) in unknown.into_iter().zip(picks) {
             _ = self.store.set_hooked_paths(&primary.name, &s.sources, Some(&sn.paths));
             s.learn(sn.paths.clone());
@@ -98,7 +92,7 @@ impl Engine {
         _ = self.learn_from_repository(run, p);
         let doing = Doing::Listing { repo: p.name.clone() };
         // A step shows it as what it does now; outside steps, it has its own line.
-        let in_step = run.live.is_some() && run.cx.step().is_some();
+        let in_step = run.cx.step().is_some();
         if in_step {
             run.activity(Some(doing), false);
         } else {
@@ -172,6 +166,19 @@ pub(super) fn shrunk(snapshots: &[Snapshot]) -> Vec<(&Snapshot, Vec<&Snapshot>)>
             (!held.is_empty()).then_some((newest, held))
         })
         .collect()
+}
+
+/// The newest snapshot of each of the `wanted` newest sources of `theirs`, in the order rustic made them. `None` with
+/// fewer sources than wanted.
+pub(super) fn picks<'a>(theirs: impl IntoIterator<Item = &'a Snapshot>, wanted: usize) -> Option<Vec<&'a Snapshot>> {
+    let mut picks: Vec<&Snapshot> = newest_by_source(theirs).into_values().collect();
+    picks.sort_by_key(|sn| Reverse(sn.time));
+    picks.truncate(wanted);
+    if picks.len() < wanted {
+        return None;
+    }
+    picks.sort_by_key(|sn| sn.time);
+    Some(picks)
 }
 
 /// The newest snapshot of each source.
