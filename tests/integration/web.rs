@@ -439,6 +439,13 @@ fn lost_repositories_are_re_created_by_copying() {
     let form = server.get("/collections/Docs/runs/new?kind=re-create&repo=Docs").body;
     assert!(form.contains(r#"<option value="">"#), "{form}");
     assert!(form.contains(r#"<option value="Docs-remote">Docs-remote</option>"#), "{form}");
+    assert!(form.contains("the copy target with the newest snapshots"), "{form}");
+    // A target comes back from the primary, not from itself.
+    let target = server.get("/collections/Docs/runs/new?kind=re-create&repo=Docs-remote").body;
+    assert!(
+        target.contains("the primary: re-created empty") && !target.contains(r#"<option value="Docs">"#),
+        "{target}"
+    );
     server.post_form("/collections/Docs/repos/Docs/runs", "kind=re-create&from=Docs-remote");
     wait_for(30, "the primary to come back", || sb.snapshots("Docs").len() == 1);
     // Copied by the backup, or by the server first: the chunker matches either way.
