@@ -201,13 +201,7 @@ impl Engine {
     /// the snapshots that no other source explains are theirs, in profile order, which rustic backs up in.
     /// Learned only when each of them made one, else the order would not tell.
     fn learn_hooked(&self, p: &RusticProfile, snapshots: &[Snapshot]) {
-        let known = known(&p.sources);
-        let theirs: Vec<&Snapshot> = snapshots.iter().filter(|sn| !known.contains(&sn.source())).collect();
-        let unknown: Vec<&Sources> = p.sources.iter().filter(|s| s.unknown()).collect();
-        if unknown.is_empty() || theirs.len() != unknown.len() {
-            return;
-        }
-        for (s, sn) in unknown.into_iter().zip(theirs).filter(|(s, sn)| s.paths() != sn.paths) {
+        for (s, sn) in learned(&p.sources, snapshots).into_iter().filter(|(s, sn)| s.paths() != sn.paths) {
             _ = self.store.set_hooked_paths(&p.name, &s.sources, Some(&sn.paths));
             s.learn(sn.paths.clone());
         }
@@ -281,4 +275,17 @@ impl Engine {
         self.measure(run, into);
         Ok(copied)
     }
+}
+
+/// Each source that a hook creates with the snapshot that tells its paths: the snapshots that no other source
+/// explains, in profile order, which rustic backs up in. None unless each of them made one, else the order would not
+/// tell.
+pub(super) fn learned<'s, 'n>(sources: &'s [Sources], snapshots: &'n [Snapshot]) -> Vec<(&'s Sources, &'n Snapshot)> {
+    let known = known(sources);
+    let theirs: Vec<&Snapshot> = snapshots.iter().filter(|sn| !known.contains(&sn.source())).collect();
+    let unknown: Vec<&Sources> = sources.iter().filter(|s| s.unknown()).collect();
+    if unknown.is_empty() || theirs.len() != unknown.len() {
+        return Vec::new();
+    }
+    unknown.into_iter().zip(theirs).collect()
 }
