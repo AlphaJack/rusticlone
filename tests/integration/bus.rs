@@ -62,15 +62,15 @@ impl Systemd {
         Vec::new()
     }
 
-    fn start_unit(&self, name: String, _mode: String) -> zbus::zvariant::OwnedObjectPath {
+    fn start_unit(&self, name: String, _mode: String) -> zbus::OwnedObjectPath {
         self.job("StartUnit", &name)
     }
 
-    fn restart_unit(&self, name: String, _mode: String) -> zbus::zvariant::OwnedObjectPath {
+    fn restart_unit(&self, name: String, _mode: String) -> zbus::OwnedObjectPath {
         self.job("RestartUnit", &name)
     }
 
-    fn stop_unit(&self, name: String, _mode: String) -> zbus::zvariant::OwnedObjectPath {
+    fn stop_unit(&self, name: String, _mode: String) -> zbus::OwnedObjectPath {
         self.job("StopUnit", &name)
     }
 
@@ -81,9 +81,9 @@ impl Systemd {
 }
 
 impl Systemd {
-    fn job(&self, method: &str, name: &str) -> zbus::zvariant::OwnedObjectPath {
+    fn job(&self, method: &str, name: &str) -> zbus::OwnedObjectPath {
         record(&self.log, &format!("{method} {name}"));
-        zbus::zvariant::OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/1").unwrap()
+        zbus::OwnedObjectPath::try_from("/org/freedesktop/systemd1/job/1").unwrap()
     }
 }
 
@@ -115,15 +115,10 @@ impl FakeBus {
             let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
             runtime.block_on(async {
                 let _connection = zbus::connection::Builder::address(at.as_str())
-                    .unwrap()
                     .name("org.freedesktop.systemd1")
-                    .unwrap()
                     .name("org.freedesktop.login1")
-                    .unwrap()
                     .serve_at("/org/freedesktop/systemd1", Systemd { log: log.clone(), unit })
-                    .unwrap()
                     .serve_at("/org/freedesktop/login1", Logind(log))
-                    .unwrap()
                     .build()
                     .await
                     .unwrap();
