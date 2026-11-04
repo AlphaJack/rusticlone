@@ -1,6 +1,6 @@
 {
   "name": "rusticlone",
-  "image": "mcr.microsoft.com/devcontainers/rust:2-bookworm",
+  "image": "mcr.microsoft.com/devcontainers/rust:latest",
   "postCreateCommand": "rustup component add rust-analyzer clippy rustfmt && cargo install --locked cargo-nextest cargo-insta cargo-binstall && cargo binstall --no-confirm \"rustic-rs@$(cargo metadata --format-version 1 --no-deps | jq -r '.metadata.rustic.version | ltrimstr(\"v\")')\"",
   "customizations": {
     "vscode": {
