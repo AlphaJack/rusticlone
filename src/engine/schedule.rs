@@ -203,11 +203,10 @@ impl Engine {
         let state = self.store.load();
         // A failure is reported once its pending ends, unless a retry made it pass.
         let pending = state.last_steps.values().filter_map(crate::state::LastStep::pending_until);
-        let (mut due, mut next) = (Vec::new(), pending.filter(|at| *at > now).min());
+        let (mut due, mut later): (_, Vec<Timestamp>) = (Vec::new(), pending.collect());
         for collection in self.collections() {
             let (_, last_backup) = backups(collection.primary, &state);
-            let stale = collection.repos().filter_map(|r| self.stale_at(collection.primary, r, &state, last_backup));
-            next = next.into_iter().chain(stale).filter(|at| *at > now).min();
+            later.extend(collection.repos().filter_map(|r| self.stale_at(collection.primary, r, &state, last_backup)));
             let requests = self.due_requests(&collection, &state, now).unwrap_or_else(|e| {
                 crate::log::event(
                     Some(collection.name()),
@@ -218,11 +217,11 @@ impl Engine {
             for (request, at) in requests {
                 match at {
                     Some(at) if at <= now => due.push((collection.name().to_owned(), request)),
-                    at => next = next.into_iter().chain(at).min(),
+                    at => later.extend(at),
                 }
             }
         }
-        (due, next)
+        (due, later.into_iter().filter(|at| *at > now).min())
     }
 
     /// The request due next after now, and when: what `due` says when nothing is due yet.
