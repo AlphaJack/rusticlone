@@ -47,9 +47,9 @@ struct Board {
     runs: OnceLock<Weak<Runs>>,
     /// What each collection is called, by key.
     titles: OnceLock<BTreeMap<String, String>>,
-    drawn: Mutex<BTreeMap<(String, i64), Drawn>>,
+    drawn: Mutex<BTreeMap<(String, Row), Drawn>>,
     /// Runs this process queued and has not started, with their labels.
-    queued: Mutex<BTreeMap<(String, i64), String>>,
+    queued: Mutex<BTreeMap<(String, Row), String>>,
     /// Results that ended runs showed.
     shown: Mutex<Vec<ResultRecord>>,
     /// The step this process does outside runs.
@@ -68,8 +68,12 @@ static BOARD: Board = Board {
     ended: Mutex::new(Vec::new()),
 };
 
-/// The id of steps outside runs, which runs never have.
-const OUTSIDE: i64 = -1;
+/// What a collection's line of the board shows: a step this process does outside runs, drawn first, or a run.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Row {
+    Outside,
+    Run(i64),
+}
 
 /// The runs of this process, drawn in a terminal.
 pub(super) fn runs() -> Arc<Runs> {
@@ -111,7 +115,7 @@ fn title(name: &str) -> &str {
 #[cfg_attr(test, mutants::skip)] // Only a terminal's board shows them, and tests have none.
 pub(super) fn queued<'a>(runs: impl IntoIterator<Item = &'a RunRecord>) {
     if BOARD.runs.get().is_some() {
-        BOARD.queued.lock().extend(runs.into_iter().map(|r| ((r.collection.clone(), r.id), r.label.clone())));
+        BOARD.queued.lock().extend(runs.into_iter().map(|r| ((r.collection.clone(), Row::Run(r.id)), r.label.clone())));
         draw();
     }
 }
@@ -119,7 +123,7 @@ pub(super) fn queued<'a>(runs: impl IntoIterator<Item = &'a RunRecord>) {
 /// Stops showing `run` as queued: it ended, perhaps without starting.
 #[cfg_attr(test, mutants::skip)] // Only a terminal's board shows them, and tests have none.
 pub(super) fn ended(run: &RunRecord) {
-    if BOARD.queued.lock().remove(&(run.collection.clone(), run.id)).is_some() {
+    if BOARD.queued.lock().remove(&(run.collection.clone(), Row::Run(run.id))).is_some() {
         draw();
     }
 }
@@ -159,7 +163,7 @@ pub(super) fn steps<M: Message + Serialize>(
         }
         return;
     }
-    let key = |name: &str| (name.to_owned(), OUTSIDE);
+    let key = |name: &str| (name.to_owned(), Row::Outside);
     BOARD.queued.lock().extend(names.iter().map(|name| (key(name), label.to_owned())));
     for (i, name) in names.iter().enumerate() {
         BOARD.queued.lock().remove(&key(name));
@@ -193,7 +197,7 @@ fn section_lines(collection: &str, heading: &str, messages: &[&dyn Message]) -> 
 #[cfg_attr(test, mutants::skip)] // Writes to the terminal, which tests have none of.
 fn draw() {
     let Some(runs) = BOARD.runs.get().and_then(Weak::upgrade) else { return };
-    let live: BTreeMap<_, _> = runs.all().into_iter().map(|l| ((l.collection.clone(), l.id), l)).collect();
+    let live: BTreeMap<_, _> = runs.all().into_iter().map(|l| ((l.collection.clone(), Row::Run(l.id)), l)).collect();
     let doing = BOARD.doing.lock();
     let mut ended = std::mem::take(&mut *BOARD.ended.lock());
     let mut drawn = BOARD.drawn.lock();
@@ -208,11 +212,15 @@ fn draw() {
     let mut queued = BOARD.queued.lock();
     queued.retain(|key, _| !live.contains_key(key));
     drawn.extend(live.into_iter().map(|(key, l)| (key, lines(&l))));
-    let waiting = queued.iter().map(|((collection, id), label)| {
+    let waiting = queued.iter().map(|((collection, row), label)| {
         let head = format!("{}: {label}", log::bold(title(collection)));
-        let wait = runs.waiting(collection, *id).map(|w| format!(": {w:#}")).unwrap_or_default();
+        let id = match row {
+            Row::Run(id) => Some(*id),
+            Row::Outside => None,
+        };
+        let wait = id.and_then(|id| runs.waiting(collection, id)).map(|w| format!(": {w:#}")).unwrap_or_default();
         let tree = tree(&[Tree::leaf(format!("{} {}{wait}", Tone::Muted.dot(), Status::Queued))]);
-        ((collection.clone(), *id), iter::once(head).chain(tree.lines().map(ToOwned::to_owned)).collect())
+        ((collection.clone(), *row), iter::once(head).chain(tree.lines().map(ToOwned::to_owned)).collect())
     });
     let mut rows: BTreeMap<_, Vec<String>> = waiting.collect();
     rows.extend(drawn.iter().map(|(key, run)| (key.clone(), run.lines.clone())));
@@ -220,7 +228,7 @@ fn draw() {
         let head = format!("{}: {label}", log::bold(title(collection)));
         let tree = tree(&[Tree::leaf(format!("{} {step}", Tone::Running.dot()))]);
         rows.insert(
-            (collection.clone(), OUTSIDE),
+            (collection.clone(), Row::Outside),
             iter::once(head).chain(tree.lines().map(ToOwned::to_owned)).collect(),
         );
     }
