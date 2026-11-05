@@ -469,6 +469,16 @@ CMD ["serve"]
         assert_eq!(std::fs::read(&path).unwrap(), bytes);
     }
 
+    /// A setting in the env file is read from its own line, the last that sets it.
+    #[test]
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn a_setting_is_read_from_its_own_line_in_the_env_file() {
+        let path = crate::sys::test_dir("env-file-value").join("rusticlone.env");
+        let text = "RUSTICLONE_AUTO_UPDATE=false\nRUSTICLONE_AUTO_UPDATE=true\nRUSTICLONE_LISTEN=0.0.0.0:80\n";
+        std::fs::write(&path, text).unwrap();
+        assert_eq!(super::value_in_env_file(&path, "RUSTICLONE_AUTO_UPDATE").as_deref(), Some("true"));
+    }
+
     #[test]
     fn settings_are_sorted() {
         assert!(ALL.is_sorted_by_key(|s| s.key));
