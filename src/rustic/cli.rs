@@ -1,7 +1,5 @@
 //! The `rustic` CLI, run as a process.
 
-#![expect(clippy::disallowed_methods, reason = "runs rustic")]
-
 use std::ffi::OsStr;
 use std::{
     io::{self, Read},
@@ -44,6 +42,7 @@ impl Cli {
     /// Rustic. On Windows, without a console window, since the server started at login has none and
     /// Windows would open one for each run, and below normal priority, as systemd's `Nice` and launchd's
     /// `Background` run it elsewhere, so that a backup does not slow down the user.
+    #[expect(clippy::disallowed_methods, reason = "runs rustic")]
     pub(crate) fn rustic() -> Command {
         let mut cmd = Command::new(super::bin::path());
         super::process::quiet(&mut cmd);
@@ -227,6 +226,7 @@ fn read(mut child: std::process::Child, stdout: Stdout) -> Result<mpsc::Receiver
 }
 
 impl Runner for Cli {
+    #[expect(clippy::disallowed_methods, reason = "runs rustic")]
     fn run(
         &self,
         cx: &Ctx,

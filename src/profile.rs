@@ -1,7 +1,5 @@
 //! Rustic profiles, read from `rustic show-config` so that rustic merges `use-profiles` itself.
 
-#![expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     env, fs,
@@ -188,12 +186,14 @@ impl RusticProfile {
     }
 
     /// Whether a local repository has its `config` file. Always true for a remote one.
+    #[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
     pub(crate) fn exists(&self) -> bool {
         self.repository_hooks || self.global_hooks || self.local.as_ref().is_none_or(|p| p.join("config").is_file())
     }
 
     /// Its files in rustic's search path, then in the directory rusticlone was started in, which a user may
     /// expect it to read. Rustic reads the first one only.
+    #[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
     pub(crate) fn files(&self) -> Vec<PathBuf> {
         let mut dirs = search_path(Some(self.dir.clone())).unwrap_or_default();
         for dir in profile_dirs().unwrap_or_default() {
@@ -223,6 +223,7 @@ fn search_path(cwd: Option<PathBuf>) -> Result<Vec<PathBuf>> {
 
 /// The directory profiles are saved in: the system's for root or an elevated Windows process, else the
 /// user's.
+#[expect(clippy::disallowed_methods, reason = "the real folder, which callers pass on")]
 pub(crate) fn own_dir() -> Option<PathBuf> {
     sys::own_config_dir("rustic")
 }
@@ -238,6 +239,7 @@ pub(crate) fn profile_dirs() -> Result<Vec<PathBuf>> {
 }
 
 /// Profile names and their directories. Like rustic, the first directory wins.
+#[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
 pub(crate) fn profile_files() -> Result<Vec<(String, PathBuf)>> {
     let mut found = BTreeMap::new();
     for dir in profile_dirs()? {
@@ -291,6 +293,7 @@ pub(crate) fn native_drive(path: &str) -> String {
 }
 
 /// Finds a profile named on the command line, as rustic would.
+#[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
 pub(crate) fn locate(name: &str) -> Result<PathBuf> {
     let dirs = search_path(env::current_dir().ok())?;
     let not_found = Error::NotFound { name: name.to_owned(), dirs: dirs.clone() };
@@ -359,6 +362,7 @@ fn set(table: &Config, path: &[&str]) -> bool {
     value(table, path).and_then(Value::as_bool) == Some(true)
 }
 
+#[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
 fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
     let get = |path: &[&str]| value(config, path);
     let strings = |v: Option<&Value>| -> Vec<String> {
@@ -614,6 +618,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
     fn snapshot_paths_match_rustic() {
         let dir = sys::test_dir("paths");
         fs::create_dir_all(dir.join("a").join("b").join("sub")).unwrap();

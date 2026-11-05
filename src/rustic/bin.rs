@@ -1,7 +1,5 @@
 //! Rustic's executable and its version.
 
-#![expect(clippy::disallowed_methods, reason = "finds rustic's executable")]
-
 use std::{env, path::PathBuf, sync::LazyLock};
 
 use anyhow::Result;
@@ -22,6 +20,7 @@ pub(crate) fn downloaded() -> Result<PathBuf> {
 /// [`settings::RUSTIC`], else the rustic in `PATH`, else the downloaded one, which a service started
 /// without the user's `PATH` does not find there. Found at each call, because it may have been installed
 /// since.
+#[expect(clippy::disallowed_methods, reason = "finds rustic's executable")]
 pub(crate) fn path() -> PathBuf {
     if let Some(path) = settings::RUSTIC.get(&[]) {
         return path.into();
