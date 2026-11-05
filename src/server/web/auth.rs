@@ -307,6 +307,10 @@ fn saved_token(path: &Path) -> Result<String> {
     }
 }
 
+/// Tests that need a folder this user may not write in.
+#[cfg(all(test, unix))]
+mod unix;
+
 #[cfg(test)]
 mod tests {
     use super::*;
