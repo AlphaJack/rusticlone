@@ -972,6 +972,25 @@ fn a_forget_on_a_repository_it_cannot_list_fails() {
     assert_eq!(failures(&run), 1, "{:?}", run.results_of(None));
 }
 
+/// The primary's forget keeps what no copy has reached yet.
+#[test]
+fn a_primary_forget_holds_what_no_copy_reached() {
+    use crate::request::Step;
+    let replay = Replay::new()
+        .ok("Docs", &["cat", "config"], &recorded("cat-config.stdout"))
+        .ok("Docs", &["snapshots", "--json"], &recorded("snapshots.stdout"))
+        .ok("Docs", &["snapshots", "--json"], &recorded("snapshots.stdout"))
+        .ok("Docs", &["forget", "--json"], &recorded("forget.stdout"));
+    let engine = engine("forget-primary-held", &replay);
+    let collections = engine.collections();
+    let run = super::Run::new(&collections[0], None);
+    // A copy confirmed, that holds none of the primary's groups.
+    run.shared.copied.lock().insert("Docs-usb".into(), BTreeMap::new());
+    engine.run_step(&run, &Step::Forget { repo: "Docs".into() });
+    let calls = replay.calls();
+    assert!(calls.iter().any(|c| c.contains(" forget ") && c.contains("--keep-id")), "{calls:?}");
+}
+
 /// A source that a hook creates learns from the one snapshot that no other source explains. With more of them than
 /// such sources, the order would not tell which is whose: none learns.
 #[test]
