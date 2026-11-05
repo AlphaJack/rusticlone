@@ -8,7 +8,6 @@ use crate::{profile, sys};
 impl Setup {
     /// Refuses a repository folder that a source holds or that holds a source. Refuses one with other files but no
     /// repository's `config` too. The folder of an existing repository is kept to back up into it again.
-    #[expect(clippy::disallowed_methods, reason = "saves the profiles")]
     pub(super) fn check_folders(&self) -> Result<(), Error> {
         let sources = self.sources();
         let mut folders = <Role as strum::IntoEnumIterator>::iter().filter_map(|role| self.folder(role));
@@ -18,6 +17,7 @@ impl Setup {
 
 /// Why backups cannot go to `folder`: it is inside one of `sources` or holds one, or it holds other files.
 #[cfg(feature = "server")]
+#[expect(clippy::disallowed_methods, reason = "looks at what the folder holds")]
 pub(crate) fn refused_folder(folder: &str, sources: &[String]) -> Option<Error> {
     use std::path::{Path, PathBuf};
     // As written and as the disk resolves it, up to its nearest folder that exists: `/tmp` is a link to
