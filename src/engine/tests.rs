@@ -1002,6 +1002,24 @@ fn a_hooked_source_learns_from_the_one_snapshot_left() {
     assert!(super::backup::learned(&unhooked.sources, &[docs]).is_empty(), "no source to learn");
 }
 
+/// A lock that fails is an error. Only a queued run that was removed from the queue meanwhile is dequeued.
+#[test]
+fn a_lock_that_fails_is_an_error() {
+    use crate::{
+        result::{RunResults, StepResult},
+        rustic::Ctx,
+    };
+    let engine = engine("lock-fails", &Replay::new());
+    let collections = engine.collections();
+    // A file where the locks go.
+    let locks = engine.store.dir.join("locks");
+    std::fs::remove_dir_all(&locks).unwrap();
+    std::fs::write(&locks, "").unwrap();
+    let (cx, mut r) = (Ctx::default(), RunResults::new("Docs"));
+    assert!(engine.lock_for(&collections[0], &Request::Backup, &cx, &mut r, None).is_none());
+    assert!(matches!(r.results[..], [StepResult::Error { .. }]), "{:?}", r.results);
+}
+
 /// A new computer's hooked sources learn from the newest snapshot of as many unexplained sources, in the order rustic
 /// made them. With fewer sources than wanted, none learns.
 #[test]
