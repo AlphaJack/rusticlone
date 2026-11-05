@@ -4,7 +4,8 @@
 use jiff::Timestamp;
 use serde::Serialize;
 
-use super::Schedule;
+use super::{Collection, Schedule};
+use crate::profile::RusticProfile;
 use crate::request::StepKey;
 use crate::result::Unusable;
 use crate::{
@@ -250,6 +251,12 @@ pub(crate) enum Issue {
         by: Option<RunStep>,
     },
     NeverBackedUp,
+    /// From an emergency kit: backups wait for its restore.
+    RestorePending,
+    /// From an emergency kit, and its restore failed: likely it describes another computer, where `files` are.
+    RestoreFailed {
+        files: String,
+    },
     /// macOS keeps rusticlone and rustic out of a source.
     #[fluent(exe = std::env::current_exe().map_or_else(|_| crate::NAME.into(), |e| e.display().to_string()))]
     NoDiskAccess {
@@ -292,6 +299,17 @@ impl Since {
 }
 
 impl Issue {
+    /// A kit's collection waiting for its restore, which may have `failed`.
+    pub(super) fn held(collection: &Collection<'_>, failed: bool) -> Self {
+        if !failed {
+            return Self::RestorePending;
+        }
+        // Its name alone if its file cannot be found, as for a profile of `use-profiles` only.
+        let file = |r: &RusticProfile| r.files().first().map(|f| f.display().to_string());
+        let files = collection.repos().map(|r| file(r).unwrap_or_else(|| format!("{}.toml", r.name)));
+        Self::RestoreFailed { files: files.collect::<Vec<_>>().join(", ") }
+    }
+
     /// A step's failed last attempt, which can be dismissed. A cancelled attempt is not an issue: whoever
     /// cancelled it knows, it waits for its next scheduled time, and what it left undone becomes stale
     /// meanwhile.
@@ -351,12 +369,14 @@ impl Message for Issue {
             | Self::SameRepository { .. }
             | Self::Failed { .. }
             | Self::Missing { primary: true, .. }
+            | Self::RestoreFailed { .. }
             | Self::InvalidSchedule { .. } => Level::Failure,
             Self::PrunesOnForget { .. }
             | Self::SettingIgnored { .. }
             | Self::CopyFailed { .. }
             | Self::Warned { .. }
             | Self::NeverBackedUp
+            | Self::RestorePending
             | Self::NoDiskAccess { .. }
             | Self::Stale { .. }
             | Self::Undelivered { .. }

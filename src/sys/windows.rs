@@ -6,6 +6,10 @@ use etcetera::BaseStrategy;
 
 use super::{HOSTNAME_BUFFER, fnv1a};
 
+/// What a command needs before it to run as an administrator: nothing, in an administrator's terminal.
+#[cfg(feature = "server")]
+pub(crate) const AS_ROOT: &str = "";
+
 /// `app`'s configuration directory for this user, laid out as the `directories` crate that rustic uses lays
 /// it out.
 pub(crate) fn user_config_dir(base: &impl BaseStrategy, app: &str) -> PathBuf {

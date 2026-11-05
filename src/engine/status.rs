@@ -298,11 +298,13 @@ impl Engine {
         let sources = p.sources.iter().flat_map(Sources::paths);
         issues
             .extend(sources.filter(|s| sys::needs_disk_access(s)).map(|source| Issue::NoDiskAccess { source }).take(1));
-        // Unknown, not "never", until the repository is first listed.
+        // Unknown, not "never", until the repository is first listed. A kit's collection is restored first.
         let listed = self.store.inventory(&p.name, &p.name).is_some();
-        if listed && backed_up.is_none() && snapshot.as_ref().is_none_or(|t| !failing(t)) {
+        let held = state.restore_first.get(&p.name);
+        if listed && held.is_none() && backed_up.is_none() && snapshot.as_ref().is_none_or(|t| !failing(t)) {
             issues.push(Issue::NeverBackedUp);
         }
+        issues.extend(held.map(|hold| Issue::held(collection, hold.failed.is_some())));
         for r in std::iter::once(&primary).chain(&targets) {
             issues.extend(r.issues(&p.name, last_backup, &failing));
         }

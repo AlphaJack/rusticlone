@@ -18,6 +18,8 @@ mod status;
 #[cfg(test)]
 mod tests;
 
+#[cfg(feature = "server")]
+pub(crate) use collection::title;
 pub(crate) use collection::{Blocked, Collection};
 use holds::Use;
 use plan::{follows, plan};
@@ -26,6 +28,8 @@ pub(crate) use report::{CollectionOverview, Last, RepoOverview, StatusReport};
 #[cfg(feature = "server")]
 pub(crate) use report::{Issue, RepoStatus, Unconfigured};
 pub(crate) use schedule::Schedule;
+#[cfg(feature = "server")]
+pub(crate) use schedule::kit_restore;
 use snapshots::{each, known, newest, newest_by_source, pick, shrunk};
 
 use std::{
@@ -45,7 +49,7 @@ use crate::result::Doing;
 use crate::{
     clock,
     live::{Guard, Live, Runs},
-    log::{Level, Logged},
+    log::{Level, Logged, Message as _},
     profile::RusticProfile,
     request::Trigger,
     result::{self, RunResults, Status, StepResult},
@@ -235,6 +239,11 @@ impl<'a> Run<'a> {
             self.cx.log(None, &result.to_string());
             results.push((self.cx.step(), result));
         }
+    }
+
+    /// How many failures the run reported so far.
+    fn failures(&self) -> usize {
+        self.shared.results.lock().iter().filter(|(_, r)| r.level() == Level::Failure).count()
     }
 
     /// Whether any step reported a result that `f` matches.
@@ -561,8 +570,19 @@ impl Engine {
                 }
             }
             Step::Restore { options } => {
-                if let Err(e) = self.restore_inner(run, options) {
-                    run.push(run.failed(&e));
+                let before = run.failures();
+                let restored = self.restore_inner(run, options);
+                if let Err(e) = &restored {
+                    run.push(run.failed(e));
+                }
+                // Only a restore of every source, in place, ends the hold of a kit's collection.
+                let every = options.snapshot.is_none() && options.source.is_none() && options.path.is_none();
+                if every && options.to.is_none() && options.at.is_none() && !options.dry_run {
+                    let ok = restored.is_ok() && run.failures() == before;
+                    let event = Event::Restored { collection: collection.name().to_owned(), at: self.store.now(), ok };
+                    if let Err(e) = self.store.apply(&[event]) {
+                        run.push(run.failed(&e));
+                    }
                 }
             }
             Step::TestRestore { from, tested } => {

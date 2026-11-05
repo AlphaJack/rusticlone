@@ -8,6 +8,7 @@
     <button class="btn" {{ m::run(base, Route::Runs, "check") }}>{{ m::icon("check") }}{{ Button::CheckAll }}</button>
     <button class="btn" {{ m::run(base, Route::Runs, "prune") }}>{{ m::icon("prune") }}{{ Button::PruneAll }}</button>
     <button class="btn" hx-post="{{ base }}{{ Route::Refresh }}">{{ m::icon("refresh") }}{{ Button::RefreshAll }}</button>
+    <a class="btn" href="{{ base }}{{ Route::Kit }}" download title="{{ Hint::KitHelp }}">{{ m::icon("download") }}{{ Button::EmergencyKit }}</a>
   </div>
   {% endif %}
 </div>

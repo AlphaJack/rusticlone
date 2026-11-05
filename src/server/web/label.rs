@@ -110,6 +110,9 @@ pub(super) enum Button<'a> {
     CopyFolderPath,
     SeeHow,
     CronSyntax,
+    EmergencyKit,
+    /// Uploads an emergency kit.
+    RestoreFromKit,
 }
 
 /// A word or a state, in a table or a breadcrumb.
@@ -203,6 +206,12 @@ pub(super) enum Hint<'a> {
         dir: &'a str,
     },
     KeepACopy,
+    /// On a fresh install: the kit brings the profiles back.
+    UploadKit {
+        file: &'a str,
+    },
+    /// What `app.js` shows: an upload that got no answer.
+    NotSent,
     NowVisible {
         app: &'a str,
     },
@@ -236,4 +245,10 @@ pub(super) enum Hint<'a> {
     WhereItWas,
     Now,
     Notify,
+    KitHelp,
+}
+
+/// This computer's name, else words for it.
+pub(super) fn this_host() -> String {
+    crate::sys::hostname().map_or_else(|| Label::ThisComputer.to_string(), ToOwned::to_owned)
 }
