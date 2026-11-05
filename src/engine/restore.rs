@@ -192,28 +192,20 @@ impl Engine {
         ranked: impl Iterator<Item = (&'a RusticProfile, Vec<Snapshot>)>,
         options: &RestoreOptions,
     ) -> Result<(&'a RusticProfile, Vec<Snapshot>, bool)> {
-        let attempt = |src: &RusticProfile, picks: &[Snapshot]| {
-            let failed = run.failures();
-            let restored = self.restore_snapshots(run, src, picks, options);
-            restored.and_then(|complete| match run.failures() {
-                n if n == failed => Ok(complete),
-                _ => Err(Error::PartlyRestored { repo: src.name.clone() }.into()),
-            })
-        };
-        let mut done = attempt(src, &picks);
+        let mut done = self.restore_snapshots(run, src, &picks, options);
         // A repository asked for is the only one ranked: there is no other to fall back to.
         if !options.dry_run {
             for (next, next_picks) in ranked.filter(|(p, _)| p.name != src.name) {
                 let Err(e) = &done else { break };
                 // Only what rustic failed to read: another repository cannot help a folder this computer refuses.
-                let read = matches!(e.downcast_ref(), Some(Error::NotRestored { .. } | Error::PartlyRestored { .. }));
+                let read = matches!(e.downcast_ref(), Some(Error::NotRestored { .. }));
                 if !read || run.cx.stopping() {
                     break;
                 }
                 let (repo, to, error) = (src.name.clone(), next.name.clone(), format!("{e:#}"));
                 run.push(StepResult::FallingBack { repo, to, error });
                 (src, picks) = (next, next_picks);
-                done = attempt(src, &picks);
+                done = self.restore_snapshots(run, src, &picks, options);
             }
         }
         done.map(|complete| (src, picks, complete))

@@ -810,7 +810,6 @@ engine-error-unreachable = non raggiungibile
 engine-error-not-copied = { $failed } snapshot su { $of } non copiati: { $error }
 engine-error-no-snapshot-of-them = { $repo } non ha snapshot di queste sorgenti: esegui prima il backup, o ripristina da un altro archivio con --repo
 engine-error-unreadable = nessun repository di { $collection } è leggibile: { $repos }. Se il suo disco è montato altrove su questo computer, scrivi la nuova posizione come `repository` in { $files }
-engine-error-partly-restored = { $repo } ha ripristinato solo alcuni percorsi
 engine-error-no-matching-snapshot = nessuno snapshot corrispondente in { $repo } o nelle sue destinazioni: usa un --at-time successivo, o esegui prima il backup
 rustic-error-dry-run-creates = una simulazione non crea archivi
 rustic-error-cannot-run = impossibile eseguire rustic: esegui { -name } in un terminale e lascia che scarichi rustic, installa rustic ({ $docs }), o imposta { $key } su uno installato

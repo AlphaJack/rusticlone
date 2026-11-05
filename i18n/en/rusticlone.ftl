@@ -813,7 +813,6 @@ engine-error-not-copied = { $failed } of { $of ->
 } not copied: { $error }
 engine-error-no-snapshot-of-them = { $repo } has no snapshot of these sources: back up first, or restore from another repository with --repo
 engine-error-unreadable = no repository of { $collection } could be read: { $repos }. If its disk is mounted elsewhere on this computer, write its new place as `repository` in { $files }
-engine-error-partly-restored = { $repo } restored only some paths
 engine-error-no-matching-snapshot = no matching snapshot in { $repo } or its targets: use a later --at-time, or back up first
 rustic-error-dry-run-creates = a dry run creates no repository
 rustic-error-cannot-run = cannot run rustic: run { -name } in a terminal and let it download rustic, install rustic ({ $docs }), or set { $key } to an installed one
