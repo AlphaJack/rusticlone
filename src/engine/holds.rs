@@ -48,13 +48,10 @@ impl Engine {
             keys.push((format!("repo:{}", self.repo_id(run, p)), mode, format!("repo:{}", p.name)));
             let links: &[&str] = match (used, p.on_disk()) {
                 (Use::Forget, _) => &[],
-                (_, Some(local)) if sys::spinning(local) => {
-                    let disk = sys::device(local).map_or_else(|| local.display().to_string(), |d| d.to_string());
-                    let mount = sys::mount_point(local).unwrap_or(local);
-                    keys.push((format!("disk:{disk}"), Mode::Exclusive, format!("disk:{}", mount.display())));
+                (_, Some(local)) => {
+                    keys.extend(spinning_disk(local).map(|(key, name)| (key, Mode::Exclusive, name)));
                     &[]
                 }
-                (_, Some(_)) => &[],
                 (Use::Read, None) => &["download"],
                 (Use::Add, None) => &["upload"],
                 (Use::Prune, None) => &["upload", "download"],
@@ -190,6 +187,17 @@ impl Engine {
         let lock = request.label(&own.collection);
         Doing::WaitingFor { by: holders(ahead.map(|q| (q.record.clone(), &lock)), true), lock }
     }
+}
+
+/// The lock of `local`'s disk and its name, if the disk spins: one run at a time reads or writes it.
+#[cfg_attr(test, mutants::skip)] // Whether a disk spins is the test machine's.
+fn spinning_disk(local: &std::path::Path) -> Option<(String, String)> {
+    if !sys::spinning(local) {
+        return None;
+    }
+    let disk = sys::device(local).map_or_else(|| local.display().to_string(), |d| d.to_string());
+    let mount = sys::mount_point(local).unwrap_or(local);
+    Some((format!("disk:{disk}"), format!("disk:{}", mount.display())))
 }
 
 /// The runs holding each lock, by process and trigger, and with `status`, by their status too.

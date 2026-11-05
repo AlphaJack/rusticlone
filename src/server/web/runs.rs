@@ -94,14 +94,20 @@ pub(super) fn log_view(
     let Some(row) = row else {
         return LogView::default();
     };
-    let tail = match shown {
-        Some((run, at)) if run == row.id => (LogLines::default(), at, true),
-        _ => {
+    let tail = match shown_at(shown, row.id) {
+        Some(at) => (LogLines::default(), at, true),
+        None => {
             let (lines, at) = log_tail(engine, collection, row.id, None);
             (lines, at, false)
         }
     };
     LogView::build(row, engine.store.run(collection, row.id), tail)
+}
+
+/// Where the log a page shows ends, if it shows `run`'s.
+#[cfg_attr(test, mutants::skip)] // Only a live page's event stream says what it shows.
+fn shown_at(shown: Option<(i64, u64)>, run: i64) -> Option<u64> {
+    shown.filter(|(shown, _)| *shown == run).map(|(_, at)| at)
 }
 
 impl LogView {

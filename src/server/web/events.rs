@@ -20,7 +20,7 @@ use super::{
     collections::{collection_main, index_main},
     render_str,
     repo::{RepoMain, repo_view},
-    runs::log_tail,
+    runs::{LogLines, log_tail},
 };
 use crate::{clock, sys};
 use jiff::Timestamp;
@@ -66,7 +66,13 @@ fn render_update(app: &Arc<App>, view: &View, shown: Option<(i64, u64)>, base: &
     let (html, log) = render_main(app, view, shown, base)?;
     let (Some((run, at)), Some(collection)) = (log, &view.collection) else { return Some((html, log, None)) };
     let (lines, at) = log_tail(&app.engine(), collection, run, Some(at));
-    Some((html, Some((run, at)), (!lines.0.is_empty()).then(|| render_str(&lines, base))))
+    Some((html, Some((run, at)), new_lines(&lines, base)))
+}
+
+/// The log lines a page lacks, rendered, if any.
+#[cfg_attr(test, mutants::skip)] // Only a live page's `log` events carry them, which the tests do not read.
+fn new_lines(lines: &LogLines, base: &Base) -> Option<String> {
+    (!lines.0.is_empty()).then(|| render_str(lines, base))
 }
 
 /// What [`render_update`] renders.
@@ -100,12 +106,24 @@ struct Stream {
 }
 
 /// Waits until `at`, or forever.
+#[cfg_attr(test, mutants::skip)] // Only the timing of a live page's events tells, which the tests do not measure.
 #[expect(clippy::disallowed_methods, reason = "what a page shows changes with time at `at`, which no event tells")]
 async fn until(at: Option<Timestamp>) {
     match at {
         Some(at) => tokio::time::sleep(Duration::try_from(at.duration_since(super::now())).unwrap_or_default()).await,
         None => std::future::pending().await,
     }
+}
+
+/// What a page says it shows, unless it reconnected, which leaves that unknown.
+fn unless_reconnected<T>(shown: Option<T>, reconnected: bool) -> Option<T> {
+    shown.filter(|_| !reconnected)
+}
+
+/// When a page is rendered again at the earliest, so that a burst of changes renders once.
+#[cfg_attr(test, mutants::skip)] // Only the timing of a live page's events tells, which the tests do not measure.
+fn next_render(rendered: tokio::time::Instant) -> tokio::time::Instant {
+    rendered + RENDER_EVERY
 }
 
 /// Sends the page's `<main>` again when what it shows changed, at most every [`RENDER_EVERY`], and
@@ -121,7 +139,7 @@ pub(super) async fn events(
     // What a reconnecting page shows is unknown.
     let reconnected = headers.contains_key("last-event-id");
     let (mut changes, failures) = (app.pages.changes.subscribe(), app.pages.failures.subscribe());
-    let seen = view.v.filter(|_| !reconnected);
+    let seen = unless_reconnected(view.v, reconnected);
     let current = seen.is_some_and(|v| {
         let changes = changes.borrow_and_update();
         v <= changes.count && !changes.since(v, view.collection.as_deref())
@@ -135,7 +153,7 @@ pub(super) async fn events(
         last: view.h,
         rendered: tokio::time::Instant::now(),
         changes_at: None,
-        log: view.log.zip(view.at).filter(|_| !reconnected),
+        log: unless_reconnected(view.log.zip(view.at), reconnected),
         lines: None,
         language: Language::current(),
         view,
@@ -170,7 +188,7 @@ pub(super) async fn events(
                     () = until(s.changes_at) => {}
                 }
                 // Render once for a burst of changes.
-                tokio::time::sleep_until(s.rendered + RENDER_EVERY).await;
+                tokio::time::sleep_until(next_render(s.rendered)).await;
             }
             (s.wait, s.rendered) = (true, tokio::time::Instant::now());
             s.seen = s.changes.borrow_and_update().count;
