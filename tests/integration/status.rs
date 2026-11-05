@@ -103,9 +103,10 @@ fn profiles_with_json_progress_work() {
     assert_eq!(std::fs::read_to_string(sb.path("source/docs/a.txt")).unwrap(), "version 2");
 }
 
-/// Status changes are deduplicated; delivery failures are retried.
-#[test]
-fn status_changes_are_notified() {
+/// A `json://` URL that answers each notification with the next of `statuses`, and the messages received, in order.
+fn listen(
+    statuses: &'static [u16],
+) -> (String, std::sync::mpsc::Receiver<serde_json::Value>, std::thread::JoinHandle<()>) {
     use std::{
         io::{BufRead, BufReader, Read, Write},
         net::TcpListener,
@@ -113,12 +114,11 @@ fn status_changes_are_notified() {
         thread,
         time::Duration,
     };
-
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("json://{}", listener.local_addr().unwrap());
     let (tx, rx) = mpsc::channel();
     let receiver = thread::spawn(move || {
-        for status in [204, 204, 500] {
+        for status in statuses {
             let (mut socket, _) = listener.accept().unwrap();
             socket.set_read_timeout(Some(Duration::from_secs(15))).unwrap();
             let mut reader = BufReader::new(&mut socket);
@@ -142,6 +142,14 @@ fn status_changes_are_notified() {
             tx.send(message).unwrap();
         }
     });
+    (url, rx, receiver)
+}
+
+/// Status changes are deduplicated; delivery failures are retried.
+#[test]
+fn status_changes_are_notified() {
+    use std::time::Duration;
+    let (url, rx, receiver) = listen(&[204, 204, 500]);
     let sb = Sandbox::new();
     sb.backup_profile("Docs", &[&["docs"]], &[], &crate::common::global_env(&[("NOTIFY_URLS", &url)]));
     let receive = || rx.recv_timeout(Duration::from_secs(15)).unwrap();
@@ -257,6 +265,19 @@ fn a_collection_is_named_after_what_its_profiles_share() {
     // Outside a run, what it does is a progress line of its own.
     let listing = json!({"target": "progress", "collection": "Docs", "event": {"kind": "listing", "repo": "Docs-usb"}});
     sb.run(&["collections", "--refresh"]).assert_exit(0).assert_json(&listing);
+}
+
+/// `notify` says what it sent once it was delivered.
+#[test]
+fn notify_says_what_it_sent() {
+    let (url, rx, receiver) = listen(&[204]);
+    let sb = Sandbox::new();
+    sb.backup_profile("Docs", &[&["docs"]], &[], &crate::common::global_env(&[("NOTIFY_URLS", &url)]));
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.run(&["notify", "--all"]).assert_exit(0).assert_result("notified", json!({}));
+    assert_eq!(rx.recv().unwrap()["type"], "success");
+    receiver.join().unwrap();
 }
 
 /// `notify` sends the status on request; in a dry run, it says what it would send.
