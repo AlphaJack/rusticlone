@@ -121,7 +121,7 @@ impl Cli {
                 }
                 // Progress lines, requested here or by the profile, are not part of the parsed output.
                 Ok(Line::Out(line)) => match serde_json::from_str::<Message>(&line) {
-                    Ok(message) if message.message_type == "status" => {
+                    Ok(message) => {
                         if let Some(callback) = progress.as_mut() {
                             callback(&message.progress);
                         }
@@ -157,7 +157,7 @@ impl Cli {
     fn stop(&self, cx: &Ctx, command: &str, alive: Option<Instant>) -> Option<Error> {
         if let Some(stop) = cx.stop() {
             Some(Error::Stopped(stop))
-        } else if alive.is_some_and(|alive| alive.elapsed() > self.stall_timeout) {
+        } else if alive.is_some_and(|alive| self.stall_timeout.saturating_sub(alive.elapsed()).is_zero()) {
             let silent = fmt::human_duration(self.stall_timeout.as_secs());
             Some(Error::Stalled { command: command.to_owned(), silent })
         } else {

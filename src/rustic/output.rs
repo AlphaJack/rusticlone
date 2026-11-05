@@ -36,11 +36,19 @@ impl Progress {
     }
 }
 
+/// A progress line: only a status is one. Other lines, as a backup's summaries, are its output.
 #[derive(Deserialize)]
 pub(super) struct Message {
-    pub(super) message_type: String,
+    #[expect(dead_code, reason = "only a status parses")]
+    message_type: Status,
     #[serde(flatten)]
     pub(super) progress: Progress,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum Status {
+    Status,
 }
 
 /// The first absolute path in a message: quoted (`` `/a/b` ``), or up to a colon. On Windows, from a
