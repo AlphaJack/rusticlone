@@ -185,3 +185,18 @@ fn a_test_restore_compares_only_folders() {
     plans.sort_by_key(Vec::len);
     assert_eq!(plans, [vec![], vec![serde_json::json!(docs)]], "{}", tested.stdout);
 }
+
+/// A dry run of a restore from a chosen snapshot reads that one, not the newest.
+#[test]
+fn a_dry_run_reads_the_chosen_snapshot() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    let groups: serde_json::Value =
+        serde_json::from_slice(&sb.rustic(&["-P", "Docs", "snapshots", "--json"]).stdout).unwrap();
+    let older = groups[0]["snapshots"][0]["id"].as_str().unwrap().get(..8).unwrap().to_owned();
+    sb.write("docs/a.txt", "version 2");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    sb.run(&["restore", "--dry-run", "-c", "Docs", "--snapshot", &older])
+        .assert_exit(0)
+        .assert_result("test-restored", serde_json::json!({"snapshot": older}));
+}
