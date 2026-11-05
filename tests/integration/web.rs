@@ -749,6 +749,33 @@ fn the_profile_folder_opens_for_this_computer_only() {
     assert_eq!(server.post_form("/setup/folder", "").code, 404);
 }
 
+/// A profile file in the way, even a link that leads nowhere, is never written over, and the form says so. A name
+/// too long for the system fails as the system says.
+#[cfg(unix)]
+#[test]
+fn setup_never_writes_over_a_profile_in_the_way() {
+    if as_root() {
+        return;
+    }
+    let sb = Sandbox::new();
+    let server = sb.server(&[]);
+    let (docs, repo) = (sb.path("docs"), sb.path("repos").join("docs"));
+    let setup = |name: &str| {
+        format!(
+            "name={name}&source.0={}&primary=local&primary.local.repository={}&primary.password=pw&target=none&every=manual&check=manual&keep=all&notify=",
+            docs.display(),
+            repo.display()
+        )
+    };
+    let link = sb.profile_path("Docs");
+    std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+    std::os::unix::fs::symlink(sb.path("nowhere"), &link).unwrap();
+    let refused = server.post_form("/setup", &setup("Docs")).body;
+    assert!(flash(&refused, "failure") && refused.contains("already exists"), "{refused}");
+    let long = server.post_form("/setup", &setup(&"D".repeat(300))).body;
+    assert!(flash(&long, "failure") && !long.contains("already exists"), "{long}");
+}
+
 #[test]
 fn a_first_user_is_shown_where_to_start() {
     if as_root() {
