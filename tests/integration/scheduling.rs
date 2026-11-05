@@ -60,15 +60,18 @@ fn the_env_file_sets_what_the_environment_does_not() {
 #[test]
 fn shadowed_profile_is_reported() {
     let sb = docs_with_remote("");
+    // Backed up: only the hidden profile warns.
+    sb.run(&["backup", "--all"]).assert_exit(0);
     // The collection and its target in rustic's working directory, the target also in the user's directory.
     let (user, cwd) = (sb.profile_dir(), sb.path("cwd"));
     fs::rename(user.join("Docs.toml"), cwd.join("Docs.toml")).unwrap();
     fs::copy(user.join("Docs-remote.toml"), cwd.join("Docs-remote.toml")).unwrap();
     let (read, hidden) = (user.join("Docs-remote.toml"), cwd.join("Docs-remote.toml"));
     let (read, hidden) = (read.display().to_string(), hidden.display().to_string());
-    sb.run(&["collections", "--collection", "Docs"])
-        .assert_exit(2)
-        .assert_result("hidden", json!({"read": read, "hidden": [hidden]}));
+    let out = sb.run(&["collections", "--collection", "Docs"]);
+    out.assert_exit(2).assert_result("hidden", json!({"read": read, "hidden": [hidden]}));
+    // The overview warns too, as the command does.
+    assert_eq!(out.json()["level"], "warning", "{}", out.stdout);
 }
 
 #[test]
