@@ -1,7 +1,5 @@
 //! The emergency kit's download: a zip of every profile with its `info.txt` in the page's language. See [`crate::kit`].
 
-#![expect(clippy::disallowed_methods, reason = "reads the profiles into the kit")]
-
 use std::sync::Arc;
 
 use axum::{
@@ -24,6 +22,7 @@ use crate::{fmt, profile, setup, sys};
 
 /// Downloads the kit always under [`crate::kit::FILE`] so that a newer one replaces it. Its `info.txt` says where
 /// and when it was made.
+#[expect(clippy::disallowed_methods, reason = "makes and reads the emergency kit")]
 pub(super) async fn kit_download() -> Response {
     blocking(|| {
         let profiles: Vec<(String, String)> = (profile::profile_files()?.into_iter())
@@ -32,8 +31,7 @@ pub(super) async fn kit_download() -> Response {
                 Some((file.clone(), std::fs::read_to_string(dir.join(file)).ok()?))
             })
             .collect();
-        // Unnamed, as on the login page.
-        let host = sys::hostname().map_or_else(|| super::Label::ThisComputer.to_string(), ToOwned::to_owned);
+        let host = super::label::this_host();
         let (time, user) = (fmt::local(now()), sys::user());
         let made = crate::kit::Made { host: &host, time: &time, user: &user, root: sys::is_root() };
         let zip = crate::kit::render(&profiles, &made)?;
@@ -52,6 +50,7 @@ pub(super) async fn kit_download() -> Response {
 /// Its new collections are held first, so that nothing backs up the empty folders of this computer: see
 /// [`Event::RestoreFirst`]. Once the server reads them, it restores them, and the page opens the restore when
 /// there is one.
+#[expect(clippy::disallowed_methods, reason = "makes and reads the emergency kit")]
 pub(super) async fn kit_upload(State(app): State<Arc<App>>, base: Base, body: Bytes) -> Response {
     blocking(move || {
         let refused = |error: String| Error::Refused(Notice::KitNotSaved { error });
@@ -95,6 +94,7 @@ pub(super) async fn kit_upload(State(app): State<Arc<App>>, base: Base, body: By
 
 /// Starts the restore of each of `collections` once the server reads them, and returns the collections and runs it
 /// started. Those it could not start are left to the schedule.
+#[expect(clippy::disallowed_methods, reason = "makes and reads the emergency kit")]
 fn restore(app: &Arc<App>, collections: &[String]) -> Vec<(String, i64)> {
     let deadline = std::time::Instant::now() + READ_WITHIN;
     let read = || collections.iter().all(|c| app.engine().collection(c).is_some());

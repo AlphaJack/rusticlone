@@ -75,11 +75,17 @@ impl Profile {
     }
 }
 
+/// A profile's name, from its file's.
+#[cfg(feature = "server")]
+fn stem(file: &str) -> String {
+    file.trim_end_matches(".toml").to_owned()
+}
+
 /// The collections of `profiles` by file name: the profiles that back something up.
 #[cfg(feature = "server")]
 pub(crate) fn primaries(profiles: &[(String, String)]) -> Vec<String> {
     let backs_up = |(_, text): &&(String, String)| !Profile::of(text).sources.is_empty();
-    profiles.iter().filter(backs_up).map(|(file, _)| file.trim_end_matches(".toml").to_owned()).collect()
+    profiles.iter().filter(backs_up).map(|(file, _)| stem(file)).collect()
 }
 
 /// `items` as a sentence lists them: `a`, `a and b`, `a, b and c`, in the reader's language.
@@ -97,7 +103,7 @@ fn listed(items: &[String]) -> String {
 #[cfg(feature = "server")]
 fn collections(profiles: &[(String, String)]) -> String {
     use crate::i18n::t;
-    let names: Vec<String> = profiles.iter().map(|(f, _)| f.trim_end_matches(".toml").to_owned()).collect();
+    let names: Vec<String> = profiles.iter().map(|(f, _)| stem(f)).collect();
     let parsed: Vec<Profile> = profiles.iter().map(|(_, text)| Profile::of(text)).collect();
     let repository = |name: &str| names.iter().position(|n| n == name).map(|i| parsed[i].repository.clone());
     let mut text = String::new();
@@ -253,7 +259,7 @@ pub(crate) fn unpack(profiles: Vec<(String, String)>, dir: &std::path::Path) -> 
     }
     for (name, text) in &profiles {
         let stem = name.strip_suffix(".toml").unwrap_or_default();
-        if stem.is_empty() || !stem.chars().all(|c| c.is_alphanumeric() || "-_.".contains(c)) {
+        if stem.is_empty() || !stem.chars().all(crate::profile::name_char) {
             return Err(Error::Name { name: name.clone() }.into());
         }
         text.parse::<DocumentMut>()?;

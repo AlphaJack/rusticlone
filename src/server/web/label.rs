@@ -247,3 +247,8 @@ pub(super) enum Hint<'a> {
     Notify,
     KitHelp,
 }
+
+/// This computer's name, else words for it.
+pub(super) fn this_host() -> String {
+    crate::sys::hostname().map_or_else(|| Label::ThisComputer.to_string(), ToOwned::to_owned)
+}

@@ -192,7 +192,7 @@ impl Setup {
     pub(super) fn check(&self) -> Result<(), Error> {
         let name = self.name.trim();
         // rustic reads a profile name that starts with `-` as options.
-        if !name.starts_with(char::is_alphanumeric) || !name.chars().all(|c| c.is_alphanumeric() || "-_.".contains(c)) {
+        if !name.starts_with(char::is_alphanumeric) || !name.chars().all(crate::profile::name_char) {
             return Err(Error::Name);
         }
         if self.sources().is_empty() {

@@ -35,6 +35,7 @@ impl Default for Reload {
 }
 
 /// Every `.toml` file of the profile folders, also those another folder's profile of the same name hides.
+#[expect(clippy::disallowed_methods, reason = "watches profiles and the state")]
 fn profile_files() -> Seen {
     let dirs = profile::profile_dirs().unwrap_or_default();
     let entries = dirs.iter().flat_map(|d| fs::read_dir(d).into_iter().flatten().flatten());

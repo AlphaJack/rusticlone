@@ -48,7 +48,6 @@ use jiff::Timestamp;
 
 use super::{App, Changes, Notice};
 use crate::{APP_NAME, engine::Last, fmt, log::Level, shape};
-
 /// Every page links to the source code, as the AGPL requires for network use.
 pub(super) const SOURCE: &str = env!("CARGO_PKG_REPOSITORY");
 pub(super) const VERSION: &str = env!("CARGO_PKG_VERSION");
