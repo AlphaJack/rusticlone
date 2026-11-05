@@ -981,7 +981,9 @@ fn the_profile_folder_opens_in_the_file_manager() {
     let path = std::env::var_os("PATH").unwrap();
     let without = std::env::split_paths(&path).filter(|d| !d.join("xdg-open").exists());
     let without = std::env::join_paths(without).unwrap().into_string().unwrap();
-    assert_eq!(open(&sb.server(&[("PATH", &without)])), 422);
+    let server = sb.server(&[("PATH", &without)]);
+    let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| open(&server)));
+    assert_eq!(refused.ok(), Some(422), "{}", server.output());
 }
 
 /// `serve --open` beside a server that runs opens that one in the browser, logged in, and starts no other.
