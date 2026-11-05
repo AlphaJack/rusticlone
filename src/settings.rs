@@ -224,10 +224,15 @@ fn set_in_env_file(path: &std::path::Path, key: &str, value: &str) -> std::io::R
 /// Whether the env file switches `setting` on, which the next start reads unless the environment sets it.
 #[cfg(all(feature = "desktop", feature = "self-update"))]
 pub(crate) fn on_in_env_file(setting: &Setting) -> bool {
-    let set = env_file().and_then(|path| dotenvy::from_path_iter(path).ok()).and_then(|vars| {
-        vars.filter_map(Result::ok).filter(|(key, _)| key == setting.key).last().map(|(_, value)| value)
-    });
+    let set = env_file().and_then(|path| value_in_env_file(&path, setting.key));
     set.or_else(|| setting.default.map(Into::into)).is_some_and(|v| v.eq_ignore_ascii_case("true"))
+}
+
+/// The value that the env file at `path` sets `key` to, last.
+#[cfg(all(feature = "desktop", feature = "self-update"))]
+fn value_in_env_file(path: &std::path::Path, key: &str) -> Option<String> {
+    let vars = dotenvy::from_path_iter(path).ok()?;
+    vars.filter_map(Result::ok).filter(|(k, _)| k == key).last().map(|(_, value)| value)
 }
 
 #[cfg(all(feature = "desktop", feature = "self-update"))]
