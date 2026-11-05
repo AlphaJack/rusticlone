@@ -309,6 +309,7 @@ mod tests {
             to: String::new(),
             at: String::new(),
             from: String::new(),
+            pick: String::new(),
         }
     }
 
