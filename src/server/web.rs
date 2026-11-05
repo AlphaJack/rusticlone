@@ -87,6 +87,7 @@ pub(super) fn router(app: Arc<App>) -> Router {
         .route(&at(Route::CollectionRuns("")), post(actions::run).delete(actions::cancel))
         .route(&at(Route::NewRun("")), get(forms::form))
         .route(&at(Route::CollectionRefresh("")), post(actions::refresh))
+        .route(&at(Route::CollectionFolder("")), post(actions::open_collection_folder))
         .route(&at(Route::Failure("", "")), delete(actions::dismiss))
         .route(&at(Route::RepoRuns("", "")), post(actions::run))
         .route(&at(Route::RepoRefresh("", "")), post(actions::refresh))

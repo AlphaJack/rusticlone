@@ -110,6 +110,9 @@ pub(super) enum Button<'a> {
     CopyFolderPath,
     SeeHow,
     CronSyntax,
+    /// The file manager's name for it, as [`Button::OpenFolder`].
+    #[fluent(os = std::env::consts::OS)]
+    ShowProfile,
 }
 
 /// A word or a state, in a table or a breadcrumb.
