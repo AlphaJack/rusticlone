@@ -161,6 +161,40 @@ mod tests {
         }
         let pair = Ed25519KeyPair::from_pkcs8(Ed25519KeyPair::generate_pkcs8(&rng).unwrap().as_ref()).unwrap();
         checks(Scheme::Ed25519, pair.public_key().as_ref(), pair.sign(data).as_ref());
+        // ring cannot generate an RSA key: a throwaway one, made with openssl.
+        let pair =
+            signature::RsaKeyPair::from_pkcs8(include_bytes!("../../tests/fixtures/attest-rsa-2048.pk8")).unwrap();
+        let paddings: [(Scheme, &dyn signature::RsaEncoding); 6] = [
+            (Scheme::RsaPssSha256, &signature::RSA_PSS_SHA256),
+            (Scheme::RsaPssSha384, &signature::RSA_PSS_SHA384),
+            (Scheme::RsaPssSha512, &signature::RSA_PSS_SHA512),
+            (Scheme::RsaPkcs1Sha256, &signature::RSA_PKCS1_SHA256),
+            (Scheme::RsaPkcs1Sha384, &signature::RSA_PKCS1_SHA384),
+            (Scheme::RsaPkcs1Sha512, &signature::RSA_PKCS1_SHA512),
+        ];
+        for (scheme, padding) in paddings {
+            let mut sig = vec![0; pair.public().modulus_len()];
+            pair.sign(padding, &rng, data, &mut sig).unwrap();
+            checks(scheme, pair.public().as_ref(), &sig);
+        }
+        // ring cannot sign with a curve and a hash that differ: signed with openssl, as `openssl dgst -sha384 -sign`.
+        let bytes = |hex: &str| -> Vec<u8> {
+            hex.as_bytes().chunks(2).map(|b| u8::from_str_radix(std::str::from_utf8(b).unwrap(), 16).unwrap()).collect()
+        };
+        for (scheme, key, sig) in [
+            (
+                Scheme::EcdsaP256Sha384,
+                "04a0c3f5f08fc6b21aa8af59ea9312af271b74d9b4d7c9a09835edbf397787aaf7048428543a417f5caf4ad23a609abb18666f0d2515e102b7cab1fdd05dc3358a",
+                "304502203029eaee33b7c9cd49b0a6399164567f0327cf9d2fbb16dfc6c6d6ec4a8c4b1b0221008d750e72239d0e65936b28717c4b2d9b78cf6779f1d0a3b8aa0d20925e970cff",
+            ),
+            (
+                Scheme::EcdsaP384Sha256,
+                "04b1c8d117100dda6e34c092885ca96b98ae5deb1c17df4987e13661f2d75cea1b170d6d6bbd3bf20d5d9111eb35d77ab3f5a57add5621ed59a0200e096eb50a2fe6401382302a21b4a02af8954a54698ce607c82805f67f7c5d18e79f6f379e1b",
+                "306502300c81a720c65e3fbe96596f1e39e2696c6f45530009a3026134c09dc24ffa1dfb66e0bf65d3c67965a5904c71ca92861e023100e34e4b24d12310c4109aae650e5e3d6c2e46247a4b1f135f714ea79d132398f0d5e638aad6ffd5d5adb26e4aab36f3ed",
+            ),
+        ] {
+            checks(scheme, &bytes(key), &bytes(sig));
+        }
         assert!(super::Ring.verify_prehashed(Scheme::Ed25519, b"", b"", b"").is_err(), "over a digest");
     }
 
