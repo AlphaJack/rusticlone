@@ -1,5 +1,5 @@
 ---
-source: src/engine/tests.rs
+source: src/engine/tests/copy.rs
 expression: "forgets_sorted(outcome(&replay, &report, &engine, &collections[0]))"
 ---
 {
