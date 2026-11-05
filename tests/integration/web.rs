@@ -93,6 +93,8 @@ fn repositories_are_listed_on_demand() {
         !repos.contains("spinner") && repos.matches(r#"<td class="right num">1</td>"#).count() == 2
     });
     assert!(card(&server.get("/collections/Docs").body, "sources").contains(r#"<td class="right num">1</td>"#));
+    // Without a [forget] policy, neither repository has anything to prune.
+    assert_eq!(card(&server.get("/collections/Docs").body, "repos").matches("keeps every snapshot").count(), 2);
     assert_eq!(server.get("/collections/Docs/repos/Unknown").code, 404);
     // The location of each repository.
     let remote = sb.path("remote/Docs").display().to_string();
