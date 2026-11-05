@@ -557,6 +557,11 @@ fn attempted(engine: &Engine, key: crate::request::StepKey, result: &crate::resu
     engine.store.apply(&[Event::Attempted { key, started: at, at, result: result.into(), by }]).unwrap();
 }
 
+/// How many failures the run reported.
+fn failures(run: &super::Run<'_>) -> usize {
+    run.shared.results.lock().iter().filter(|(_, r)| r.level() == Level::Failure).count()
+}
+
 fn backed_up() -> crate::result::StepResult {
     crate::result::StepResult::BackedUp { repo: "Docs".into(), snapshots: vec![], new_repository: false }
 }
@@ -794,7 +799,7 @@ fn a_run_keeps_each_result_once_and_counts_failures() {
     run.push_once(backed_up());
     assert_eq!(run.results_of(None), [failed(), backed_up()]);
     run.push(failed());
-    assert_eq!(run.failures(), 2);
+    assert_eq!(failures(&run), 2);
     run.activity(Some(Doing::WaitingForListing { repo: "Docs".into() }), false);
     assert_eq!(guard.live.activities().len(), 1);
     run.idle();
@@ -964,7 +969,7 @@ fn a_forget_on_a_repository_it_cannot_list_fails() {
     let collections = engine.collections();
     let run = super::Run::new(&collections[0], None);
     engine.forget(&run, collections[0].repo("Docs-usb").unwrap(), &[]);
-    assert_eq!(run.failures(), 1, "{:?}", run.results_of(None));
+    assert_eq!(failures(&run), 1, "{:?}", run.results_of(None));
 }
 
 /// A source that a hook creates learns from the one snapshot that no other source explains. With more of them than
