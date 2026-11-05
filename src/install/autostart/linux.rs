@@ -96,12 +96,14 @@ fn dir() -> Result<PathBuf> {
 
 /// A user without a graphical session, as on a server over SSH, whose services systemd would stop at logout.
 #[cfg_attr(test, mutants::skip)] // Reads this session's environment, which every test shares.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn headless() -> bool {
     !sys::is_root() && ["DISPLAY", "WAYLAND_DISPLAY"].iter().all(|v| std::env::var_os(v).is_none())
 }
 
 /// Writes the unit unless a package installed it, and a drop-in with this executable and `PATH`. Restarted,
 /// so that a running server takes them. Headless, systemd keeps the user's services running without a login.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
     if headless() {
         linger()?;
@@ -162,6 +164,7 @@ pub(super) fn start() -> Result<bool> {
 }
 
 /// `None` if not installed.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn uninstall() -> Result<Option<Removed>> {
     let (dir, service) = (dir()?, format!("{NAME}.service"));
     let drop_in = dir.join(format!("{service}.d"));

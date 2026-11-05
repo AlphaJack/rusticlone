@@ -1,8 +1,6 @@
 //! Replaces the running executable with the one of the newest release, built by dist for this system,
 //! once its checksum and GitHub's attestation that the release workflow built it both hold.
 
-#![expect(clippy::disallowed_methods, reason = "writes the new executable beside the temporary files")]
-
 use std::{collections::BTreeMap, env::consts::EXE_SUFFIX, path::Path};
 
 use anyhow::Result;
@@ -134,6 +132,7 @@ fn system(target: &str) -> impl Iterator<Item = &str> {
 /// with. Returns whether rustic is left to update here: this executable is the newest. A dry run only says
 /// whether there is a newer release.
 #[cfg_attr(test, mutants::skip)] // Downloads the newest release, and starts it.
+#[expect(clippy::disallowed_methods, reason = "writes the new executable beside the temporary files")]
 pub(crate) fn update(dry_run: bool) -> Result<bool> {
     // Read before it is replaced: Linux then names the old file, with ` (deleted)`.
     let exe = std::env::current_exe()?;
@@ -201,6 +200,7 @@ fn without_download(
 /// Downloads the newest release if it is newer, checks it against its checksum, and replaces this
 /// executable with it.
 #[cfg_attr(test, mutants::skip)] // Downloads the newest release.
+#[expect(clippy::disallowed_methods, reason = "writes the new executable beside the temporary files")]
 fn replace(dry_run: bool) -> Result<Logged> {
     let current = Version::parse(env!("CARGO_PKG_VERSION"))?;
     let api = REPOSITORY.replace("://github.com/", "://api.github.com/repos/");

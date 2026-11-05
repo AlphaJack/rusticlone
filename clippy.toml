@@ -3,6 +3,8 @@ allow-expect-in-tests = true
 allow-panic-in-tests = true
 too-many-lines-threshold = 80
 disallowed-methods = [
+  { path = "rusticlone::sys::paths::own_config_dir", reason = "take the folder as an argument: a test passes one of its own" },
+  { path = "rusticlone::settings::state_dir", reason = "take the folder as an argument: a test passes one of its own" },
   { path = "rusticlone::sys::disk::presence", reason = "a source is read through rustic, whose hooks may mount or fill it" },
   { path = "std::thread::sleep", reason = "use condition-based waits or a clock abstraction" },
   { path = "rusticlone::clock::Wakes::sleep", reason = "wait for a notification: clock::WAKES.wait, a channel or a signal" },

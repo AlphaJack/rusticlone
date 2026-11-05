@@ -1,7 +1,5 @@
 //! File locks shared across processes: for runs, requests, repositories and the resources they use.
 
-#![expect(clippy::disallowed_methods, reason = "creates lock files")]
-
 use std::{
     collections::BTreeMap,
     fs::{File, OpenOptions, TryLockError},
@@ -139,6 +137,7 @@ impl Store {
         self.dir.join("locks").join(format!("{:016x}.lock", sys::fnv1a(key.as_bytes())))
     }
 
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
     pub(super) fn lock_file(&self, key: &str) -> std::io::Result<File> {
         OpenOptions::new().create(true).truncate(false).write(true).open(self.lock_path(key))
     }
@@ -153,6 +152,7 @@ mod tests {
 
     /// A shared wait ends at once beside other shared locks, and only once an exclusive one is released.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
     fn a_shared_wait_ends_once_no_exclusive_lock_is_held() {
         let store = store("lock-blocking-test");
         let (held, waiting) = (store.lock_file("repo").unwrap(), store.lock_file("repo").unwrap());
@@ -171,6 +171,7 @@ mod tests {
 
     /// A run waits for the one ahead of it, showing the lock it waits for, and releases its locks once dropped.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
     fn a_run_waits_for_the_one_ahead_then_holds_its_locks() {
         let store = store("lock-ahead-test");
         let (cx, ahead) = (Ctx::default(), store.lock_file("run:Docs:1").unwrap());

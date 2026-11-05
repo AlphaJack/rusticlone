@@ -9,6 +9,7 @@ pub(crate) enum Error {
 }
 
 /// Runs a macOS tool that has no API, like `launchctl` or `codesign`. Fails with what it printed.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 fn run(program: &str, args: &[&str]) -> Result<()> {
     let out = (std::process::Command::new(program).args(args).output())
         .map_err(|source| Error::CannotRun { program: program.to_owned(), source })?;
@@ -143,6 +144,7 @@ fn register(app: &Path) -> Result<()> {
 
 /// The app, with a copy of this executable, signed as itself rather than by the linker's anonymous
 /// signature. A copy rather than a link, which macOS would resolve to the executable outside the app.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn bundle(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
     let contents = app.join("Contents");
     // Named as the app: Login Items and Activity Monitor show it.
@@ -203,6 +205,7 @@ fn set_attribute(path: &Path, name: &std::ffi::CStr, value: &[u8]) -> Result<()>
 /// The package manager's executable when it changed since the app that holds `exe` copied it: not when the
 /// app's signature changed the copy, else each start would copy it again.
 #[cfg(any(feature = "self-update", test))]
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn stale(exe: &Path) -> Option<PathBuf> {
     let (source, copied) = crate::install::app::source(exe)?;
     let new = std::fs::read(&source).ok()?;
@@ -238,6 +241,7 @@ pub(super) fn rewrite_app(version: &str) -> Result<()> {
 
 /// Whether the plist is installed and the user switched it off. macOS 13 introduced the switch.
 #[expect(unsafe_code, reason = "asks Service Management about a plist's path")]
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn blocked() -> bool {
     use objc2_foundation::{NSString, NSURL};
     use objc2_service_management::{SMAppService, SMAppServiceStatus};
@@ -251,6 +255,7 @@ pub(super) fn blocked() -> bool {
 }
 
 /// Started now and at load, restarted after a failure, at low priority, as the systemd unit.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
     let (file, dir) = (plist()?, crate::profile::own_dir().ok_or(NoProfileDir {})?);
     // rustic's profile directory, so that the server reads no profiles from wherever it started.
@@ -279,6 +284,7 @@ pub(super) fn install(_listen: &str, exe: &Path, serve: &[String]) -> Result<Pat
 }
 
 /// Whether `launchctl disable` keeps launchd from loading the plist at login. Older macOS says `true`.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 fn disabled() -> bool {
     let listed = std::process::Command::new("launchctl").args(["print-disabled", &domain()]).output();
     let entry = format!("\"{NAME}\" =>");
@@ -290,6 +296,7 @@ fn disabled() -> bool {
     })
 }
 
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn at_login() -> Option<bool> {
     plist().ok().filter(|f| f.exists())?;
     Some(!disabled() && !blocked())
@@ -310,6 +317,7 @@ pub(super) fn set_at_login(on: bool) -> Result<()> {
 
 /// Asks launchd to start the installed server, as installed, unless it runs; false if not installed, or
 /// kept from starting at login, when launchd may not have loaded it.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn start() -> Result<bool> {
     if !plist()?.exists() || disabled() {
         return Ok(false);
@@ -319,6 +327,7 @@ pub(super) fn start() -> Result<bool> {
 }
 
 /// `None` if not installed.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn uninstall() -> Result<Option<Removed>> {
     let file = plist()?;
     if !file.exists() {
@@ -368,6 +377,7 @@ mod tests {
     /// The app copies Homebrew's executable and signs the copy, which changes it: the app is not stale then, else
     /// each start would copy it again and restart. It is once Homebrew upgrades its executable.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
     fn the_app_copies_homebrews_executable_again_only_once_it_changed() {
         let dir = std::env::temp_dir().join(format!("{}-brew-app-{}", crate::NAME, std::process::id()));
         let (app, cellar) = (
@@ -405,6 +415,7 @@ mod tests {
     /// An update replaces the executable inside the app, which breaks its signature: written again, the app
     /// shows the new version and its signature holds.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
     fn the_app_is_signed_again_around_a_new_executable() {
         let dir = std::env::temp_dir().join(format!("{}-app-{}", crate::NAME, std::process::id()));
         let app = dir.join(format!("{}.app", crate::APP_NAME));

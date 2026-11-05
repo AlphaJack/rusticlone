@@ -57,6 +57,7 @@ fn not_installed(error: &windows_service::Error) -> bool {
 }
 
 /// Asks the service to stop, and waits until it has: runs get [`crate::server`]'s time to record that.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 fn stop(service: &Service) -> Result<()> {
     if service.query_status()?.current_state == ServiceState::Stopped {
         return Ok(());
@@ -69,6 +70,7 @@ fn stop(service: &Service) -> Result<()> {
     Ok(())
 }
 
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 fn install_service(exe: &Path, serve: &[String]) -> Result<PathBuf> {
     let info = ServiceInfo {
         name: NAME.into(),
@@ -239,6 +241,7 @@ fn start_menu() -> Result<PathBuf> {
 /// What runs `exe` with `args` without a console window, so that none opens at login or from the Start
 /// menu: `exe` itself from Windows 11 24H2 on, which reads the console policy of its manifest, else Windows's
 /// console host, which gives it a console that has no window.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 fn without_window(exe: &str, args: &str) -> (PathBuf, String) {
     if sys::windows_build() >= CONSOLE_POLICY_BUILD {
         return (PathBuf::from(exe), args.into());
@@ -247,6 +250,7 @@ fn without_window(exe: &str, args: &str) -> (PathBuf, String) {
     (PathBuf::from(root).join(r"System32\conhost.exe"), format!("--headless \"{exe}\" {args}"))
 }
 
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn install(listen: &str, exe: &Path, serve: &[String]) -> Result<PathBuf> {
     use std::os::windows::process::CommandExt;
     if sys::is_root() {
@@ -281,6 +285,7 @@ fn set_run(exe: &str, serve: &[String]) -> Result<()> {
 
 /// Installed with its Start menu entry; started at login by the `Run` key.
 #[expect(unsafe_code, reason = "reads a registry value named by NUL-terminated strings")]
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn at_login() -> Option<bool> {
     use windows_sys::Win32::System::Registry::{RRF_RT_REG_SZ, RegGetValueW};
     start_menu().ok().filter(|link| link.exists())?;
@@ -328,6 +333,7 @@ fn keep_own_handles() {
 
 /// `None` if not installed. The server started at login has no service to stop it: it runs until logout.
 #[expect(unsafe_code, reason = "deletes a registry value named by NUL-terminated strings")]
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(super) fn uninstall() -> Result<Option<Removed>> {
     if sys::is_root() {
         return uninstall_service();

@@ -1,7 +1,5 @@
 //! Unix's keepers: the system, Nix and Homebrew.
 
-#![expect(clippy::disallowed_methods, reason = "lays out package managers' folders")]
-
 use std::path::Path;
 
 use super::{Keeper, keeper, managed};
@@ -24,6 +22,7 @@ fn nixs_store_is_managed() {
 
 /// Started through Homebrew's `bin`, macOS names the executable by the link.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "lays out package managers' folders")]
 fn homebrews_cellar_is_managed_through_its_link() {
     let root = std::env::temp_dir().join(format!("{}-brew-{}", crate::NAME, std::process::id()));
     let (cellar, bin) = (root.join("Cellar").join("rusticlone").join("2.0.1").join("bin"), root.join("bin"));

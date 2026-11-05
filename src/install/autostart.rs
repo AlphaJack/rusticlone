@@ -2,8 +2,6 @@
 //! own service manager, and starts now. It runs this executable with the current `PATH`, so that it
 //! finds the same rustic.
 
-#![expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
-
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -78,6 +76,7 @@ pub(crate) fn start_installed(listen: &str) -> Result<bool> {
 
 /// Whether the server answers on `listen` within a minute, which an update at its start can take.
 #[cfg_attr(test, mutants::skip)] // Waits up to a minute for a server to answer.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(crate) fn answers_soon(listen: &str) -> bool {
     const POLL: std::time::Duration = std::time::Duration::from_millis(200);
     let deadline = std::time::Instant::now() + std::time::Duration::from_mins(1);
@@ -189,6 +188,7 @@ pub(crate) fn set_at_login(on: bool) -> Result<()> {
 
 /// Deletes the state directory: the runs and the login token. Never the profiles, nor
 /// the repositories.
+#[expect(clippy::disallowed_methods, reason = "writes the service files and runs the service manager")]
 pub(crate) fn delete() -> Result<Option<Logged>> {
     let dir = crate::settings::state_dir()?;
     if !dir.exists() {

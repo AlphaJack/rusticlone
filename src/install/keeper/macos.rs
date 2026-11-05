@@ -1,13 +1,12 @@
 //! macOS's keepers: the app's copy of a package manager's executable.
 
-#![expect(clippy::disallowed_methods, reason = "lays out the app")]
-
 use std::path::Path;
 
 use super::managed;
 
 /// The app copies Homebrew's executable, and names it in its resources.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "lays out the app")]
 fn the_macos_apps_copy_of_homebrews_executable_is_managed() {
     let app = std::env::temp_dir().join(format!("{}-app-{}.app", crate::NAME, std::process::id()));
     let exe = app.join("Contents").join("MacOS").join(crate::APP_NAME);

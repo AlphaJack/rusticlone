@@ -2,8 +2,6 @@
 //! are the source of truth: if the database is lost, every scheduled step runs once and lag is
 //! measured again. Run logs are text files next to it, in `runs/<collection>/`.
 
-#![expect(clippy::disallowed_methods, reason = "opens the state database")]
-
 mod event;
 mod kept;
 mod locks;
@@ -238,6 +236,7 @@ struct Parsed {
 struct Scratch(PathBuf);
 
 impl Drop for Scratch {
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn drop(&mut self) {
         _ = fs::remove_dir_all(&self.0);
     }
@@ -245,6 +244,7 @@ impl Drop for Scratch {
 
 impl Store {
     /// The state in the state directory.
+    #[expect(clippy::disallowed_methods, reason = "the real folder: tests use `Store::at`")]
     pub fn open() -> Result<Self> {
         Self::at(settings::state_dir()?)
     }
@@ -252,6 +252,7 @@ impl Store {
     /// The store of a dry run: a copy of the state in memory, read without writing to the state, which a
     /// database open for writing would. Its locks are the state's, so that it waits for other runs. Without
     /// a state yet, they are in a temporary directory, so that the dry run creates no state.
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     pub(crate) fn open_dry_run() -> Result<Self> {
         let _one = os::one_at_a_time();
         let dir = settings::state_dir()?;
@@ -309,6 +310,7 @@ impl Store {
     }
 
     /// The state in `dir`.
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     pub fn at(dir: PathBuf) -> Result<Self> {
         let _one = os::one_at_a_time();
         fs::create_dir_all(dir.join("locks"))?;
@@ -628,6 +630,7 @@ mod tests {
 
     /// The paths a hook's sources lead to are kept until they are no longer known. A store shows where it is.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn hooked_paths_are_kept_until_unknown() {
         let store = store("hooked-paths-test");
         let (sources, paths) = (["docs".to_owned()], ["/mnt/docs".to_owned()]);
@@ -641,6 +644,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn checks_take_the_data_subsets_in_turn() {
         let a = store("subsets-test");
         let b = Store::at(a.dir.clone()).unwrap();
@@ -652,6 +656,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn a_state_written_by_a_newer_version_is_not_opened() {
         let a = store("newer-test");
         let known = Ledger::MIGRATIONS.len() as u64;
@@ -663,6 +668,7 @@ mod tests {
 
     #[cfg(feature = "server")]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn writes_count_the_changes_pages_show() {
         let a = store("changes-test");
         let b = Store::at(a.dir.clone()).unwrap();
@@ -676,6 +682,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn two_handles_share_the_state() {
         let a = store("shared-test");
         let b = Store::at(a.dir.clone()).unwrap();
@@ -693,6 +700,7 @@ mod tests {
 
     /// A new state records what reading it takes, for older versions to refuse it if they cannot.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn a_new_state_records_what_reading_it_takes() {
         let a = store("readable-from-test");
         for (name, _, readable_from) in kinds() {
@@ -704,6 +712,7 @@ mod tests {
 
     /// A session is valid until it expires, and adding one keeps the others valid.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "opens the state database")]
     fn a_session_is_valid_until_it_expires() {
         let a = store("sessions-test").with_clock(clock::Fixed::at("2026-10-16T12:00:00Z"));
         let (now, hour) = (a.now(), jiff::SignedDuration::from_hours(1));

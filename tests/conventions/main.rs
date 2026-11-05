@@ -1,6 +1,7 @@
 //! The code conventions in CONTRIBUTING that a test can check, read from the sources with `syn`, in one binary.
 
 mod duplicates;
+mod expects;
 mod literals;
 mod paths;
 mod systems;

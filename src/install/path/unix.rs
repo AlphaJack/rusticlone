@@ -3,6 +3,7 @@ use std::{io::Write, path::Path};
 use anyhow::Result;
 
 /// The startup files changed, by name.
+#[expect(clippy::disallowed_methods, reason = "reads PATH and edits the shells' startup files")]
 pub(super) fn add(dir: &Path) -> Result<String> {
     // Root's folder is on `PATH` already.
     if crate::sys::is_root() {

@@ -1,7 +1,5 @@
 //! Saving the profiles, refusing folders that would lose data.
 
-#![expect(clippy::disallowed_methods, reason = "saves the profiles")]
-
 use std::path::PathBuf;
 
 use super::{Error, Role, Setup};
@@ -10,6 +8,7 @@ use crate::{profile, sys};
 impl Setup {
     /// Refuses a repository folder that a source holds or that holds a source. Refuses one with other files but no
     /// repository's `config` too. The folder of an existing repository is kept to back up into it again.
+    #[expect(clippy::disallowed_methods, reason = "saves the profiles")]
     pub(super) fn check_folders(&self) -> Result<(), Error> {
         use std::path::{Path, PathBuf};
         // As written and as the disk resolves it, up to its nearest folder that exists: `/tmp` is a link to
@@ -46,6 +45,7 @@ pub(crate) fn dir() -> Option<PathBuf> {
 }
 
 /// Saves the profiles in [`dir`], and returns it. Never overwrites a file.
+#[expect(clippy::disallowed_methods, reason = "saves the profiles")]
 pub(crate) fn save(setup: &Setup) -> anyhow::Result<PathBuf> {
     use std::{fs, io::Write};
     setup.check()?;

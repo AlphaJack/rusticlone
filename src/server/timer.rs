@@ -1,7 +1,5 @@
 //! Waiting for wall clock times, which schedules use, across suspends and clock changes.
 
-#![expect(clippy::disallowed_methods, reason = "reads the wall clock")]
-
 use std::time::Duration;
 
 use jiff::Timestamp;
@@ -30,6 +28,7 @@ use imp::wall_timer;
 const SUSPEND_CHECK: Duration = Duration::from_secs(60);
 
 /// Waits until `at` by the wall clock, also across a suspend. Forever if `None`.
+#[expect(clippy::disallowed_methods, reason = "reads the wall clock")]
 pub(super) async fn wall_clock(at: Option<Timestamp>) {
     let Some(at) = at else { return std::future::pending().await };
     if let Err(e) = wall_timer(at).await {
@@ -45,6 +44,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "reads the wall clock")]
     fn wall_timer_fires() {
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
         let at = Timestamp::now() + Duration::from_millis(50);

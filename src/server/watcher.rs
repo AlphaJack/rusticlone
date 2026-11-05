@@ -1,7 +1,5 @@
 //! Watching profiles and the state for changes.
 
-#![expect(clippy::disallowed_methods, reason = "watches profiles and the state")]
-
 use std::{
     collections::BTreeSet,
     fs,
@@ -39,6 +37,7 @@ impl Reload {
 /// Edited profiles are read again, and state changes, also from other processes, reach
 /// the web UI at once. Without a watcher (no inotify watches left, for example), `systemctl reload`
 /// still reads the profiles again.
+#[expect(clippy::disallowed_methods, reason = "watches profiles and the state")]
 pub(super) fn watch_files(state: &Path, app: &Arc<App>, reload: &Arc<Reload>) -> Option<RecommendedWatcher> {
     let profile_dirs = profile::profile_dirs().unwrap_or_default();
     let (dirs, app, reload, runs) = (profile_dirs.clone(), app.clone(), reload.clone(), state.join("runs"));

@@ -3,8 +3,6 @@
 //! its line, and rustic's own log is left out: the results already say what went wrong. Text outside a
 //! terminal has no progress.
 
-#![expect(clippy::disallowed_methods, reason = "timestamps log lines, and reads NO_COLOR")]
-
 use std::{
     io::{IsTerminal, Write, stderr, stdout},
     sync::{
@@ -348,6 +346,7 @@ pub(crate) fn clear() {
 }
 
 #[cfg_attr(test, mutants::skip)] // Sets the process's output mode once, which every other test would then share.
+#[expect(clippy::disallowed_methods, reason = "timestamps log lines, and reads NO_COLOR")]
 pub(crate) fn init(json: bool, verbose: bool) {
     let live = !json && stdout().is_terminal() && crate::sys::ansi();
     let color = live && std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
@@ -430,6 +429,7 @@ fn route(mode: Mode, target: &str) -> Option<Out> {
 
 /// The line that `mode` writes. `name`: the collection, or for rustic's own lines, the profile. `extra` fields
 /// appear in JSON only.
+#[expect(clippy::disallowed_methods, reason = "timestamps log lines, and reads NO_COLOR")]
 fn line(mode: Mode, target: &str, level: Level, name: Option<&str>, message: &str, extra: Value) -> String {
     if mode.json {
         // The level names log processors expect.

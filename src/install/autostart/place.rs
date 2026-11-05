@@ -2,8 +2,6 @@
 //! does not run a file left in a folder such as Downloads, and new terminals find the command. A package
 //! manager's stays where it keeps it, so that it updates the one the server runs.
 
-#![expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -28,6 +26,7 @@ enum Error {
 log::level!(Success: Logged);
 
 /// The executable to install: this one where it is, if [`kept`], else one in [`sys::bin_dir`].
+#[expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
 pub(super) fn target() -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
     let installer = sys::installer_dir().ok();
@@ -57,6 +56,7 @@ fn linked(exe: &Path, path: &std::ffi::OsStr) -> Option<PathBuf> {
 
 /// Copies this executable to `placed` unless that leads to it, and puts its folder on `PATH` for new terminals,
 /// unless a package manager keeps it: its own link or shim is on `PATH` already.
+#[expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
 pub(super) fn place(placed: &Path) -> Result<()> {
     let (exe, dir) = (std::env::current_exe()?, placed.parent().unwrap_or(placed));
     let same = placed.canonicalize().is_ok_and(|p| exe.canonicalize().is_ok_and(|e| e == p));
@@ -90,6 +90,7 @@ mod tests {
     pub(super) struct Folder(pub(super) PathBuf);
 
     impl Folder {
+        #[expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
         pub(super) fn new(name: &str) -> Self {
             let dir = std::env::temp_dir().join(format!("{}-{name}-{}", crate::NAME, std::process::id()));
             std::fs::create_dir_all(&dir).unwrap();
@@ -97,6 +98,7 @@ mod tests {
         }
 
         /// An executable at `relative`, with its folders.
+        #[expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
         pub(super) fn exe(&self, relative: &str) -> PathBuf {
             let exe = self.0.join(relative);
             std::fs::create_dir_all(exe.parent().unwrap()).unwrap();
@@ -106,6 +108,7 @@ mod tests {
     }
 
     impl Drop for Folder {
+        #[expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
         fn drop(&mut self) {
             _ = std::fs::remove_dir_all(&self.0);
         }

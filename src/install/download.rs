@@ -1,7 +1,5 @@
 //! Executables downloaded from GitHub releases: rustic's when it is missing, and rusticlone's own on update.
 
-#![expect(clippy::disallowed_methods, reason = "writes downloaded executables")]
-
 use std::{
     io::{Read, Write},
     path::Path,
@@ -55,6 +53,7 @@ pub(crate) fn untar(archive: &str, data: &[u8], name: &str) -> Result<Vec<u8>> {
 }
 
 /// Writes an executable, renamed into place so that no half-written one runs.
+#[expect(clippy::disallowed_methods, reason = "writes downloaded executables")]
 pub(crate) fn install(binary: &[u8], path: &Path) -> Result<()> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir)?;
@@ -121,6 +120,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes downloaded executables")]
     fn the_executable_is_found_at_any_depth_and_installed_whole() {
         let mut tar = tar::Builder::new(flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast()));
         let mut header = tar::Header::new_gnu();
