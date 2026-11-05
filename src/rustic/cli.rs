@@ -4,7 +4,7 @@
 
 use std::ffi::OsStr;
 use std::{
-    io::{self, BufRead, BufReader, Read},
+    io::{self, Read},
     path::Path,
     process::{Command, ExitStatus, Stdio},
     sync::mpsc::{self, RecvTimeoutError},
@@ -25,17 +25,17 @@ use crate::fmt;
 
 /// How often a running rustic is checked for activity and stop requests.
 const TICK: Duration = Duration::from_millis(500);
-/// Bytes read at a time from a counted stdout.
+/// Bytes read at a time from a pipe.
 const READ_CHUNK: usize = 1 << 16;
 
 pub(crate) struct Cli {
     pub(super) stall_timeout: Duration,
 }
 
-/// Messages from the threads that watch rustic.
+/// Messages from the threads that watch rustic: what its pipes gave, as it came.
 enum Line {
-    Out(String),
-    Err(String),
+    Out(Vec<u8>),
+    Err(Vec<u8>),
     Bytes(usize),
     Exited(io::Result<ExitStatus>),
 }
@@ -107,6 +107,12 @@ impl Cli {
         let (mut text, mut bytes, mut alive, mut status) = (String::new(), 0, Instant::now(), None);
         let mut worked = work(pid);
         let mut stderr = Log::default();
+        let (mut out, mut err) = (Pending::default(), Pending::default());
+        let mut stderr_line = |line: &str| {
+            log(line);
+            stderr.line(line);
+        };
+        let mut output = |line: &str| output_line(line, &mut text, &mut progress);
         loop {
             let received = rx.recv_timeout(TICK);
             // No output while it hashes or waits for a remote. Its I/O shows that it is still working.
@@ -115,19 +121,8 @@ impl Cli {
                 (alive, worked) = (Instant::now(), work);
             }
             match received {
-                Ok(Line::Err(line)) => {
-                    log(&line);
-                    stderr.line(&line);
-                }
-                // Progress lines, requested here or by the profile, are not part of the parsed output.
-                Ok(Line::Out(line)) => match serde_json::from_str::<Message>(&line) {
-                    Ok(message) => {
-                        if let Some(callback) = progress.as_mut() {
-                            callback(&message.progress);
-                        }
-                    }
-                    _ => text.push_str(&format!("{line}\n")),
-                },
+                Ok(Line::Err(chunk)) => err.lines(&chunk).iter().for_each(|line| stderr_line(line)),
+                Ok(Line::Out(chunk)) => out.lines(&chunk).iter().for_each(|line| output(line)),
                 Ok(Line::Bytes(n)) => bytes += n as u64,
                 Ok(Line::Exited(exited)) => status = Some(exited?),
                 // Exited and silent. A process that rustic started may keep the pipes open.
@@ -142,6 +137,10 @@ impl Cli {
                 return Err(why.into());
             }
         }
+        // Rustic ends its output without a newline. A process it started may keep the pipe open, so that the
+        // last line never ends.
+        err.rest().iter().for_each(|line| stderr_line(line));
+        out.rest().iter().for_each(|line| output(line));
         let status = status.ok_or(Error::NoStatus)?;
         let output = Output {
             success: status.success(),
@@ -166,35 +165,63 @@ impl Cli {
     }
 }
 
+/// A line of rustic's output: progress, requested here or by the profile, is not part of the parsed output.
+fn output_line(line: &str, text: &mut String, progress: &mut Option<&mut dyn FnMut(&Progress)>) {
+    match serde_json::from_str::<Message>(line) {
+        Ok(message) => {
+            if let Some(callback) = progress.as_mut() {
+                callback(&message.progress);
+            }
+        }
+        Err(_) => text.push_str(&format!("{line}\n")),
+    }
+}
+
+/// What a pipe gave, cut into lines as they arrive, without their `\n` or `\r\n`. What follows the last newline waits
+/// for the rest of its line.
+#[derive(Default)]
+struct Pending(Vec<u8>);
+
+impl Pending {
+    /// The lines that `chunk` ends.
+    fn lines(&mut self, chunk: &[u8]) -> Vec<String> {
+        self.0.extend_from_slice(chunk);
+        let Some(end) = self.0.iter().rposition(|b| *b == b'\n') else { return Vec::new() };
+        let ended: Vec<u8> = self.0.drain(..=end).collect();
+        ended[..end].split(|b| *b == b'\n').map(line).collect()
+    }
+
+    /// The line left without its newline, if any.
+    fn rest(self) -> Option<String> {
+        (!self.0.is_empty()).then(|| line(&self.0))
+    }
+}
+
+/// Bytes of a line as text, without the `\r` of a `\r\n`.
+fn line(bytes: &[u8]) -> String {
+    String::from_utf8_lossy(bytes.strip_suffix(b"\r").unwrap_or(bytes)).into_owned()
+}
+
 /// Detached threads read rustic's output and wait for its exit. After a kill, processes that rustic
 /// started may keep the pipes open.
 fn read(mut child: std::process::Child, stdout: Stdout) -> Result<mpsc::Receiver<Line>> {
     let (tx, rx) = mpsc::channel();
     let (out, err) = (child.stdout.take().ok_or(Error::NotPiped)?, child.stderr.take().ok_or(Error::NotPiped)?);
-    let lines = |pipe: Box<dyn Read + Send>, tx: mpsc::Sender<Line>, wrap: fn(String) -> Line| {
+    let chunks = |mut pipe: Box<dyn Read + Send>, tx: mpsc::Sender<Line>, wrap: fn(&[u8]) -> Line| {
         thread::spawn(move || {
-            for line in BufReader::new(pipe).lines().map_while(io::Result::ok) {
-                if tx.send(wrap(line)).is_err() {
+            let mut buf = vec![0; READ_CHUNK];
+            while let Ok(n @ 1..) = pipe.read(&mut buf) {
+                if tx.send(wrap(&buf[..n])).is_err() {
                     return;
                 }
             }
         })
     };
     match stdout {
-        Stdout::Text => _ = lines(Box::new(out), tx.clone(), Line::Out),
-        Stdout::Count => {
-            let (tx, mut out) = (tx.clone(), out);
-            thread::spawn(move || {
-                let mut buf = vec![0; READ_CHUNK];
-                while let Ok(n @ 1..) = out.read(&mut buf) {
-                    if tx.send(Line::Bytes(n)).is_err() {
-                        return;
-                    }
-                }
-            });
-        }
+        Stdout::Text => _ = chunks(Box::new(out), tx.clone(), |b| Line::Out(b.to_vec())),
+        Stdout::Count => _ = chunks(Box::new(out), tx.clone(), |b| Line::Bytes(b.len())),
     }
-    lines(Box::new(err), tx.clone(), Line::Err);
+    chunks(Box::new(err), tx.clone(), |b| Line::Err(b.to_vec()));
     thread::spawn(move || tx.send(Line::Exited(child.wait())));
     Ok(rx)
 }
@@ -246,5 +273,22 @@ pub(super) fn shell_word(word: &OsStr) -> String {
         word.into_owned()
     } else {
         format!("'{}'", word.replace('\'', "'\\''"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Pending;
+
+    /// Lines are cut where they end, however the pipe splits them, without their `\n` or `\r\n`. The last one
+    /// waits for its newline, or for the end.
+    #[test]
+    fn lines_are_cut_as_they_end() {
+        let mut pending = Pending::default();
+        assert_eq!(pending.lines(b"[\n  {\"a\""), ["["]);
+        assert_eq!(pending.lines(b": 1}\r\n\n"), ["  {\"a\": 1}", ""]);
+        assert_eq!(pending.lines(b"]"), Vec::<String>::new());
+        assert_eq!(pending.rest().as_deref(), Some("]"));
+        assert_eq!(Pending::default().rest(), None);
     }
 }

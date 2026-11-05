@@ -141,24 +141,14 @@ fn a_slow_listing_holds_up_nothing_else() {
     let id = sb.snapshot_ids("Docs")[0].clone();
     // A rustic that reads snapshots slowly, like a slow remote: first in PATH, or on Windows a batch file that
     // rusticlone is told to run.
-    let path = std::env::var_os("PATH").unwrap();
-    let name = if cfg!(windows) { "rustic.exe" } else { "rustic" };
-    let rustic = std::env::split_paths(&path).map(|d| d.join(name)).find(|p| p.is_file()).unwrap();
-    let dir = sb.path("slow");
-    std::fs::create_dir_all(&dir).unwrap();
     #[cfg(unix)]
-    let env = {
-        let slow = dir.join("rustic");
-        // Quoted, so that a path with spaces, as macOS's Application Support, stays one word.
-        let quoted = rustic.display().to_string().replace('\'', r"'\''");
-        let script = format!("#!/bin/sh\ncase \" $* \" in *\" ls \"*) sleep 2;; esac\nexec '{quoted}' \"$@\"\n");
-        std::fs::write(&slow, script).unwrap();
-        std::fs::set_permissions(&slow, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
-        let path = std::env::join_paths(std::iter::once(dir).chain(std::env::split_paths(&path))).unwrap();
-        ("PATH".to_owned(), path.into_string().unwrap())
-    };
+    let env = crate::common::wrapped_rustic(&sb, "ls", "sleep 2");
     #[cfg(windows)]
     let env = {
+        let path = std::env::var_os("PATH").unwrap();
+        let rustic = std::env::split_paths(&path).map(|d| d.join("rustic.exe")).find(|p| p.is_file()).unwrap();
+        let dir = sb.path("slow");
+        std::fs::create_dir_all(&dir).unwrap();
         let slow = dir.join("rustic.cmd");
         let script = format!(
             "@echo off\r\necho  %* | findstr /c:\" ls \" >nul && ping -n 3 127.0.0.1 >nul\r\n\
