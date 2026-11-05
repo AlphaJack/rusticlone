@@ -156,6 +156,19 @@ fn rustic_is_not_waited_for_past_its_exit() {
     assert!(started.elapsed() < Duration::from_secs(15), "{:?}", started.elapsed());
 }
 
+/// Rustic that prints nothing while it reads, as when it hashes files, is working, not stalled. Linux counts what a
+/// process reads, wherever from.
+#[cfg(target_os = "linux")]
+#[test]
+fn silent_rustic_that_reads_is_not_stalled() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    let file = sb.path("source/docs/a.txt").display().to_string();
+    let reads = format!("i=0; while [ $i -lt 16 ]; do read -r line < '{file}'; sleep 0.25; i=$((i+1)); done");
+    let (key, path) = crate::common::wrapped_rustic(&sb, "snapshots", &reads);
+    sb.run_with(&["collections", "--refresh"], &[(&key, &path), (&var("STALL_TIMEOUT"), "2s")]).assert_exit(0);
+}
+
 #[test]
 fn a_killed_run_leaves_its_locks_with_rustic() {
     let sb = Sandbox::new();
