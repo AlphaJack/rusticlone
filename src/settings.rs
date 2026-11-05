@@ -68,9 +68,19 @@ impl Setting {
     /// For a setting read at start the environment, else its file; for the others the first profile in
     /// `chain` that sets it. Else the default. A blank value is not set.
     pub(crate) fn get(&self, chain: &[&RusticProfile]) -> Option<String> {
+        self.pick(chain, env::var(self.key).ok(), || self.file().ok().flatten())
+    }
+
+    /// [`Self::get`], given what the environment sets and the secret's file, read only if needed.
+    fn pick(
+        &self,
+        chain: &[&RusticProfile],
+        env: Option<String>,
+        file: impl FnOnce() -> Option<String>,
+    ) -> Option<String> {
         let set = |v: &String| !v.trim().is_empty();
         let value = if self.scope.at_start() {
-            env::var(self.key).ok().filter(set).or_else(|| self.file().ok().flatten().filter(set))
+            env.filter(set).or_else(|| file().filter(set))
         } else {
             chain.iter().find_map(|p| p.env.get(self.key).filter(|v| set(v)).cloned())
         };
