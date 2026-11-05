@@ -577,20 +577,36 @@ fn a_command_s_locks_show_in_the_server() {
 /// A queued run says what it waits for, as its own request names it: a copy waits for the backup, which copies too.
 #[test]
 fn a_queued_copy_says_it_waits_for_the_backup() {
+    use std::io::BufRead;
     let sb = Sandbox::new();
-    slow_profile(&sb, "Slow", 20, "[copy]\ntargets = ['Slow-remote']\n");
+    // A backup that lasts until the test is done with it.
+    let done = sb.path("done");
+    stdin_profile(&sb, "Slow", &cmd::until_exists(&done), "[copy]\ntargets = ['Slow-remote']\n");
     sb.target("Slow-remote", "Slow", "");
+    // Created first: a copy refuses a primary that its first backup has yet to create.
+    assert!(sb.rustic(&["-P", "Slow", "init"]).status.success());
     let server = sb.server(&[]);
     server.post_form("/collections/Slow/runs", "kind=backup");
     wait_for(20, "the backup", || server.collection("Slow")["running"][0]["activities"][0]["on"][0] == "Slow");
-    let queued = || {
-        let store = sb.store();
-        store.unfinished(Some("Slow")).iter().any(|r| r.status == Status::Queued && store.alive(r))
-    };
     let mut copy = sb.spawn(&["copy", "--collection", "Slow"], &[]);
-    // A busy machine takes a while to start the command.
-    wait_for(30, "the copy to wait", queued);
+    // The copy says when it starts to wait.
+    let (said, waits) = std::sync::mpsc::channel();
+    let out = std::io::BufReader::new(copy.stdout.take().unwrap());
+    thread::spawn(move || {
+        let mut lines = Vec::new();
+        for line in out.lines().map_while(Result::ok) {
+            if line.contains(r#""kind":"waiting-for""#) {
+                _ = said.send(Ok(()));
+                return;
+            }
+            lines.push(line);
+        }
+        _ = said.send(Err(lines.join("\n")));
+    });
+    let waited = waits.recv_timeout(Duration::from_secs(60)).expect("the copy says what it does");
+    assert!(waited.is_ok(), "the copy did not wait for the backup: {waited:?}");
     let runs = card(&server.get("/collections/Slow").body, "runs");
+    fs::write(&done, "").unwrap();
     copy.kill().unwrap();
     copy.wait().unwrap();
     assert!(runs.contains("(copy to every target, running)"), "{runs}");
@@ -935,6 +951,8 @@ fn only_the_waiting_command_stopped_stops() {
     let sb = Sandbox::new();
     slow_profile(&sb, "Slow", 30, "[copy]\ntargets = ['Slow-remote']\n");
     sb.target("Slow-remote", "Slow", "");
+    // Created first: a copy refuses a primary that its first backup has yet to create.
+    assert!(sb.rustic(&["-P", "Slow", "init"]).status.success());
     let server = sb.server(&[]);
     server.post_form("/collections/Slow/runs", "kind=backup");
     wait_for(20, "the backup", || server.collection("Slow")["running"][0]["activities"][0]["on"][0] == "Slow");
