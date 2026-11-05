@@ -221,12 +221,12 @@ enum Age {
 impl std::fmt::Display for Age {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (t, age) = match *self {
-            Age::Last(Last::At(t)) => (t, fmt::human_ago(t, now())),
-            Age::For(t) => (t, fmt::human_age(t, now())),
-            Age::Last(Last::Never) => return f.write_str(&Last::never()),
-            Age::Last(Last::Unknown) => return write!(f, "{}", Label::Unknown),
-            Age::Last(Last::Failing(_)) => return f.write_str(&Level::Failure.word()),
-            Age::Queued => return Ok(()),
+            Self::Last(Last::At(t)) => (t, fmt::human_ago(t, now())),
+            Self::For(t) => (t, fmt::human_age(t, now())),
+            Self::Last(Last::Never) => return f.write_str(&Last::never()),
+            Self::Last(Last::Unknown) => return write!(f, "{}", Label::Unknown),
+            Self::Last(Last::Failing(_)) => return f.write_str(&Level::Failure.word()),
+            Self::Queued => return Ok(()),
         };
         write!(f, r#"<time datetime="{t}" title="{}">{age}</time>"#, fmt::local(t))
     }

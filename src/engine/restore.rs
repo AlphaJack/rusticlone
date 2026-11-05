@@ -22,7 +22,7 @@ use crate::{
 /// The repository of the run's collection named `name`, else its primary.
 fn repo_named<'a>(run: &Run<'a>, name: Option<&str>) -> Result<&'a RusticProfile> {
     let collection = run.collection;
-    let name = name.unwrap_or(collection.name());
+    let name = name.unwrap_or_else(|| collection.name());
     let repo = collection.repo(name);
     Ok(repo.ok_or_else(|| Error::NotOfProfile { name: name.to_owned(), collection: collection.title.to_owned() })?)
 }
@@ -320,7 +320,7 @@ impl Engine {
                     continue;
                 }
                 #[expect(clippy::disallowed_methods, reason = "creates the restore destination")]
-                fs::create_dir_all(dest.parent().unwrap_or(Path::new("/")))?;
+                fs::create_dir_all(dest.parent().unwrap_or_else(|| Path::new("/")))?;
                 run.tracked(Some(Doing::Path { path: path.clone() }), |progress| {
                     self.rustic.restore(&run.cx, repo, &sn.id, path, &dest, progress)
                 })

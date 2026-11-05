@@ -54,7 +54,7 @@ fn translated(id: &str) -> Vec<(String, String)> {
 /// An application that opens the web UI logged in, by running `exe`, quoted as desktop entries require.
 pub(crate) fn desktop_entry(exe: &str) -> String {
     let quoted: String =
-        exe.chars().flat_map(|c| ['\\'].into_iter().filter(move |_| "\"`$\\".contains(c)).chain([c])).collect();
+        exe.chars().flat_map(|c| std::iter::once('\\').filter(move |_| "\"`$\\".contains(c)).chain([c])).collect();
     // Backslashes are escaped again in any value, and `%` starts a field code.
     let exe = quoted.replace('\\', "\\\\").replace('%', "%%");
     format!(

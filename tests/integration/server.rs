@@ -697,7 +697,7 @@ fn fake_service_manager(sb: &Sandbox, log: &std::path::Path) -> Option<Fake> {
         fs::create_dir_all(&bin).unwrap();
         fs::write(bin.join("launchctl"), format!("#!/bin/sh\necho \"$*\" >> {}\n", log.display())).unwrap();
         fs::set_permissions(bin.join("launchctl"), fs::Permissions::from_mode(0o755)).unwrap();
-        let path = std::env::join_paths([bin].into_iter().chain(std::env::split_paths(&path)));
+        let path = std::env::join_paths(std::iter::once(bin).chain(std::env::split_paths(&path)));
         Some(Fake { path: path.unwrap().into_string().unwrap() })
     }
 }
@@ -718,7 +718,7 @@ impl Fake {
         let bus = self.bus.env();
         #[cfg(not(target_os = "linux"))]
         let bus: [(&str, &str); 0] = [];
-        [("PATH", self.path.as_str())].into_iter().chain(bus).collect()
+        std::iter::once(("PATH", self.path.as_str())).chain(bus).collect()
     }
 }
 

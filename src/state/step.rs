@@ -33,7 +33,7 @@ pub struct RunStep {
 }
 
 /// A step's result as an [`Event`](super::Event) carries it: what is shown, and how the step ended.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Outcome {
     pub status: Status,
     pub record: ResultRecord,
@@ -45,7 +45,7 @@ impl From<&StepResult> for Outcome {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LastStep {
     pub last_ok: Option<Timestamp>,
     pub last_attempt: Option<Timestamp>,
@@ -102,7 +102,7 @@ impl LastStep {
 }
 
 /// A repository's progress through its data subsets.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Checks {
     /// The next subset in the cycle.
     pub next: u32,
@@ -116,11 +116,11 @@ pub struct Checks {
 impl Checks {
     /// The subset the next check reads.
     pub fn upcoming(&self) -> u32 {
-        self.owed.first().copied().unwrap_or(self.next.max(1))
+        self.owed.first().copied().unwrap_or_else(|| self.next.max(1))
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Lag {
     pub checked_at: Timestamp,
     /// The time of the primary's oldest snapshot that the target lacks.

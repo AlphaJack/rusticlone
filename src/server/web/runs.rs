@@ -138,7 +138,7 @@ impl LogView {
             results: s.results.iter().map(|l| (l.level.into(), s.result(l))).collect(),
         };
         let (lines, at, kept) = tail;
-        LogView {
+        Self {
             run: Some(row.id),
             collection: row.collection.clone(),
             stoppable: row.stoppable && row.since.is_some(),
@@ -171,7 +171,7 @@ pub(super) struct LogLineView {
 
 impl From<LogLine> for LogLineView {
     fn from(LogLine { at, origin, text }: LogLine) -> Self {
-        let text = at.map_or(text.clone(), |at| format!("{} {text}", fmt::local_time(at)));
+        let text = at.map_or_else(|| text.clone(), |at| format!("{} {text}", fmt::local_time(at)));
         Self { text, origin }
     }
 }
@@ -284,7 +284,7 @@ impl RunRow {
         let waiting = !activities.is_empty() && activities.iter().all(waits);
         let since = activities.iter().map(|a| a.since).min().filter(|_| waiting);
         let waiting_since = since.map(|since| Age::For(since - before));
-        RunRow {
+        Self {
             collection: collection.to_owned(),
             title: title.to_owned(),
             id: r.id,

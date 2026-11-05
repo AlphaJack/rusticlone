@@ -236,7 +236,8 @@ impl Engine {
             check_schedule: schedule::of(&[r, p], RunKind::Check, now, &self.tz),
             repository: r.repository.as_deref().map(fmt::redact),
             latest_snapshot,
-            next_subset: super::maintain::subsets(&[r, p]).and(state.checks.get(&r.name).map(Checks::upcoming)),
+            next_subset: super::maintain::subsets(&[r, p])
+                .and_then(|_| state.checks.get(&r.name).map(Checks::upcoming)),
             check_subsets: settings::CHECK_SUBSETS.get(&[r, p]),
             pruned: shown(&prune, None),
             checked: shown(&check, None),

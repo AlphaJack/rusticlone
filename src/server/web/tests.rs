@@ -245,7 +245,7 @@ fn collection_pages() {
         holds,
         ..step(Step::Snapshot { repo: "Docs".into() }, Status::Running, &[])
     };
-    let running = RunRecord { ..run("2026-10-16T11:58:00Z", Status::Running, vec![snapshot]) };
+    let running = run("2026-10-16T11:58:00Z", Status::Running, vec![snapshot]);
     let live = Running {
         id: running.id,
         kind: RunKind::Backup,

@@ -153,7 +153,7 @@ impl Snapshot {
         self.original.as_ref().unwrap_or(&self.id)
     }
 
-    pub fn same(&self, other: &Snapshot) -> bool {
+    pub fn same(&self, other: &Self) -> bool {
         self.identity() == other.identity()
     }
 }

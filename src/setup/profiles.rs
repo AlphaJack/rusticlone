@@ -61,7 +61,7 @@ impl Setup {
         // others' alone. The first one says what the entries answer.
         let snapshots = self.sources().into_iter().enumerate().map(|(i, source)| {
             let mut snapshot = if i == 0 { section(Question::WhatToBackUp) } else { Table::new() };
-            snapshot["sources"] = value([source].into_iter().collect::<Array>());
+            snapshot["sources"] = value(std::iter::once(source).collect::<Array>());
             snapshot
         });
         let mut backup = Table::new();
@@ -75,7 +75,7 @@ impl Setup {
         let target = (self.target != Kind::None).then(|| {
             let name = self.profile_name(Role::Target);
             let mut copy = section(Question::WhereCopied);
-            copy["targets"] = value([name.as_str()].into_iter().collect::<Array>());
+            copy["targets"] = value(std::iter::once(name.as_str()).collect::<Array>());
             primary["copy"] = Item::Table(copy);
             let mut target = DocumentMut::new();
             target["repository"] = self.repository(Role::Target, section(Question::WhereCopied));
