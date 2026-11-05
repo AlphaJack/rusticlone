@@ -195,6 +195,24 @@ fn interrupting_stops_rustic_and_what_it_started() {
     assert!(started.elapsed() < Duration::from_secs(20), "waited for the slow backup's leftovers");
 }
 
+/// Interrupted, a command takes the collections whose turn has not come out of the queue: none of them runs, and
+/// none is left waiting.
+#[test]
+fn interrupting_leaves_the_next_collections_unrun() {
+    let sb = Sandbox::new();
+    slow_profile(&sb, "Alpha", 60, "");
+    slow_profile(&sb, "Beta", 60, "");
+    let all = sb.spawn(&["backup", "--all"], &[]);
+    wait_for(30, "the first backup to start", || {
+        let store = sb.store();
+        let running = |r: &rusticlone::RunRecord| r.steps.iter().any(|s| s.status == Status::Running);
+        store.unfinished(Some("Alpha")).iter().any(|r| store.alive(r) && running(r))
+    });
+    assert!(signal(all.id(), "INT"));
+    to_run(&all.wait_with_output().unwrap()).assert_exit(130);
+    assert_eq!(sb.store().runs("Beta", 5).len(), 0, "{:?}", sb.store().runs("Beta", 5));
+}
+
 /// Asked while the same backup runs and another is queued, a command joins the queued one: it waits for
 /// it, shows whom it waits for, and reports its results instead of backing up a third time.
 #[test]
