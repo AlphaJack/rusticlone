@@ -556,6 +556,7 @@ fn attempted(engine: &Engine, key: crate::request::StepKey, result: &crate::resu
         (engine.store.now(), scheduled.then(|| RunStep { collection: "Docs".into(), run: 1, step: None, scheduled }));
     engine.store.apply(&[Event::Attempted { key, started: at, at, result: result.into(), by }]).unwrap();
 }
+
 /// How many failures the run reported.
 fn failures(run: &super::Run<'_>) -> usize {
     run.shared.results.lock().iter().filter(|(_, r)| r.level() == Level::Failure).count()
