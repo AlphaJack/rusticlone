@@ -56,13 +56,16 @@ impl Engine {
             n if n.retry_at().is_some_and(|at| now < at) => n.clone(),
             n => Notified { failures: n.failures + 1, last_attempt: Some(now), ..n.clone() },
         });
-        let notified = match update {
-            Ok(Some(attempt)) if attempt.level != level => {
+        let notified = update.and_then(|attempt| match attempt {
+            Some(attempt) if attempt.level != level => {
                 let text = self.message(collection, &status, &attempt);
                 let sent = notification::send(&mut notification::logged(Some(title)), &urls, level, &text);
-                self.record_sent(key, title, level, &sent).unwrap_or(attempt)
+                Ok(self.record_sent(key, title, level, &sent).unwrap_or(attempt))
             }
-            Ok(_) => self.store.notified(key),
+            _ => self.store.notified(key),
+        });
+        let notified = match notified {
+            Ok(notified) => notified,
             Err(e) => {
                 log::event(Some(title), &notification::Logged::NotRecorded { error: format!("{e:#}") });
                 return None;
@@ -80,7 +83,8 @@ impl Engine {
     ) -> Result<String, notification::Error> {
         let status = self.status_of(collection);
         let urls = settings::NOTIFY.get(&[collection.primary]).ok_or(notification::Error::NoUrls)?;
-        let before = self.store.notified(collection.name());
+        // Unread, it says the level without how long the one before lasted.
+        let before = self.store.notified(collection.name()).unwrap_or_default();
         let text = self.message(collection, &status, &before);
         if self.store.is_dry_run() {
             return Ok(text);

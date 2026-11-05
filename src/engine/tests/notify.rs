@@ -15,12 +15,12 @@ fn a_failed_notification_is_sent_again_after_its_backoff() {
     engine.store.apply(&[failed]).unwrap();
     let collection = &engine.collections()[0];
     let retry = engine.notify(collection).unwrap();
-    assert_eq!(engine.store.notified("Docs").failures, 1);
+    assert_eq!(engine.store.notified("Docs").unwrap().failures, 1);
     assert_eq!(engine.notify(collection), Some(retry), "not before its backoff");
-    assert_eq!(engine.store.notified("Docs").failures, 1);
+    assert_eq!(engine.store.notified("Docs").unwrap().failures, 1);
     engine.store.wait(retry.duration_since(at).unsigned_abs(), &|| false);
     assert!(engine.notify(collection) > Some(retry), "sent again, and failed again");
-    assert_eq!(engine.store.notified("Docs").failures, 2);
+    assert_eq!(engine.store.notified("Docs").unwrap().failures, 2);
 }
 
 /// A recovery says how long the level notified before it lasted, from when that level was delivered, and
@@ -92,13 +92,13 @@ fn a_level_is_notified_once_from_when_it_started() {
     let left = Notified { level, failures: 2, error: Some("refused".into()), ..Notified::default() };
     unsent.store.update_notified("Docs", |_| left.clone()).unwrap();
     unsent.notify(&unsent.collections()[0]);
-    let notified = unsent.store.notified("Docs");
+    let notified = unsent.store.notified("Docs").unwrap();
     assert_eq!((notified.level, notified.failures, notified.error), (level, 0, None));
     engine.notify_now(collection, &mut |_| {}).unwrap();
-    let first = engine.store.notified("Docs").since;
+    let first = engine.store.notified("Docs").unwrap().since;
     engine.store.wait(std::time::Duration::from_hours(1), &|| false);
     engine.notify_now(collection, &mut |_| {}).unwrap();
-    assert_eq!(engine.store.notified("Docs").since, first);
+    assert_eq!(engine.store.notified("Docs").unwrap().since, first);
     answering.join().unwrap();
 }
 
