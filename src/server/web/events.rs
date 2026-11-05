@@ -219,3 +219,13 @@ pub(super) async fn events(
     // Otherwise nginx buffers the events.
     ([(HeaderName::from_static("x-accel-buffering"), "no")], Sse::new(stream).keep_alive(sse::KeepAlive::default()))
 }
+
+#[cfg(test)]
+mod tests {
+    /// What a page says it shows counts, unless it reconnected: then what it shows is unknown.
+    #[test]
+    fn a_reconnected_page_shows_nothing_known() {
+        assert_eq!(super::unless_reconnected(Some(7), false), Some(7));
+        assert_eq!(super::unless_reconnected(Some(7), true), None);
+    }
+}
