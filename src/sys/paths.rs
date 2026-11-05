@@ -8,7 +8,7 @@ use super::{is_root, os};
 /// that rustic uses lays them out.
 pub(crate) fn config_dirs(app: &str) -> Result<Vec<PathBuf>, etcetera::HomeDirError> {
     let base = etcetera::base_strategy::choose_native_strategy()?;
-    Ok([os::user_config_dir(&base, app)].into_iter().chain(os::system_config_dir(app)).collect())
+    Ok(std::iter::once(os::user_config_dir(&base, app)).chain(os::system_config_dir(app)).collect())
 }
 
 /// Where `install` places rusticlone, on `PATH`, unless it runs from [`installer_dir`] already: that folder,

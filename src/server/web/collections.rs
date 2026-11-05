@@ -83,16 +83,16 @@ impl ScheduleView {
         let what = what.to_string();
         match schedule {
             Some(Schedule { error: Some(e), .. }) => {
-                ScheduleView { class: "failure", title: Label::Unschedulable { what: &what, error: e }.to_string() }
+                Self { class: "failure", title: Label::Unschedulable { what: &what, error: e }.to_string() }
             }
-            Some(Schedule { cron, next: Some(next), .. }) => ScheduleView {
+            Some(Schedule { cron, next: Some(next), .. }) => Self {
                 class: "on",
                 title: Label::ScheduledNext { what: &what, cron, next: &fmt::local(*next) }.to_string(),
             },
             Some(Schedule { cron, next: None, .. }) => {
-                ScheduleView { class: "on", title: Label::Scheduled { what: &what, cron }.to_string() }
+                Self { class: "on", title: Label::Scheduled { what: &what, cron }.to_string() }
             }
-            None => ScheduleView { class: "", title: Label::NotScheduled { what: &what }.to_string() },
+            None => Self { class: "", title: Label::NotScheduled { what: &what }.to_string() },
         }
     }
 }
@@ -174,7 +174,7 @@ impl CollectionInput {
         let listed = inventory.is_some();
         let snapshots = inventory.and_then(|l| l.result.ok()).map(|i| i.snapshots);
         let notifies = collection.is_some_and(|j| crate::settings::NOTIFY.get(&[j.primary]).is_some());
-        CollectionInput {
+        Self {
             runs: collection_run_rows(engine, &name, runs),
             listings,
             existing,
@@ -204,7 +204,7 @@ struct Listed {
 impl Listed {
     /// `restorable` unless the listing says otherwise.
     fn of(listing: Option<&Listing>, restorable: bool) -> Self {
-        let mut listed = Listed {
+        let mut listed = Self {
             snapshots: Label::Unknown.to_string(),
             size: Size(None),
             listing: false,
@@ -292,12 +292,12 @@ impl CollectionView {
             let newest = snapshots.iter().filter(|sn| sn.source() == group).max_by_key(|sn| sn.time);
             let summary = newest.and_then(|sn| sn.summary.as_ref());
             SourceView {
-                files: summary.map_or(Label::Unknown.to_string(), |s| s.total_files_processed.to_string()),
+                files: summary.map_or_else(|| Label::Unknown.to_string(), |s| s.total_files_processed.to_string()),
                 size: Size(summary.map(|s| s.total_bytes_processed)),
                 sources: s.sources,
             }
         };
-        CollectionView {
+        Self {
             copy_blocked,
             restore_blocked: (!repos.is_empty() && !repos.iter().any(|r| r.restorable))
                 .then_some(Hint::NothingToRestore),
@@ -378,7 +378,7 @@ impl IndexMain {
         runs.truncate(RECENT_RUNS);
         let collections: Vec<CollectionView> = inputs.into_iter().map(CollectionView::build).collect();
         let actions = collections.iter().any(|j| j.configured);
-        IndexMain {
+        Self {
             overview: Overview { collections, actions },
             runs,
             with_collection: true,
@@ -426,7 +426,7 @@ impl CollectionMain {
         for r in &mut runs {
             r.shown = log.shown().is_some_and(|(run, _)| r.id == run);
         }
-        CollectionMain { log, runs, collection: CollectionView::build(input), with_collection: false }
+        Self { log, runs, collection: CollectionView::build(input), with_collection: false }
     }
 }
 

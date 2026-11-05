@@ -196,7 +196,8 @@ fn graphs(name: &str, documents: &[Vec<Occurrence>]) -> (Graph, Graph, BTreeSet<
             }
             let common = a.iter().zip(&b).take_while(|(x, y)| x == y).count();
             if common < a.len() && common < b.len() {
-                let path = |m: &[&str]| [name].iter().chain(&m[..=common]).copied().collect::<Vec<_>>().join("::");
+                let path =
+                    |m: &[&str]| std::iter::once(&name).chain(&m[..=common]).copied().collect::<Vec<_>>().join("::");
                 modules.entry(path(&a)).or_default().insert(path(&b));
             }
             if !used.in_body {

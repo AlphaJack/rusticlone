@@ -47,7 +47,7 @@ pub(super) fn report(phase: Phase) {
         // With a timestamp that systemd compares with its own.
         Phase::Reloading => {
             let now = NotifyState::monotonic_usec_now().ok();
-            _ = sd_notify::notify(&[NotifyState::Reloading].into_iter().chain(now).collect::<Vec<_>>());
+            _ = sd_notify::notify(&std::iter::once(NotifyState::Reloading).chain(now).collect::<Vec<_>>());
             return;
         }
         Phase::Stopping => NotifyState::Stopping,

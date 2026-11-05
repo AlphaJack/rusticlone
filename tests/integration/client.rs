@@ -56,7 +56,7 @@ impl Sandbox {
 
     /// With these extra arguments to `server`.
     pub(crate) fn server_with(&self, args: &[&str], envs: &[(&str, &str)]) -> Server {
-        let args: Vec<&str> = ["serve"].into_iter().chain(args.iter().copied()).collect();
+        let args: Vec<&str> = std::iter::once("serve").chain(args.iter().copied()).collect();
         let listen = var("LISTEN");
         let mut child = self.spawn(&args, &[&[(listen.as_str(), "127.0.0.1:0")], envs].concat());
         let mut stdout = BufReader::new(child.stdout.take().unwrap());

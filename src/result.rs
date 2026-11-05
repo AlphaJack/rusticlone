@@ -59,7 +59,7 @@ impl From<Level> for Status {
 impl Status {
     /// A run's, by its worst result, unless it was stopped.
     pub fn ended(level: Level, stop: Option<Stop>) -> Self {
-        stop.map_or(level.into(), Self::from)
+        stop.map_or_else(|| level.into(), Self::from)
     }
 
     /// A step's: cancelled if a result says so, else by its worst result. `Skipped` if it reported nothing.
@@ -103,7 +103,7 @@ impl Status {
 }
 
 /// What a step did, or why it could not. Stored in the run's record.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum StepResult {
     /// `snapshots`: short ids. Empty when nothing changed.
@@ -590,7 +590,7 @@ impl std::fmt::Display for Detail<'_> {
 }
 
 /// A copy target in `[copy] targets` that cannot be used.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, crate::i18n::Fluent)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, crate::i18n::Fluent)]
 #[fluent(prefix = "result-unusable")]
 pub struct Unusable {
     pub target: String,

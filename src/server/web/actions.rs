@@ -31,9 +31,9 @@ impl FromRequestParts<Arc<App>> for Selection {
         let params = parts.extract::<RawPathParams>().await.ok();
         let param = |name: &str| Some(params.as_ref()?.iter().find(|(k, _)| *k == name)?.1.to_owned());
         let selection = match (param("collection"), param("repo")) {
-            (Some(collection), Some(repo)) => Selection::Repo(collection, repo),
-            (Some(collection), None) => Selection::Collection(collection),
-            (None, _) => Selection::All,
+            (Some(collection), Some(repo)) => Self::Repo(collection, repo),
+            (Some(collection), None) => Self::Collection(collection),
+            (None, _) => Self::All,
         };
         match app.engine().named(&selection) {
             Ok(_) => Ok(selection),

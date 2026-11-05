@@ -86,7 +86,7 @@ impl RepoView {
             Some(Listing::Listed(l)) => Some(l),
             Some(Listing::Running) | None => None,
         };
-        let mut view = RepoView {
+        let mut view = Self {
             collection,
             title,
             name: repo.to_owned(),

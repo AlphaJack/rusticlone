@@ -418,7 +418,7 @@ CMD ["serve"]
         let root = crate::tests::root();
         let read = |path: &std::path::Path| std::fs::read_to_string(path).unwrap_or_default();
         let tests: String = files(&root.join("tests").join("integration")).iter().map(|p| read(p)).collect();
-        for doc in [root.join("README.md")].into_iter().chain(files(&root.join("screenshots").join("scripts"))) {
+        for doc in std::iter::once(root.join("README.md")).chain(files(&root.join("screenshots").join("scripts"))) {
             let text = read(&doc);
             let names = text
                 .split(|c: char| !(c.is_ascii_uppercase() || c == '_'))

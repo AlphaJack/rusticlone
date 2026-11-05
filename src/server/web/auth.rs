@@ -112,8 +112,8 @@ impl FromRequestParts<Arc<App>> for Access {
         };
         let access = match bearer.and_then(|bearer| app.tokens.access(bearer)) {
             Some(access) => access,
-            None if session().is_some() => Access::Session,
-            None => Access::Anonymous,
+            None if session().is_some() => Self::Session,
+            None => Self::Anonymous,
         };
         parts.extensions.insert(access);
         Ok(access)

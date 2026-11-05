@@ -82,7 +82,7 @@ fn fitted(tree: &Tree, side: u32) -> Result<Pixmap> {
     let mut pixmap = Pixmap::new(side, side).context("empty logo")?;
     let transform = Transform::from_translate(-drawn.x(), -drawn.y())
         .post_scale(scale, scale)
-        .post_translate((side_f - drawn.width() * scale) / 2.0, (side_f - drawn.height() * scale) / 2.0);
+        .post_translate(drawn.width().mul_add(-scale, side_f) / 2.0, drawn.height().mul_add(-scale, side_f) / 2.0);
     resvg::render(tree, transform, &mut pixmap.as_mut());
     Ok(pixmap)
 }

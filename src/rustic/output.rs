@@ -294,7 +294,7 @@ pub(crate) enum Ended {
 }
 
 /// The sizes a prune reported.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pruned {
     pub removed: String,
     pub remaining: String,

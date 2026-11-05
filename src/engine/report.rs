@@ -295,9 +295,9 @@ impl Issue {
     /// A step's failed last attempt, which can be dismissed. A cancelled attempt is not an issue: whoever
     /// cancelled it knows, it waits for its next scheduled time, and what it left undone becomes stale
     /// meanwhile.
-    pub(super) fn failed(last: Option<&LastStep>, key: &StepKey) -> Option<Issue> {
+    pub(super) fn failed(last: Option<&LastStep>, key: &StepKey) -> Option<Self> {
         let last = last?;
-        Some(Issue::Failed { step: key.clone(), error: last.last_error.clone()?, by: last.by.clone() })
+        Some(Self::Failed { step: key.clone(), error: last.last_error.clone()?, by: last.by.clone() })
     }
 
     /// Counts towards the collection's level, and is notified. A failing notification is neither: its
