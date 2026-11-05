@@ -39,13 +39,18 @@ fn install_puts_its_folder_on_path_for_new_terminals() {
     let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
     let home = sb.path("home");
     fs::create_dir_all(&home).unwrap();
-    fs::write(home.join(".bashrc"), "# mine").unwrap();
+    // Longer than the line install adds, which it looks for in it, and without a newline at its end.
+    let mine = format!("# mine{}", " and more".repeat(30));
+    fs::write(home.join(".bashrc"), &mine).unwrap();
     for _ in 0..2 {
         sb.run_with(&["install"], &fake.env()).assert_exit(0);
     }
     let line = |file: &str| fs::read_to_string(home.join(file)).unwrap().matches("env\"\n").count();
     assert_eq!((line(".profile"), line(".bashrc")), (1, 1), "once each");
-    assert!(fs::read_to_string(home.join(".bashrc")).unwrap().starts_with("# mine\n"), "below the user's own lines");
+    assert!(
+        fs::read_to_string(home.join(".bashrc")).unwrap().starts_with(&format!("{mine}\n")),
+        "below the user's own lines"
+    );
     assert!(!home.join(".bash_profile").exists(), "not created");
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
 }
