@@ -104,8 +104,7 @@ fn install_service(exe: &Path, serve: &[String]) -> Result<PathBuf> {
     // This `PATH` and rustic, so that it runs the same rustic, even one downloaded into this user's
     // directory rather than the system account's.
     let rustic = crate::rustic::bin::path();
-    let environment = [format!("PATH={}", std::env::var("PATH").unwrap_or_default())]
-        .into_iter()
+    let environment = std::iter::once(format!("PATH={}", std::env::var("PATH").unwrap_or_default()))
         .chain(rustic.is_absolute().then(|| format!("{}={}", settings::RUSTIC.key, rustic.display())));
     // A NUL-terminated string each, then one more NUL.
     let data: Vec<u16> = environment.flat_map(wide).chain([0]).collect();

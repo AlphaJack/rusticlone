@@ -157,6 +157,7 @@ fn watch_theme() {
 
 impl Tray {
     #[expect(clippy::unused_async, reason = "as on Linux, where showing waits for D-Bus")]
+    #[expect(clippy::needless_pass_by_ref_mut, reason = "the same as Linux's, which changes its panel icon")]
     pub(super) async fn show(&mut self, login: &str, rows: &[Row], switches: &[(Switch, Option<bool>)]) {
         if self.shown.send((login.to_owned(), rows.to_vec(), switches.to_vec())).is_ok() {
             post(self.thread, WM_APP);
