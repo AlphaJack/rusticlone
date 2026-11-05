@@ -29,6 +29,16 @@ fn ts(s: &str) -> Timestamp {
     s.parse().unwrap()
 }
 
+/// A page shows an age as of the moment it is rendered.
+#[test]
+#[expect(clippy::disallowed_methods, reason = "an age as of the real now")]
+fn an_age_is_as_of_now() {
+    let then = Timestamp::now() - jiff::SignedDuration::from_hours(2);
+    let shown = super::Age::Last(super::Last::At(then)).to_string();
+    let expected = crate::fmt::human_ago(then, Timestamp::now());
+    assert!(shown.contains(&format!(">{expected}</time>")), "{shown}");
+}
+
 /// How a repository in sync reads, which the catalog words.
 fn synced() -> String {
     RepoStatus::InSync.to_string()
