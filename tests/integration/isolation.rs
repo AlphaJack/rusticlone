@@ -169,6 +169,31 @@ fn silent_rustic_that_reads_is_not_stalled() {
     sb.run_with(&["collections", "--refresh"], &[(&key, &path), (&var("STALL_TIMEOUT"), "2s")]).assert_exit(0);
 }
 
+/// Only a run that may write checks rustic's release, which it may download: a dry run runs nothing to find out.
+#[cfg(unix)]
+#[test]
+fn only_a_real_run_checks_rustics_release() {
+    let sb = docs_with_remote("");
+    let asked = sb.path("asked");
+    let (key, path) = crate::common::wrapped_rustic(&sb, "--version", &format!("echo >> '{}'", asked.display()));
+    let checks = |args: &[&str]| {
+        _ = fs::remove_file(&asked);
+        sb.run_with(args, &[(&key, &path)]);
+        fs::read_to_string(&asked).unwrap_or_default().lines().count()
+    };
+    // Rustic's version is also asked to read its output: once more for the release.
+    assert_eq!(checks(&["collections"]), checks(&["collections", "--dry-run"]) + 1);
+}
+
+/// Without the network, `update` fails, and says what it could not reach.
+#[cfg(feature = "self-update")]
+#[test]
+fn update_without_the_network_fails() {
+    let sb = Sandbox::new();
+    let offline = [("HTTPS_PROXY", "http://127.0.0.1:9")];
+    sb.run_with(&["update", "--dry-run"], &offline).assert_exit(1).assert_output("api.github.com");
+}
+
 #[test]
 fn a_killed_run_leaves_its_locks_with_rustic() {
     let sb = Sandbox::new();
