@@ -1007,12 +1007,15 @@ fn a_first_install_opens_the_web_ui() {
     let sb = Sandbox::new();
     let log = sb.path("manager.log");
     let Some(fake) = fake_service_manager(&sb, &log) else { return };
+    // Not even the profile that the others share.
+    fs::remove_file(sb.profile_dir().join("common.toml")).unwrap();
     let server = sb.server(&[]);
     let listen = var("LISTEN");
     let env = [fake.env(), vec![(listen.as_str(), server.addr.as_str())]].concat();
     sb.run_with(&["install"], &env).assert_exit(0);
     let opens = || fs::read_to_string(&log).unwrap().matches("OpenURI ").count();
     assert_eq!(opens(), 1, "{}", fs::read_to_string(&log).unwrap());
+    sb.common_env(&[]);
     sb.backup_profile("Docs", &[&["docs"]], &[], "");
     sb.run_with(&["install"], &env).assert_exit(0);
     assert_eq!(opens(), 1, "{}", fs::read_to_string(&log).unwrap());
