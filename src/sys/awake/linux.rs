@@ -18,7 +18,7 @@ pub(crate) fn stay_awake() -> anyhow::Result<Awake> {
                 &args,
             )
             .await?;
-        Ok::<_, zbus::Error>(std::os::fd::OwnedFd::from(reply.body().deserialize::<zbus::zvariant::OwnedFd>()?))
+        Ok::<_, zbus::Error>(std::os::fd::OwnedFd::from(reply.body().deserialize::<zbus::OwnedFd>()?))
     };
     // On a run's thread, outside the server's runtime.
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
