@@ -1,8 +1,6 @@
 //! The size of a folder to back up. The setup form shows it next to the folder while it is typed: the first
 //! backup reads all of it.
 
-#![expect(clippy::disallowed_methods, reason = "measures the folder the setup form names")]
-
 use std::{
     collections::BTreeMap,
     path::Path,
@@ -32,6 +30,7 @@ enum Measured {
 
 impl Measured {
     /// All of `folder`, read on all cores without following links, until `stop` is set.
+    #[expect(clippy::disallowed_methods, reason = "measures the folder the setup form names")]
     fn of(folder: &str, stop: &Arc<AtomicBool>) -> Self {
         let path = Path::new(folder);
         if folder.is_empty() {
@@ -97,6 +96,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "measures the folder the setup form names")]
     fn measures_all_of_a_folder() {
         let dir = crate::sys::test_dir("size");
         std::fs::create_dir_all(dir.join(".hidden")).unwrap();
