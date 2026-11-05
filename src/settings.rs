@@ -452,6 +452,18 @@ CMD ["serve"]
         assert!(written.contains("\nRUSTICLONE_AUTO_UPDATE=true\n") && !written.contains("#RUSTICLONE_AUTO_UPDATE="));
     }
 
+    /// An env file that cannot be read is left as it is: writing the setting alone would lose the rest.
+    #[test]
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn an_unreadable_env_file_is_left_as_it_is() {
+        let path = crate::sys::test_dir("env-file-unreadable").join("rusticlone.env");
+        // Not UTF-8.
+        let bytes = b"RUSTICLONE_LISTEN=\xff\n";
+        std::fs::write(&path, bytes).unwrap();
+        assert!(super::set_in_env_file(&path, "RUSTICLONE_AUTO_UPDATE", "true").is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), bytes);
+    }
+
     #[test]
     fn settings_are_sorted() {
         assert!(ALL.is_sorted_by_key(|s| s.key));
