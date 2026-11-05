@@ -1,5 +1,5 @@
-//! A D-Bus of a test's own, with systemd's manager and logind, which only record the calls they get: the
-//! install reaches no real service manager.
+//! A D-Bus of a test's own, with systemd's manager, logind and the desktop's services, which only record the calls
+//! they get: the install reaches no real service manager, and nothing opens on the desktop.
 
 #![expect(
     clippy::needless_pass_by_value,
@@ -96,6 +96,55 @@ impl Logind {
     }
 }
 
+/// The desktop portal, which opens a page in the browser.
+struct Portal(PathBuf);
+
+#[zbus::interface(name = "org.freedesktop.portal.OpenURI")]
+impl Portal {
+    #[zbus(name = "OpenURI")]
+    fn open_uri(
+        &self,
+        _parent: String,
+        uri: String,
+        _options: std::collections::HashMap<String, zbus::OwnedVariant>,
+    ) -> zbus::OwnedObjectPath {
+        record(&self.0, &format!("OpenURI {uri}"));
+        zbus::OwnedObjectPath::try_from("/org/freedesktop/portal/desktop/request/1").unwrap()
+    }
+}
+
+/// The file manager, which opens a folder.
+struct FileManager(PathBuf);
+
+#[zbus::interface(name = "org.freedesktop.FileManager1")]
+impl FileManager {
+    fn show_folders(&self, uris: Vec<String>, _startup: String) {
+        record(&self.0, &format!("ShowFolders {}", uris.join(" ")));
+    }
+}
+
+/// The notification server, which records the title and the icon it was given.
+struct Notifications(PathBuf);
+
+#[zbus::interface(name = "org.freedesktop.Notifications")]
+impl Notifications {
+    #[expect(clippy::too_many_arguments, reason = "the arguments of the specification's `Notify`")]
+    fn notify(
+        &self,
+        _app: String,
+        _replaces: u32,
+        icon: String,
+        summary: String,
+        _body: String,
+        _actions: Vec<String>,
+        _hints: std::collections::HashMap<String, zbus::OwnedVariant>,
+        _timeout: i32,
+    ) -> u32 {
+        record(&self.0, &format!("Notify {summary} {icon}"));
+        1
+    }
+}
+
 impl FakeBus {
     /// Starts the bus in the sandbox, with the fake services recording to `log`. systemd knows a unit in
     /// the `unit` state, as one a package installed, or none.
@@ -117,8 +166,14 @@ impl FakeBus {
                 let _connection = zbus::connection::Builder::address(at.as_str())
                     .name("org.freedesktop.systemd1")
                     .name("org.freedesktop.login1")
+                    .name("org.freedesktop.portal.Desktop")
+                    .name("org.freedesktop.FileManager1")
+                    .name("org.freedesktop.Notifications")
                     .serve_at("/org/freedesktop/systemd1", Systemd { log: log.clone(), unit })
-                    .serve_at("/org/freedesktop/login1", Logind(log))
+                    .serve_at("/org/freedesktop/login1", Logind(log.clone()))
+                    .serve_at("/org/freedesktop/portal/desktop", Portal(log.clone()))
+                    .serve_at("/org/freedesktop/FileManager1", FileManager(log.clone()))
+                    .serve_at("/org/freedesktop/Notifications", Notifications(log))
                     .build()
                     .await
                     .unwrap();
