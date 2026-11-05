@@ -3,13 +3,18 @@ use std::{io::Write, path::Path};
 use anyhow::Result;
 
 /// The startup files changed, by name.
-#[expect(clippy::disallowed_methods, reason = "reads PATH and edits the shells' startup files")]
+#[expect(clippy::disallowed_methods, reason = "reads the user's shell")]
 pub(super) fn add(dir: &Path) -> Result<String> {
     // Root's folder is on `PATH` already.
     if crate::sys::is_root() {
         return Ok(String::new());
     }
-    let home = etcetera::home_dir()?;
+    add_in(dir, &etcetera::home_dir()?, &std::env::var("SHELL").unwrap_or_default())
+}
+
+/// [`add`] for the user whose home is `home` and whose shell is `shell`.
+#[expect(clippy::disallowed_methods, reason = "edits the shells' startup files")]
+fn add_in(dir: &Path, home: &Path, shell: &str) -> Result<String> {
     let env = dir.parent().unwrap_or(dir).join("env");
     let quoted = dir.display().to_string().replace('"', "\\\"");
     if !env.exists() {
@@ -27,7 +32,6 @@ esac
         );
         std::fs::write(&env, script)?;
     }
-    let shell = std::env::var("SHELL").unwrap_or_default();
     let source = format!(". \"{}\"\n", env.display().to_string().replace('"', "\\\""));
     let fish = format!("fish_add_path --global --prepend \"{quoted}\"\n");
     // Created if missing: .profile for every shell, the others for the user's own.
