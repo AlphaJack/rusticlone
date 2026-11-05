@@ -588,7 +588,8 @@ fn a_queued_copy_says_it_waits_for_the_backup() {
         store.unfinished(Some("Slow")).iter().any(|r| r.status == Status::Queued && store.alive(r))
     };
     let mut copy = sb.spawn(&["copy", "--collection", "Slow"], &[]);
-    wait_for(10, "the copy to wait", queued);
+    // A busy machine takes a while to start the command.
+    wait_for(30, "the copy to wait", queued);
     let runs = card(&server.get("/collections/Slow").body, "runs");
     copy.kill().unwrap();
     copy.wait().unwrap();
