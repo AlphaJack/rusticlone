@@ -974,16 +974,19 @@ fn the_profile_folder_opens_in_the_file_manager() {
         let cookie = format!("Cookie: {}", session.split(';').next().unwrap());
         server.request("POST", "/setup/folder", &[form, &cookie], "").code
     };
-    assert_eq!(open(&sb.server(&bus.env())), 204);
+    // Its output tells why, if it does not answer.
+    let answers = |server: &Server, code: u16| {
+        let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| open(server)));
+        assert_eq!(got.ok(), Some(code), "{}", server.output());
+    };
+    answers(&sb.server(&bus.env()), 204);
     let folder = format!("ShowFolders file://{}", sb.profile_dir().display());
     assert!(fs::read_to_string(&log).unwrap().contains(&folder), "{}", fs::read_to_string(&log).unwrap());
     drop(bus);
     let path = std::env::var_os("PATH").unwrap();
     let without = std::env::split_paths(&path).filter(|d| !d.join("xdg-open").exists());
     let without = std::env::join_paths(without).unwrap().into_string().unwrap();
-    let server = sb.server(&[("PATH", &without)]);
-    let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| open(&server)));
-    assert_eq!(refused.ok(), Some(422), "{}", server.output());
+    answers(&sb.server(&[("PATH", &without)]), 422);
 }
 
 /// `serve --open` beside a server that runs opens that one in the browser, logged in, and starts no other.
