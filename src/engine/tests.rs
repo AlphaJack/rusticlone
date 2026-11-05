@@ -330,6 +330,30 @@ fn a_source_that_shrank_holds_its_older_snapshots() {
     assert!(held(&[snapshot("a", "2026-10-01T00:00:00Z", 1000), snapshot("b", "2026-10-02T00:00:00Z", 0)]).is_empty());
 }
 
+/// A copy into a repository fails when its listing then lacks a snapshot it copied.
+#[test]
+fn a_copy_into_fails_without_what_it_copied() {
+    let replay = Replay::new()
+        .ok("Docs", &["cat", "config"], &recorded("cat-config.stdout"))
+        .ok("Docs-usb", &["cat", "config"], &recorded("cat-config.stdout"))
+        .ok("Docs-usb", &["copy"], "");
+    // Listed, then again after each wait for a remote that lags.
+    for _ in 0..4 {
+        replay.ok("Docs", &["snapshots", "--json"], &recorded("snapshots.stdout"));
+    }
+    let engine = engine("copy-into-unlisted", &replay);
+    let collections = engine.collections();
+    let run = super::Run::new(&collections[0], None);
+    let missing: crate::rustic::Snapshot = serde_json::from_value(serde_json::json!({
+        "id": "ffffffff", "time": "2026-10-16T03:00:00Z", "paths": ["/elsewhere"]
+    }))
+    .unwrap();
+    let (docs, usb) = (collections[0].primary, collections[0].repo("Docs-usb").unwrap());
+    let copied = engine.copy_into(&run, docs, usb, &[missing]);
+    let not_copied = copied.as_ref().err().and_then(|e| e.downcast_ref::<super::Error>());
+    assert!(matches!(not_copied, Some(super::Error::NotCopiedInto { .. })), "{copied:?}");
+}
+
 /// A recovery says how long the level notified before it lasted, from when that level was delivered, and
 /// how many other collections notified at the same URLs are not healthy.
 #[test]
