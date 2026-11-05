@@ -480,6 +480,19 @@ CMD ["serve"]
         assert_eq!(super::value_in_env_file(&path, "RUSTICLONE_AUTO_UPDATE").as_deref(), Some("true"));
     }
 
+    /// The env file switches a setting on or off by its own line. Without the file, its default decides.
+    #[test]
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn the_env_file_switches_a_setting() {
+        let dir = crate::sys::test_dir("env-file-switch");
+        let (on, off) = (dir.join("on.env"), dir.join("off.env"));
+        std::fs::write(&on, "RUSTICLONE_AUTO_UPDATE=TRUE\n").unwrap();
+        std::fs::write(&off, "RUSTICLONE_AUTO_UPDATE=false\n").unwrap();
+        let switched = |file: Option<&std::path::Path>| super::on_in_env_file(&super::AUTO_UPDATE, file);
+        let default = super::AUTO_UPDATE.default.is_some_and(|d| d.eq_ignore_ascii_case("true"));
+        assert_eq!((switched(Some(&on)), switched(Some(&off)), switched(None)), (true, false, default));
+    }
+
     #[test]
     fn settings_are_sorted() {
         assert!(ALL.is_sorted_by_key(|s| s.key));
