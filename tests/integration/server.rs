@@ -856,7 +856,9 @@ fn install_loads_a_login_agent() {
 fn install_copies_itself_onto_path() {
     let sb = docs_with_remote("");
     let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
-    let install = || sb.run_with(&["install"], &[fake.env(), vec![("SHELL", "/bin/zsh")]].concat());
+    // An empty `CARGO_HOME` is unset, as for the installer script.
+    let env = [fake.env(), vec![("SHELL", "/bin/zsh"), ("CARGO_HOME", "")]].concat();
+    let install = || sb.run_with(&["install"], &env);
     install().assert_exit(0).assert_result("copied", json!({})).assert_result("on-path", json!({}));
     // The copy it finds may be an older version: replaced.
     install().assert_exit(0).assert_result("copied", json!({}));
