@@ -54,7 +54,8 @@ fn a_source_that_shrank_to_almost_nothing_keeps_what_it_held() {
     sb.run(&["backup", "--all"]).assert_exit(0);
     fs::remove_file(sb.path("source/docs/big.bin")).unwrap();
     sb.write("docs/a.txt", "a");
-    sb.run(&["backup", "--all"]).assert_exit(2).assert_result("forgot", json!({"shrunk": 1}));
+    // Kept because it shrank, not held for a copy.
+    sb.run(&["backup", "--all"]).assert_exit(2).assert_result("forgot", json!({"shrunk": 1, "held": 0}));
     assert_eq!(sb.snapshots("Docs").len(), 2);
     sb.run(&["collections"]).assert_exit(2).assert_result("shrunk", json!({}));
     // The same size again: forgotten by policy.
