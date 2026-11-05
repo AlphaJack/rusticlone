@@ -44,6 +44,15 @@ fn profiles_in_the_working_directory_are_read() {
     assert_eq!(sb.snapshots("Kept").len(), 1);
 }
 
+/// A shell completes collection names from the profiles found.
+#[test]
+fn collection_names_are_completed() {
+    let sb = docs_with_remote("");
+    let words = ["--", NAME, "backup", "--collection", "Docs-"];
+    let run = sb.run_text_with(&words, &[("COMPLETE", "fish")]);
+    assert_eq!(run.stdout.lines().collect::<Vec<_>>(), ["Docs-remote"], "{}", run.output);
+}
+
 #[test]
 fn profiles_are_classified() {
     let sb = docs_with_remote("");
