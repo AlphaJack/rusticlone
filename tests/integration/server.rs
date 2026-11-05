@@ -422,6 +422,23 @@ fn server_runs_jobs_independently() {
     _ = fs::remove_dir(repo.parent().unwrap());
 }
 
+/// Auto-update set to neither `true` nor `false` stops the server from starting, rather than guessing.
+#[cfg(feature = "self-update")]
+#[test]
+#[expect(clippy::disallowed_methods, reason = "observe external processes over a bounded interval")]
+fn a_server_with_an_invalid_auto_update_does_not_start() {
+    let sb = Sandbox::new();
+    let (listen, update) = (var("LISTEN"), var("AUTO_UPDATE"));
+    let mut server = sb.spawn(&["serve"], &[(listen.as_str(), "127.0.0.1:0"), (update.as_str(), "maybe")]);
+    let deadline = Instant::now() + Duration::from_secs(30);
+    while server.try_wait().unwrap().is_none() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(100));
+    }
+    let ended = server.try_wait().unwrap();
+    _ = server.kill();
+    assert_eq!(ended.and_then(|s| s.code()), Some(1));
+}
+
 /// With nothing due, the server is idle: reacting to state changes does not change the state.
 #[test]
 #[expect(clippy::disallowed_methods, reason = "observe external processes over a bounded interval")]
