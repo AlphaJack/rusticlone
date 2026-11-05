@@ -86,6 +86,18 @@ pub(crate) enum Keep {
     All,
 }
 
+impl Every {
+    /// How often the repositories are checked for damage: often enough to find it before many backups depend
+    /// on a damaged one. Rarely enough not to read them over and over. Never without a schedule.
+    pub(super) fn check(self) -> Self {
+        match self {
+            Self::Manual => Self::Manual,
+            Self::Hourly | Self::Daily | Self::Custom => Self::Weekly,
+            Self::Weekly | Self::Monthly => Self::Monthly,
+        }
+    }
+}
+
 impl Keep {
     /// How often what it no longer keeps is removed: often enough that a month's backups do not pile up, and
     /// never when it keeps everything.

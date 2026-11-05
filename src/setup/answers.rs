@@ -41,13 +41,11 @@ pub(crate) struct Setup {
     pub values: BTreeMap<String, String>,
     pub every: Every,
     pub keep: Keep,
-    /// How often the repositories are checked.
-    pub check: Every,
     pub notify: String,
 }
 
 /// `path` with a leading `~` as the home folder: rustic would read it as a folder named `~`.
-fn home(path: &str) -> String {
+pub(crate) fn home(path: &str) -> String {
     let rest =
         path.strip_prefix('~').filter(|rest| rest.is_empty() || rest.starts_with(['/', std::path::MAIN_SEPARATOR]));
     match (rest, etcetera::home_dir()) {
@@ -71,8 +69,28 @@ pub(crate) fn repository_folder(text: &str) -> String {
 /// The first backup works without a second disk.
 impl Default for Setup {
     fn default() -> Self {
+        Self::of_folder(FOLDERS[0])
+    }
+}
+
+/// The home folders a collection is first suggested for in this order.
+const FOLDERS: [&str; 6] = ["Documents", "Pictures", "Desktop", "Music", "Videos", "Downloads"];
+
+impl Setup {
+    /// A further collection: for the first home folder that exists and that no profile is named after yet.
+    #[cfg(feature = "server")]
+    #[expect(clippy::disallowed_methods, reason = "looks for the user's folders")]
+    pub(crate) fn next(profiles: &[String]) -> Self {
+        let home = etcetera::home_dir().unwrap_or_default();
+        let taken = |name: &str| profiles.iter().any(|p| p == name || p.starts_with(&format!("{name}-")));
+        let free = FOLDERS.iter().find(|name| !taken(name) && home.join(name).is_dir());
+        free.map_or_else(|| Self { name: String::new(), ..Self::default() }, |name| Self::of_folder(name))
+    }
+
+    /// The answers for backing up the home folder `name` (the system's files for root) to a folder named
+    /// after it.
+    fn of_folder(name: &str) -> Self {
         let home = etcetera::home_dir().unwrap_or_else(|_| "/home/me".into());
-        let name = "Documents";
         let source = if sys::is_root() { super::os::ROOT_SOURCE.into() } else { home.join(name).display().to_string() };
         let folder = &Kind::Local.fields()[0];
         Self {
@@ -89,7 +107,6 @@ impl Default for Setup {
             .into(),
             every: Every::Daily,
             keep: Keep::default(),
-            check: Every::Weekly,
             notify: desktop().unwrap_or_default().into(),
         }
     }
@@ -188,6 +205,21 @@ impl Setup {
         pasted(self.shown(role, self.kind(role), field))
     }
 
+    /// Whether `role`'s repository refuses deletes.
+    pub(super) fn immutable(&self, role: Role) -> bool {
+        (self.kind(role).fields().iter()).any(|f| f.key == Key::Immutable && !self.value(role, f).is_empty())
+    }
+
+    /// Whether any repository forgets backups. Otherwise how long they are kept is not asked.
+    pub(crate) fn forgets(&self) -> bool {
+        <Role as strum::IntoEnumIterator>::iter().any(|r| self.kind(r) != Kind::None && !self.immutable(r))
+    }
+
+    /// How long backups are kept: all of them when no repository forgets any.
+    pub(super) fn keep(&self) -> Keep {
+        if self.forgets() { self.keep } else { Keep::All }
+    }
+
     #[cfg(any(feature = "server", test))]
     pub(super) fn check(&self) -> Result<(), Error> {
         let name = self.name.trim();
@@ -230,13 +262,12 @@ impl Setup {
         Ok(())
     }
 
-    /// Each step's setting, the form's name for it, and how often it runs.
     /// Each schedule's setting, the form's field, its answer and the question it answers.
     pub(super) fn schedules(&self) -> [(settings::Setting, &'static str, Every, Question); 3] {
         [
             (settings::BACKUP, "every", self.every, Question::WhenBackUp),
-            (settings::CHECK, "check", self.check, Question::HowOftenCheck),
-            (settings::PRUNE, "prune", self.keep.prune(), Question::HowLongKeep),
+            (settings::CHECK, "check", self.every.check(), Question::HowOftenCheck),
+            (settings::PRUNE, "prune", self.keep().prune(), Question::HowLongKeep),
         ]
     }
 
