@@ -1,8 +1,6 @@
 //! The current time, and waits that end early on an interrupt or a [`Wakes::wake`]. Tests use a clock that
 //! moves only when waited on.
 
-#![expect(clippy::disallowed_methods, reason = "reads the system clock")]
-
 use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, Instant},
@@ -20,10 +18,12 @@ pub(crate) trait Clock: Send + Sync {
 pub(crate) struct System;
 
 impl Clock for System {
+    #[expect(clippy::disallowed_methods, reason = "reads the system clock")]
     fn now(&self) -> Timestamp {
         Timestamp::now()
     }
 
+    #[expect(clippy::disallowed_methods, reason = "reads the system clock")]
     fn wait(&self, for_: Duration, stop: &dyn Fn() -> bool) {
         WAKES.sleep(for_, stop);
     }
@@ -147,6 +147,7 @@ mod tests {
 
     /// A sleep lasts its time, and ends early once woken with its condition met.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "reads the system clock")]
     fn a_sleep_lasts_its_time_unless_stopped() {
         let (wakes, stop) = (Arc::new(Wakes::new()), Arc::new(AtomicBool::new(false)));
         let start = Instant::now();

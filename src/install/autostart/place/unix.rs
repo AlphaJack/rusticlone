@@ -1,7 +1,5 @@
 //! Unix's links, through which Homebrew puts its executables on `PATH`.
 
-#![expect(clippy::disallowed_methods, reason = "lays out a Homebrew folder")]
-
 use super::{
     kept, linked,
     tests::{Folder, path},
@@ -9,6 +7,7 @@ use super::{
 
 /// As Homebrew's `bin/rusticlone` leads to its `Cellar`: the link outlives the version's folder.
 #[test]
+#[expect(clippy::disallowed_methods, reason = "copies the executable and reads PATH")]
 fn homebrews_executable_stays_named_by_its_link_on_path() {
     let folder = Folder::new("linked");
     let exe = folder.exe("Cellar/rusticlone/2.0.1/bin/rusticlone");

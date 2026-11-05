@@ -346,6 +346,7 @@ fn login_url(url: &str, tokens: &Tokens) -> String {
 
 /// With a server already on `listen`, as after `install`, opens it logged in, with the token it keeps
 /// in the state directory, and returns true.
+#[expect(clippy::disallowed_methods, reason = "the running server's own folder")]
 pub(crate) fn open_running(listen: &str) -> Result<bool> {
     let Some(addr) = std::net::ToSocketAddrs::to_socket_addrs(listen)?.next() else { return Ok(false) };
     if crate::health::check(listen).is_err() {

@@ -1,8 +1,6 @@
 //! The runs in progress in this process: their activity, their log, whether they should stop, and
 //! who to notify when they change.
 
-#![expect(clippy::disallowed_methods, reason = "records when an activity starts")]
-
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{
@@ -186,6 +184,7 @@ impl Live {
 
     /// What `step` does. Doing the same again keeps when it started, as waiting for a lock does at every change
     /// of the state.
+    #[expect(clippy::disallowed_methods, reason = "records when an activity starts")]
     pub(crate) fn set_activity(&self, step: Option<usize>, doing: Option<Doing>, on: Option<(String, String)>) {
         let mut activities = self.activities.lock();
         if activities.iter().any(|a| (a.step, &a.doing, &a.on) == (step, &doing, &on)) {
@@ -291,6 +290,7 @@ mod tests {
     /// A run is listed while its guard lives. Its activities are one per step, its waits add up, and a cancelled run
     /// shows as cancelling. Each change is told.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "records when an activity starts")]
     fn a_running_run_shows_what_it_does() {
         let store = Store::at(crate::sys::test_dir("live-test")).unwrap();
         let (runs, told) = runs();

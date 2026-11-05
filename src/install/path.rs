@@ -1,8 +1,6 @@
 //! Putting a folder on the user's `PATH` for new terminals, as rustup and the installer script do: for
 //! rusticlone, and for the rustic it downloads beside it.
 
-#![expect(clippy::disallowed_methods, reason = "reads PATH and edits the shells' startup files")]
-
 use std::path::Path;
 
 use anyhow::Result;
@@ -20,6 +18,7 @@ pub(crate) enum Logged {
 log::level!(Success: Logged);
 
 /// Whether this process's `PATH` has `dir`.
+#[expect(clippy::disallowed_methods, reason = "reads PATH and edits the shells' startup files")]
 pub(crate) fn has(dir: &Path) -> bool {
     std::env::var_os("PATH").is_some_and(|path| std::env::split_paths(&path).any(|d| d == dir))
 }

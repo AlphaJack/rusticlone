@@ -1,5 +1,3 @@
-#![expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
-
 use std::{env, path::PathBuf};
 
 use anyhow::Result;
@@ -67,6 +65,7 @@ impl Setting {
 
     /// For a setting read at start the environment, else its file; for the others the first profile in
     /// `chain` that sets it. Else the default. A blank value is not set.
+    #[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
     pub(crate) fn get(&self, chain: &[&RusticProfile]) -> Option<String> {
         let set = |v: &String| !v.trim().is_empty();
         let value = if self.scope.at_start() {
@@ -78,6 +77,7 @@ impl Setting {
     }
 
     /// The trimmed contents of a secret's file.
+    #[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
     fn file(&self) -> Result<Option<String>, Error> {
         let path = (self.scope == Scope::Secret).then(|| env::var_os(format!("{}_FILE", self.key)));
         let Some(path) = path.flatten() else { return Ok(None) };
@@ -102,6 +102,7 @@ impl Setting {
 
 /// Fails on a `<KEY>_FILE` that cannot be read, which [`Setting::get`] would skip, and on a profile's setting
 /// in the environment, which it ignores.
+#[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
 pub(crate) fn check_env() -> Result<(), Error> {
     ALL.iter().try_for_each(|s| match env::var_os(s.key) {
         Some(_) if !s.scope.at_start() => Err(Error::ProfileOnly { key: s.key }),
@@ -182,6 +183,7 @@ pub(crate) fn ignored(p: &RusticProfile, profiles: &[&RusticProfile]) -> Vec<Ign
 }
 
 /// `rusticlone.env` in the configuration directory.
+#[expect(clippy::disallowed_methods, reason = "the real file, which callers pass on")]
 pub(crate) fn env_file() -> Option<PathBuf> {
     crate::sys::own_config_dir(crate::NAME).map(|d| d.join(format!("{}.env", crate::NAME)))
 }
@@ -206,6 +208,7 @@ pub(crate) fn write_env_file(setting: &Setting, value: &str) -> Result<PathBuf> 
 
 #[cfg(all(feature = "desktop", feature = "self-update"))]
 /// Writes `key=value` into the env file at `path`, created readable by its owner only.
+#[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
 fn set_in_env_file(path: &std::path::Path, key: &str, value: &str) -> std::io::Result<()> {
     let text = match std::fs::read_to_string(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -461,6 +464,7 @@ CMD ["serve"]
     /// An env file that cannot be read is left as it is: writing the setting alone would lose the rest.
     #[test]
     #[cfg(all(feature = "desktop", feature = "self-update"))]
+    #[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
     fn an_unreadable_env_file_is_left_as_it_is() {
         let path = crate::sys::test_dir("env-file-unreadable").join("rusticlone.env");
         // Not UTF-8.
@@ -473,6 +477,7 @@ CMD ["serve"]
     /// A setting in the env file is read from its own line, the last that sets it.
     #[test]
     #[cfg(all(feature = "desktop", feature = "self-update"))]
+    #[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
     fn a_setting_is_read_from_its_own_line_in_the_env_file() {
         let path = crate::sys::test_dir("env-file-value").join("rusticlone.env");
         let text = "RUSTICLONE_AUTO_UPDATE=false\nRUSTICLONE_AUTO_UPDATE=true\nRUSTICLONE_LISTEN=0.0.0.0:80\n";
@@ -483,6 +488,7 @@ CMD ["serve"]
     /// The env file switches a setting on or off by its own line. Without the file, its default decides.
     #[test]
     #[cfg(all(feature = "desktop", feature = "self-update"))]
+    #[expect(clippy::disallowed_methods, reason = "settings are read from the environment")]
     fn the_env_file_switches_a_setting() {
         let dir = crate::sys::test_dir("env-file-switch");
         let (on, off) = (dir.join("on.env"), dir.join("off.env"));

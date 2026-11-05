@@ -1,8 +1,6 @@
 //! Each collection's runs, from the time they are requested: their records, which also form the queue, and
 //! their logs as JSON lines.
 
-#![expect(clippy::disallowed_methods, reason = "writes run logs")]
-
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fs::{self, File, OpenOptions, TryLockError},
@@ -130,6 +128,7 @@ impl RunLog {
     }
 
     /// The first line also writes the record, so a run that logs nothing leaves no trace.
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     pub(crate) fn line(&mut self, origin: Origin, line: &str) {
         // Written at once, so that a follower never reads half of it.
         let line = LogLine { at: Some(self.store.now()), origin, text: line.to_owned() }.json() + "\n";
@@ -291,6 +290,7 @@ impl Store {
     }
 
     /// Whether its process still holds its lock. The lock of an ended process is removed, once.
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     pub fn alive(&self, run: &RunRecord) -> bool {
         let path = self.lock_path(&run_lock(&run.collection, run.id));
         match OpenOptions::new().write(true).open(&path).map(|f| f.try_lock()) {
@@ -346,6 +346,7 @@ impl Store {
 
     /// Keeps the collection's newest [`MAX_RUNS`] with their logs, plus every queued or running run, so that
     /// a long run is not dropped by the runs that end around it.
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn trim_runs(&self, collection: &str) -> Result<()> {
         let old: Vec<i64> = self.write(Shown::Of(collection), |w| {
             let mut table = w.open_table(RUNS)?;
@@ -432,6 +433,7 @@ impl Store {
     }
 
     /// Whole lines of a run's log from byte `from`, else its end, and the offset after them.
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     pub fn run_log_tail(&self, collection: &str, id: i64, from: Option<u64>) -> (Vec<LogLine>, u64) {
         let Ok(mut file) = File::open(self.log_path(collection, id)) else { return (Vec::new(), from.unwrap_or(0)) };
         let mut first = String::new();
@@ -465,6 +467,7 @@ mod tests {
     /// Runs started in the same millisecond, queued or at once, in two processes, never share an id: the second
     /// would overwrite the first's record.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn runs_started_at_once_have_their_own_ids() {
         let at = |store: Store| store.with_clock(clock::Fixed::at("2026-10-16T12:00:00Z"));
         let a = at(store("run-ids-test"));
@@ -520,6 +523,7 @@ mod tests {
     /// Recorded once in `tests/fixtures/runs.jsonl`. Deleting it records this version's runs again, and
     /// drops the shapes that earlier versions stored.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn runs_stored_by_earlier_versions_are_still_read() {
         let path = crate::tests::root().join("tests").join("fixtures").join("runs.jsonl");
         if !path.exists() {
@@ -542,6 +546,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn runs_are_written_as_they_go_and_the_oldest_dropped() {
         let store = store("runs-test");
         // A run that logs nothing leaves no trace.
@@ -592,6 +597,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn queued_runs_take_their_turn() {
         let a = store("queue-test");
         let b = Store::at(a.dir.clone()).unwrap();
@@ -628,6 +634,7 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn a_long_log_keeps_its_start_and_end() {
         // A fixed time, so that each line has the same length.
         let store = store("log-cap-test").with_clock(clock::Fixed::at("2026-10-16T12:00:00Z"));
@@ -653,6 +660,7 @@ mod tests {
 
     /// A queued run that its process drops leaves the queue. A started one stays.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn a_dropped_queued_run_leaves_the_queue() {
         let store = store("dropped-queued-test");
         let queued = RunLog::queued(&store, "Docs", Request::Backup, Trigger::Cli).unwrap();
@@ -668,6 +676,7 @@ mod tests {
     /// A run that holds a lock shows before it logs, so that the runs waiting for the lock name it. Waiting
     /// alone, it stays hidden.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn a_run_shows_what_it_holds_before_it_logs() {
         let store = store("holds-test");
         let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
@@ -684,6 +693,7 @@ mod tests {
 
     /// A step's waits add up. A request replaced shows in the record. The log is its version, then its lines.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn a_run_keeps_its_waits_its_request_and_its_lines() {
         let store = store("run-record-test");
         let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
@@ -704,6 +714,7 @@ mod tests {
 
     /// A new run's id comes after a stored run's, even one with an id from a later time.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn a_new_id_comes_after_the_stored_runs() {
         let store = store("id-after-stored-test");
         let mut later = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
@@ -716,6 +727,7 @@ mod tests {
 
     /// The runs read stay parsed, but for those removed since.
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn removed_runs_leave_the_parsed_ones() {
         let store = store("parsed-runs-test");
         let queued = RunLog::queued(&store, "Docs", Request::Backup, Trigger::Cli).unwrap();
@@ -733,6 +745,7 @@ mod tests {
     /// Stored runs that this version cannot read are counted.
     #[cfg(feature = "server")]
     #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes run logs")]
     fn unreadable_runs_are_counted() {
         let store = store("unreadable-runs-test");
         let mut run = RunLog::new(&store, "Docs", Request::Backup, Trigger::Cli);
