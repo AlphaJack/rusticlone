@@ -35,7 +35,7 @@ pub(super) fn theme_colors() -> [&'static str; 2] {
             .split_once("--background: light-dark(")
             .and_then(|(_, rest)| rest.split_once(");"))
             .and_then(|(value, _)| value.split_once(", "))
-            .map_or(["", ""], |(light, dark)| [light, dark])
+            .map_or(["", ""], Into::into)
     });
     *COLORS
 }

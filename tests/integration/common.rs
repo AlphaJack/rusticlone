@@ -187,7 +187,7 @@ impl Sandbox {
             "the integration tests need `rustic` in PATH"
         );
         let test = std::thread::current().name().unwrap_or("test").replace("::", "-");
-        let base = ["/dev/shm"].iter().map(PathBuf::from).find(|d| d.is_dir()).unwrap_or_else(env::temp_dir);
+        let base = std::iter::once(&"/dev/shm").map(PathBuf::from).find(|d| d.is_dir()).unwrap_or_else(env::temp_dir);
         // One directory per test process, inside a shared one. Directories of ended processes are removed,
         // including kept ones.
         let runs = base.join(env!("CARGO_PKG_NAME"));

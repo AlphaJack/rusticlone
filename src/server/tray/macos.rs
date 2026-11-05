@@ -46,7 +46,9 @@ define_class!(
     unsafe impl NSApplicationDelegate for Reopen {
         #[unsafe(method(applicationShouldHandleReopen:hasVisibleWindows:))]
         fn reopened(&self, _app: &NSApplication, _visible: bool) -> bool {
-            if let Some(login) = LOGIN.lock().clone() {
+            // Not locked while the desktop opens it.
+            let login = LOGIN.lock().clone();
+            if let Some(login) = login {
                 _ = crate::server::open_on_desktop(&login);
             }
             false
@@ -103,6 +105,7 @@ fn stop() {
 
 impl Tray {
     #[expect(clippy::unused_async, reason = "as on Linux, where showing waits for D-Bus")]
+    #[expect(clippy::needless_pass_by_ref_mut, reason = "the same as Linux's, which changes its panel icon")]
     pub(super) async fn show(&mut self, login: &str, rows: &[Row], switches: &[(Switch, Option<bool>)]) {
         let (login, rows, switches) = (login.to_owned(), rows.to_vec(), switches.to_vec());
         *LOGIN.lock() = Some(login.clone());

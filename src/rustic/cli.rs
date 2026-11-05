@@ -263,7 +263,7 @@ impl Runner for Cli {
 
     #[cfg(feature = "server")]
     fn command(&self, profile: &str, dir: &Path) -> Command {
-        Cli::command(profile, dir)
+        Self::command(profile, dir)
     }
 }
 

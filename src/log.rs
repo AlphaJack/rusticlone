@@ -52,9 +52,9 @@ impl Level {
     /// Its colored circle, for text without styles.
     pub fn emoji(self) -> &'static str {
         match self {
-            Level::Success => "🟢",
-            Level::Warning => "🟡",
-            Level::Failure => "🔴",
+            Self::Success => "🟢",
+            Self::Warning => "🟡",
+            Self::Failure => "🔴",
         }
     }
 
@@ -304,8 +304,12 @@ pub(crate) fn ask(question: &str, short: &str) -> std::io::Result<bool> {
         return Ok(false);
     }
     #[cfg(any(feature = "desktop", feature = "self-update"))]
-    if let Some(hooks) = *HOOKS.lock() {
-        return (hooks.ask)(short);
+    {
+        // Not locked while it waits for the answer.
+        let hooks = *HOOKS.lock();
+        if let Some(hooks) = hooks {
+            return (hooks.ask)(short);
+        }
     }
     #[cfg(not(any(feature = "desktop", feature = "self-update")))]
     let _ = short;

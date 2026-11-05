@@ -304,6 +304,18 @@ redundant_explicit_links = "deny"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Nursery lints that fight this code base's choices.
+# `pub(crate)` marks what other modules use, even inside a private module.
+redundant_pub_crate = "allow"
+# Each `const fn` is a promise to callers, for no gain here.
+missing_const_for_fn = "allow"
+# `map_or_else` chains read worse than `if let`.
+option_if_let_else = "allow"
+# It flags guards held on purpose across the work they protect, as the board drawn under its locks.
+significant_drop_tightening = "allow"
+# The server runs on one thread. The compiler already requires `Send` where a future moves to another.
+future_not_send = "allow"
 redundant_clone = "warn"
 needless_collect = "warn"
 str_to_string = "warn"

@@ -246,7 +246,7 @@ pub(crate) fn profile_files() -> Result<Vec<(String, PathBuf)>> {
                 && path.is_file()
                 && let Some(name) = path.file_stem().and_then(|s| s.to_str())
             {
-                found.entry(name.to_owned()).or_insert(dir.clone());
+                found.entry(name.to_owned()).or_insert_with(|| dir.clone());
             }
         }
     }

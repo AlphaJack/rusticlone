@@ -18,7 +18,7 @@ impl Run<'_> {
     /// collection's activity. `doing`: what the step's label does not say.
     pub(super) fn tracked<T>(&self, doing: Option<Doing>, f: impl FnOnce(&mut dyn FnMut(&Progress)) -> T) -> T {
         let text =
-            [self.label()].into_iter().chain(doing.as_ref().map(ToString::to_string)).collect::<Vec<_>>().join(" ");
+            std::iter::once(self.label()).chain(doing.as_ref().map(ToString::to_string)).collect::<Vec<_>>().join(" ");
         self.activity(doing, true);
         let mut report = |progress: &Progress| {
             crate::log::progress(self.collection.title, &text, &progress.summary(), progress.percent_done);

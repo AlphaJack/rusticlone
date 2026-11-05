@@ -89,7 +89,7 @@ pub struct RunRecord {
 }
 
 /// The resources a step holds and waits for, by the names the tables show.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Holds {
     pub using: Vec<String>,
     pub waiting_for: Option<String>,
@@ -97,7 +97,7 @@ pub struct Holds {
 
 /// A result as `--json` prints it: its kind and values, its level and its text. Unlike a
 /// [`StepResult`], it reads back whatever kinds results had when it was written.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResultRecord {
     pub level: Level,
     /// The repository, target, path or step it concerns, shown before [`Self::text`].
@@ -198,7 +198,7 @@ fn lenient<'de, D: Deserializer<'de>, T: DeserializeOwned>(d: D) -> Result<Optio
 }
 
 /// One step of a run, and its results.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepRecord {
     /// `copy to usb`.
     pub label: String,
@@ -239,7 +239,7 @@ impl StepRecord {
 impl StepRecord {
     /// A result of it, without the subject that its row names: its label or repository.
     pub fn result(&self, result: &ResultRecord) -> String {
-        result.within(&[self.label.as_str()].into_iter().chain(self.repo.as_deref()).collect::<Vec<_>>())
+        result.within(&std::iter::once(self.label.as_str()).chain(self.repo.as_deref()).collect::<Vec<_>>())
     }
 }
 

@@ -14,7 +14,7 @@ use crate::{
 };
 
 /// Holds what is shown, as the ledger does, so that events read back as it does.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Event {
     /// A step that started at `started` ended at `at`.
@@ -119,7 +119,7 @@ pub enum Event {
 }
 
 /// How a check read a data subset.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Read {
     /// Read without errors.
@@ -131,7 +131,7 @@ pub enum Read {
 }
 
 /// What a target lacks of its primary's snapshots.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Behind {
     /// Listed: behind since its oldest missing snapshot, if any.
@@ -141,7 +141,7 @@ pub enum Behind {
 }
 
 /// What is known of every collection: all events applied so far, read in one piece.
-#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Ledger {
     /// How each step last went.
     pub last_steps: BTreeMap<StepKey, LastStep>,

@@ -5,7 +5,7 @@ use crate::log::{self, Level, Tone};
 #[derive(Clone)]
 pub(super) struct Tree {
     pub(super) line: String,
-    pub(super) below: Vec<Tree>,
+    pub(super) below: Vec<Self>,
 }
 
 impl Tree {

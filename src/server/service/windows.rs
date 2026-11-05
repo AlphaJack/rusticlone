@@ -22,6 +22,7 @@ impl Hangups {
         Self
     }
 
+    #[expect(clippy::needless_pass_by_ref_mut, reason = "the same as Unix's, which reads its signal stream")]
     pub(in crate::server) async fn next(&mut self) {
         std::future::pending::<()>().await;
     }

@@ -49,7 +49,7 @@ impl RunKind {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RestoreOptions {
     /// The repository to restore from. Unset: the one with the newest snapshots.
     pub from: Option<String>,
@@ -187,7 +187,7 @@ pub(crate) struct NoTime {
 }
 
 /// One run of a collection. Its [`RunKind`] is the variant alone.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, strum::EnumDiscriminants)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, strum::EnumDiscriminants)]
 #[strum_discriminants(
     name(RunKind),
     vis(pub),
@@ -219,7 +219,7 @@ pub enum Request {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Tested {
     /// The newest snapshot of each source, or of one `[[backup.snapshots]]` entry.
@@ -235,44 +235,40 @@ impl Request {
     /// The one repository it works on, if any.
     fn repo(&self) -> Option<&str> {
         match self {
-            Request::Backup | Request::Restore(_) => None,
-            Request::Copy(repo) | Request::Recreate { repo, .. } => Some(repo),
-            Request::Prune(repos) => only(repos).map(String::as_str),
-            Request::Check(repos) => only(repos).map(|(repo, _)| repo.as_str()),
-            Request::TestRestore(repo, _) => repo.as_deref(),
+            Self::Backup | Self::Restore(_) => None,
+            Self::Copy(repo) | Self::Recreate { repo, .. } => Some(repo),
+            Self::Prune(repos) => only(repos).map(String::as_str),
+            Self::Check(repos) => only(repos).map(|(repo, _)| repo.as_str()),
+            Self::TestRestore(repo, _) => repo.as_deref(),
         }
     }
 
     /// A prune or check of only the repositories that `keep` keeps.
-    pub(crate) fn retain(&self, mut keep: impl FnMut(&str) -> bool) -> Request {
+    pub(crate) fn retain(&self, mut keep: impl FnMut(&str) -> bool) -> Self {
         match self {
-            Request::Prune(repos) => Request::Prune(repos.iter().filter(|r| keep(r)).cloned().collect()),
-            Request::Check(repos) => Request::Check(repos.iter().filter(|(r, _)| keep(r)).cloned().collect()),
-            Request::Backup
-            | Request::Copy(_)
-            | Request::Restore(_)
-            | Request::TestRestore(..)
-            | Request::Recreate { .. } => self.clone(),
+            Self::Prune(repos) => Self::Prune(repos.iter().filter(|r| keep(r)).cloned().collect()),
+            Self::Check(repos) => Self::Check(repos.iter().filter(|(r, _)| keep(r)).cloned().collect()),
+            Self::Backup | Self::Copy(_) | Self::Restore(_) | Self::TestRestore(..) | Self::Recreate { .. } => {
+                self.clone()
+            }
         }
     }
 
     /// The repositories a prune or check works on, one step each.
     pub(crate) fn maintained(&self) -> Vec<&str> {
         match self {
-            Request::Prune(repos) => repos.iter().map(String::as_str).collect(),
-            Request::Check(repos) => repos.iter().map(|(repo, _)| repo.as_str()).collect(),
-            Request::Backup
-            | Request::Copy(_)
-            | Request::Restore(_)
-            | Request::TestRestore(..)
-            | Request::Recreate { .. } => Vec::new(),
+            Self::Prune(repos) => repos.iter().map(String::as_str).collect(),
+            Self::Check(repos) => repos.iter().map(|(repo, _)| repo.as_str()).collect(),
+            Self::Backup | Self::Copy(_) | Self::Restore(_) | Self::TestRestore(..) | Self::Recreate { .. } => {
+                Vec::new()
+            }
         }
     }
 
     /// Whether it adds nothing to the same request queued before it, which would find what it finds. Not a
     /// check, which reads the next data subset, nor a restore, which may be repeated on purpose.
     pub fn joins(&self) -> bool {
-        matches!(self, Request::Backup | Request::Copy(_) | Request::Prune(_))
+        matches!(self, Self::Backup | Self::Copy(_) | Self::Prune(_))
     }
 
     /// Two requests with the same key run one after the other. It ignores the check reading, and names
@@ -285,19 +281,19 @@ impl Request {
     /// The repository it works on, or `None` when it applies to the whole collection.
     pub fn scope<'a>(&'a self, collection: &str) -> Option<&'a str> {
         // A copy from the primary goes to every target.
-        self.repo().filter(|repo| !matches!(self, Request::Copy(_) if *repo == collection))
+        self.repo().filter(|repo| !matches!(self, Self::Copy(_) if *repo == collection))
     }
 
     /// `verb` followed by the scope and reading: `backup collection`, `copy to Docs-usb`, `check Docs 3/10`.
     fn words(&self, collection: &str, verb: &str) -> String {
         let scope = match (self, self.scope(collection)) {
-            (Request::Copy(_), Some(to)) => Scope::CopyTo { target: to }.to_string(),
-            (Request::Copy(_), None) => Scope::CopyToAll.to_string(),
-            (Request::TestRestore(..), Some(from)) => Scope::From { repo: from }.to_string(),
-            (Request::Backup | Request::Prune(_) | Request::Check(_), None) => Scope::Collection.to_string(),
+            (Self::Copy(_), Some(to)) => Scope::CopyTo { target: to }.to_string(),
+            (Self::Copy(_), None) => Scope::CopyToAll.to_string(),
+            (Self::TestRestore(..), Some(from)) => Scope::From { repo: from }.to_string(),
+            (Self::Backup | Self::Prune(_) | Self::Check(_), None) => Scope::Collection.to_string(),
             (_, scope) => scope.unwrap_or_default().to_owned(),
         };
-        let reading = if let Request::Check(repos) = self { only(repos).and_then(|(_, r)| r.as_ref()) } else { None };
+        let reading = if let Self::Check(repos) = self { only(repos).and_then(|(_, r)| r.as_ref()) } else { None };
         let reading = reading.map(ToString::to_string).unwrap_or_default();
         [verb, &scope, &reading].into_iter().filter(|w| !w.is_empty()).collect::<Vec<_>>().join(" ")
     }
@@ -315,14 +311,14 @@ impl Request {
     /// The kind its words name: a restore's dry run, like a test restore, is `restore (dry-run)`.
     fn shown(&self) -> RunKind {
         match self {
-            Request::Restore(options) if options.dry_run => RunKind::TestRestore,
-            Request::Backup
-            | Request::Copy(_)
-            | Request::Prune(_)
-            | Request::Check(..)
-            | Request::Restore(_)
-            | Request::TestRestore(..)
-            | Request::Recreate { .. } => self.kind(),
+            Self::Restore(options) if options.dry_run => RunKind::TestRestore,
+            Self::Backup
+            | Self::Copy(_)
+            | Self::Prune(_)
+            | Self::Check(..)
+            | Self::Restore(_)
+            | Self::TestRestore(..)
+            | Self::Recreate { .. } => self.kind(),
         }
     }
 }
