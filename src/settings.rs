@@ -32,7 +32,8 @@ pub(crate) enum Error {
 }
 
 /// Where a setting is read: the environment, or a profile's `[global.env]`.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, crate::i18n::Fluent)]
+#[fluent(prefix = "setting-scope")]
 pub(crate) enum Scope {
     Environment,
     /// Also read from the file that `<KEY>_FILE` names, so that it need not be in the environment.
@@ -318,13 +319,31 @@ mod tests {
         of.collect()
     }
 
+    /// The book's settings page: every setting, where it is read, its default and what it does.
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn settings_page() -> String {
+        let rows: String = (ALL.iter())
+            .map(|s| {
+                let default = s.default.map(|d| format!("`{d}`")).unwrap_or_default();
+                format!("| `{}` | {} | {default} | {} |\n", s.key, s.scope, s.help().unwrap())
+            })
+            .collect();
+        let t = |id| crate::i18n::find(id, []).unwrap();
+        let (title, intro, columns) = (t("docs-settings-title"), t("docs-settings-intro"), t("docs-settings-columns"));
+        format!("# {title}\n\n{intro}\n\n{columns}\n|---|---|---|---|\n{rows}")
+    }
+
     /// What the release ships, which is built with the default features.
     #[test]
     #[cfg(all(feature = "desktop", feature = "self-update"))]
     fn generated_env_file() {
         crate::tests::generated(
             file!(),
-            &[(format!("packaging/{}.env", crate::NAME), &env_file), ("packaging/Dockerfile".into(), &dockerfile)],
+            &[
+                (format!("packaging/{}.env", crate::NAME), &env_file),
+                ("packaging/Dockerfile".into(), &dockerfile),
+                ("docs/src/reference/settings.md".into(), &settings_page),
+            ],
         );
     }
     /// The container image's recipe: it fetches the release that dist built for the platform's Linux target, of the
@@ -396,7 +415,7 @@ CMD ["serve"]
         )
     }
 
-    /// The examples reach the server where it listens by default: nginx's proxy, and the README's port.
+    /// The examples reach the server where it listens by default: nginx's proxy, and the book's port.
     #[test]
     #[cfg(feature = "server")]
     #[expect(clippy::disallowed_methods, reason = "reads the examples")]
@@ -406,7 +425,25 @@ CMD ["serve"]
         let nginx = read("packaging/nginx.conf").unwrap();
         assert!(nginx.contains(&format!("proxy_pass http://{listen}")), "nginx.conf proxies elsewhere than {listen}");
         let port = listen.rsplit_once(':').map_or(listen, |(_, port)| port);
-        assert!(read("README.md").unwrap().contains(&format!("port {port}")), "the README names another port");
+        assert!(read("docs/src/web-ui.md").unwrap().contains(&format!("port {port}")), "the book names another port");
+    }
+
+    /// The book's folders are where this system's rusticlone puts them: its configuration file, rustic's profiles
+    /// and the state. Each CI system checks its own row. A folder moved by `XDG_*_HOME` or the setting is not.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "the book names folders by the variables that hold them")]
+    fn book_names_the_folders() {
+        if crate::sys::xdg_moved() || super::STATE_DIR.get(&[]).is_some() {
+            return;
+        }
+        let mut folders = crate::sys::config_dirs("rustic").unwrap();
+        folders.extend(super::env_file());
+        folders.push(super::state_dir().unwrap());
+        let docs = crate::tests::root().join("docs").join("src");
+        let book = std::fs::read_to_string(docs.join("reference").join("folders.md")).unwrap();
+        for folder in folders.iter().map(|f| crate::sys::as_documented(f)) {
+            assert!(book.contains(&format!("`{folder}`")), "the book's folders page does not name {folder}");
+        }
     }
 
     /// Every setting has a description.
@@ -417,7 +454,7 @@ CMD ["serve"]
         }
     }
 
-    /// Every variable that the README and the screenshots' scripts name is read: a setting, or a test's.
+    /// Every variable that the README, the book and the screenshots' scripts name is read: a setting, or a test's.
     #[test]
     #[cfg(feature = "server")]
     #[expect(clippy::disallowed_methods, reason = "reads the documentation, the scripts and the tests")]
@@ -431,7 +468,8 @@ CMD ["serve"]
         let root = crate::tests::root();
         let read = |path: &std::path::Path| std::fs::read_to_string(path).unwrap_or_default();
         let tests: String = files(&root.join("tests").join("integration")).iter().map(|p| read(p)).collect();
-        for doc in std::iter::once(root.join("README.md")).chain(files(&root.join("screenshots").join("scripts"))) {
+        let docs = std::iter::once(root.join("README.md")).chain(files(&root.join("docs").join("src")));
+        for doc in docs.chain(files(&root.join("screenshots").join("scripts"))) {
             let text = read(&doc);
             let names = text
                 .split(|c: char| !(c.is_ascii_uppercase() || c == '_'))

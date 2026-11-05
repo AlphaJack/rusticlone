@@ -7,8 +7,8 @@
 //! `cargo xtask logo`: see [`logo`].
 //! `cargo xtask translations`: see [`translations`].
 //! `cargo xtask generate`: writes anew every generated file: the logo's renderings, and the files of the
-//! `generated_*` tests, such as the env file and the Linux packages.
-//! `cargo xtask screenshots [--setup | --only NAME... | --teardown]`: takes the README's screenshots anew, in Docker:
+//! `generated_*` tests, such as the env file, the book's reference pages and the Linux packages.
+//! `cargo xtask screenshots [--setup | --only NAME... | --teardown]`: takes the book's screenshots anew, in Docker:
 //! see `screenshots/scripts/run.sh`.
 
 #![expect(clippy::disallowed_methods, reason = "developer tool using files, processes and the network")]

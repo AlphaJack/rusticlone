@@ -1,5 +1,5 @@
 #!/bin/bash
-# Gives jack the Documents collection of the README, a Pictures one with two copy targets, and a few snapshots, as after two weeks of use.
+# Gives jack the Documents collection of the book, a Pictures one with two copy targets, and a few snapshots, as after two weeks of use.
 set -euo pipefail
 cd ~
 source /screenshots/scripts/bytes.sh

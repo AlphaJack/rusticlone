@@ -1,5 +1,5 @@
 #!/bin/bash
-# Takes the README's screenshots into screenshots/: MyComputer, with the README's Documents collection and a few snapshots, its terminal
+# Takes the book's screenshots into screenshots/: MyComputer, with the book's Documents collection and a few snapshots, its terminal
 # recorded by vhs and its web UI by Playwright, each in dark and light mode. Needs only Docker.
 #
 # run.sh                 sets MyComputer up, takes every screenshot, and removes it

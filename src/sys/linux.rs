@@ -4,6 +4,19 @@ use std::path::{Path, PathBuf};
 
 use etcetera::BaseStrategy;
 
+/// Whether a variable moved one of the XDG folders from where the book says it is.
+#[cfg(test)]
+#[expect(clippy::disallowed_methods, reason = "the book names folders by the variables that hold them")]
+pub(crate) fn xdg_moved() -> bool {
+    let home = etcetera::home_dir().unwrap_or_default();
+    let xdg = [
+        ("XDG_CONFIG_HOME", home.join(".config")),
+        ("XDG_DATA_HOME", home.join(".local").join("share")),
+        ("XDG_STATE_HOME", home.join(".local").join("state")),
+    ];
+    xdg.iter().any(|(var, default)| std::env::var_os(var).is_some_and(|d| Path::new(&d) != default))
+}
+
 pub(super) use super::unix::read_hostname;
 pub(crate) use super::unix::*;
 

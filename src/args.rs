@@ -210,14 +210,14 @@ impl Command {
 
 /// The command line's grammar, with its help from the catalog.
 pub(crate) fn command() -> clap::Command {
-    help(Cli::command(), "help")
+    help(Cli::command(), "help", crate::sys::is_root())
 }
 
 /// `command`'s help and its arguments', from messages `<key>` and `<key>-<argument>`, else `help-<argument>` for
 /// an argument that several subcommands share; then its subcommands', whose keys are `<key>-<subcommand>`.
-/// `$root`: whether who runs it is root or an administrator, for whom the server starts with the computer.
-fn help(command: clap::Command, key: &str) -> clap::Command {
-    let find = |id: &str| i18n::find(id, [("root", crate::sys::is_root().to_string().into())]);
+/// `root`: whether who runs it is root or an administrator, for whom the server starts with the computer.
+fn help(command: clap::Command, key: &str, root: bool) -> clap::Command {
+    let find = |id: &str| i18n::find(id, [("root", root.to_string().into())]);
     let command = match find(key) {
         Some(about) => command.about(about),
         None => command,
@@ -230,7 +230,9 @@ fn help(command: clap::Command, key: &str) -> clap::Command {
         }
     });
     let names: Vec<String> = command.get_subcommands().map(|c| c.get_name().to_owned()).collect();
-    names.iter().fold(command, |command, name| command.mut_subcommand(name, |c| help(c, &format!("{key}-{name}"))))
+    names
+        .iter()
+        .fold(command, |command, name| command.mut_subcommand(name, |c| help(c, &format!("{key}-{name}"), root)))
 }
 
 /// Completes a collection or repository with the profiles' names, read without rustic, which would be slow.
@@ -292,6 +294,49 @@ mod tests {
         assert!(parse(&["healthcheck", "--dry-run"]).is_err() && parse(&["--dry-run", "update"]).is_err());
         assert!(Cli::try_parse_from([NAME, "archive"]).is_err());
         assert!(Cli::try_parse_from([NAME, "--unknown-flag"]).is_err());
+    }
+
+    /// The book's commands page: each command's help, as `--help` shows it to a regular user, whoever runs the
+    /// test: CI's Windows runs as an administrator.
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn commands_page() -> String {
+        fn options(command: &clap::Command) -> String {
+            let line = |arg: &clap::Arg| {
+                let value = arg.get_action().takes_values().then(|| {
+                    let names = arg.get_value_names().map_or_else(|| arg.get_id().to_string(), |v| v.join(" "));
+                    format!(" <{}>", names.to_uppercase())
+                });
+                let short = arg.get_short().map(|s| format!("-{s}, ")).unwrap_or_default();
+                let long = arg.get_long().unwrap_or_default();
+                format!("- `{short}--{long}{}`: {}\n", value.unwrap_or_default(), arg.get_help().unwrap())
+            };
+            command.get_arguments().filter(|a| !a.is_hide_set()).map(line).collect()
+        }
+        fn section(command: &clap::Command, path: &str, out: &mut String) {
+            for sub in command.get_subcommands().filter(|c| !c.is_hide_set()) {
+                let path = format!("{path} {}", sub.get_name());
+                *out += &format!("\n## `{path}`\n\n{}\n\n{}", sub.get_about().unwrap(), options(sub));
+                section(sub, &path, out);
+            }
+        }
+        let t = |id| i18n::find(id, []).unwrap();
+        let root = help(Cli::command(), "help", false);
+        let mut out = format!(
+            "# {}\n\n{}\n\n## {}\n\n{}",
+            t("docs-commands-title"),
+            t("docs-commands-intro"),
+            t("docs-commands-global"),
+            options(&root)
+        );
+        section(&root, NAME, &mut out);
+        out
+    }
+
+    /// What the release ships, which is built with the default features.
+    #[test]
+    #[cfg(all(feature = "desktop", feature = "self-update"))]
+    fn generated_commands_page() {
+        crate::tests::generated(file!(), &[("docs/src/reference/commands.md".into(), &commands_page)]);
     }
 
     /// Every subcommand and argument has help, and every `help-` message is one's.
