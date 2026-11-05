@@ -890,6 +890,8 @@ fn install_copies_itself_onto_path() {
     for rc in [".profile", ".zshenv"] {
         assert_eq!(fs::read_to_string(sb.path("home").join(rc)).unwrap().matches(&source).count(), 1, "{rc}");
     }
+    // Created, a startup file holds that line alone.
+    assert_eq!(fs::read_to_string(sb.path("home/.profile")).unwrap(), format!("{source}\n"));
     let sourced = std::process::Command::new("sh").arg("-c").arg(format!("{source}; echo $PATH")).output().unwrap();
     assert!(String::from_utf8_lossy(&sourced.stdout).starts_with(&sb.path("home/.cargo/bin").display().to_string()));
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
