@@ -1,5 +1,5 @@
 ---
-source: tests/integration/web.rs
+source: tests/integration/web/pages.rs
 expression: "server.get(\"/metrics\").body"
 ---
 # HELP process_start_time_seconds when the server started
