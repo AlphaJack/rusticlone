@@ -667,6 +667,20 @@ fn a_listed_primary_without_snapshots_was_never_backed_up() {
     assert!(!never());
 }
 
+/// A primary that cannot be listed is not created again once a backup into it succeeded, even before its newest
+/// snapshot was ever recorded.
+#[test]
+fn a_primary_backed_up_before_is_not_created_again() {
+    use crate::request::StepKey;
+    let replay = Replay::new();
+    let engine = engine("backed-up-before", &replay);
+    attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    let collections = engine.collections();
+    asked(&engine, &collections[0], &Request::Backup);
+    let calls = replay.calls();
+    assert!(!calls.iter().any(|c| c.starts_with("-P Docs backup")), "{calls:?}");
+}
+
 /// A notification error shows only while sends fail.
 #[test]
 fn an_undelivered_notification_shows_while_it_fails() {
