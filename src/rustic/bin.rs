@@ -1,6 +1,11 @@
 //! Rustic's executable and its version.
 
-use std::{env, path::PathBuf, sync::LazyLock};
+use std::{
+    env,
+    ffi::OsString,
+    path::{Path, PathBuf},
+    sync::LazyLock,
+};
 
 use anyhow::Result;
 use serde::Serialize;
@@ -22,11 +27,21 @@ pub(crate) fn downloaded() -> Result<PathBuf> {
 /// since.
 #[expect(clippy::disallowed_methods, reason = "finds rustic's executable")]
 pub(crate) fn path() -> PathBuf {
-    if let Some(path) = settings::RUSTIC.get(&[]) {
-        return path.into();
+    pick(settings::RUSTIC.get(&[]), env::var_os("PATH"), downloaded().ok(), Path::is_file)
+}
+
+/// [`path`], given the setting, `PATH`, the downloaded one's place, and which files exist.
+fn pick(
+    set: Option<String>,
+    path: Option<OsString>,
+    downloaded: Option<PathBuf>,
+    is_file: impl Fn(&Path) -> bool,
+) -> PathBuf {
+    if let Some(set) = set {
+        return set.into();
     }
-    let in_path = env::var_os("PATH").and_then(|p| env::split_paths(&p).map(|d| d.join(name())).find(|f| f.is_file()));
-    in_path.or_else(|| downloaded().ok().filter(|d| d.is_file())).unwrap_or_else(|| name().into())
+    let in_path = path.and_then(|p| env::split_paths(&p).map(|d| d.join(name())).find(|f| is_file(f)));
+    in_path.or_else(|| downloaded.filter(|d| is_file(d))).unwrap_or_else(|| name().into())
 }
 
 /// The release the tests run, from `Cargo.toml`, which `the_tested_release_is_known` checks.
