@@ -182,7 +182,7 @@ pub(crate) fn ignored(p: &RusticProfile, profiles: &[&RusticProfile]) -> Vec<Ign
 }
 
 /// `rusticlone.env` in the configuration directory.
-fn env_file() -> Option<PathBuf> {
+pub(crate) fn env_file() -> Option<PathBuf> {
     crate::sys::own_config_dir(crate::NAME).map(|d| d.join(format!("{}.env", crate::NAME)))
 }
 
@@ -221,10 +221,11 @@ fn set_in_env_file(path: &std::path::Path, key: &str, value: &str) -> std::io::R
     )
 }
 
-/// Whether the env file switches `setting` on, which the next start reads unless the environment sets it.
+/// Whether the env file at `file`, [`env_file`] but in tests, switches `setting` on, which the next start reads unless
+/// the environment sets it. Without a file, as its default says.
 #[cfg(all(feature = "desktop", feature = "self-update"))]
-pub(crate) fn on_in_env_file(setting: &Setting) -> bool {
-    let set = env_file().and_then(|path| value_in_env_file(&path, setting.key));
+pub(crate) fn on_in_env_file(setting: &Setting, file: Option<&std::path::Path>) -> bool {
+    let set = file.and_then(|path| value_in_env_file(path, setting.key));
     set.or_else(|| setting.default.map(Into::into)).is_some_and(|v| v.eq_ignore_ascii_case("true"))
 }
 

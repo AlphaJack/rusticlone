@@ -104,7 +104,10 @@ impl Switch {
         match self {
             Self::AtLogin => crate::install::autostart::at_login(),
             #[cfg(feature = "self-update")]
-            Self::AutoUpdate => Some(crate::settings::on_in_env_file(&crate::settings::AUTO_UPDATE)),
+            Self::AutoUpdate => {
+                let file = crate::settings::env_file();
+                Some(crate::settings::on_in_env_file(&crate::settings::AUTO_UPDATE, file.as_deref()))
+            }
         }
     }
 
