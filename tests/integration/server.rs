@@ -858,7 +858,8 @@ fn install_copies_itself_onto_path() {
     let Some(fake) = fake_service_manager(&sb, &sb.path("manager.log")) else { return };
     let install = || sb.run_with(&["install"], &[fake.env(), vec![("SHELL", "/bin/zsh")]].concat());
     install().assert_exit(0).assert_result("copied", json!({})).assert_result("on-path", json!({}));
-    install().assert_exit(0);
+    // The copy it finds may be an older version: replaced.
+    install().assert_exit(0).assert_result("copied", json!({}));
     assert!(sb.path("home/.cargo/bin").join(NAME).is_file());
     let source = format!(". \"{}\"", sb.path("home/.cargo/env").display());
     for rc in [".profile", ".zshenv"] {
