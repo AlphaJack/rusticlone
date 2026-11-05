@@ -139,6 +139,24 @@ fn a_shared_repository_keeps_each_profile_its_snapshots() {
     assert!(!to.join(below_root(&sb.path("source/plain"))).exists(), "the other profile's data");
 }
 
+/// On a new computer, a restore learns where hooked sources are before it picks their snapshots: a plain source
+/// beside them, found as written, does not leave them out.
+#[test]
+fn a_restore_learns_hooked_sources_beside_plain_ones() {
+    let sb = Sandbox::new();
+    sb.write("real/one/a.txt", "a");
+    sb.write("plain/p.txt", "p");
+    let plain = format!("[[backup.snapshots]]\nsources = ['{}']\n", sb.path("source/plain").display());
+    hooked(&sb, "Hooked", &[("one", "real/one")], &plain);
+    sb.run(&["backup", "--collection", "Hooked"]).assert_exit(0);
+    sb.remove("store");
+    let to = sb.path("restored");
+    sb.run(&["restore", "--collection", "Hooked", "--to", to.to_str().unwrap()])
+        .assert_exit(0)
+        .assert_no_result("some-sources", json!({}));
+    assert_eq!(sb.tree(&format!("restored/{}", below_root(&sb.path("source/real")).display())).len(), 1);
+}
+
 /// Profiles that reach one repository by different URLs, here a path and `opendal:fs`, share its locks,
 /// which are named after the repository's id: a forget waits for a backup into it.
 #[test]
