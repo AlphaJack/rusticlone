@@ -380,10 +380,6 @@ fn run(engine: &Engine, kind: RunKind, options: &RestoreOptions, source: Option<
         let (own, rest) = queued.take().into_iter().partition(|(name, _)| name == collection.name());
         queued.replace(rest);
         let lines = own.into_iter().flat_map(|(_, queued): (_, Result<Asked>)| match queued {
-            Ok(asked) if clock::interrupted() => {
-                stopped(engine, &asked);
-                Vec::new()
-            }
             Ok(Asked::Queued(queued)) => {
                 let record = queued.record.clone();
                 let results = engine.execute(collection, queued, &batch).results;
@@ -399,7 +395,7 @@ fn run(engine: &Engine, kind: RunKind, options: &RestoreOptions, source: Option<
         });
         RunResults { collection: collection.title.to_owned(), results: lines.collect() }
     });
-    // Stopped before their collection's turn.
+    // Stopped before their collection's turn: an interrupt ends the loop over them.
     queued.take().into_iter().filter_map(|(_, q)| q.ok()).for_each(|asked| stopped(engine, &asked));
     Ok(level)
 }
