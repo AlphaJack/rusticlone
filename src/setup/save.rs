@@ -45,12 +45,17 @@ pub(crate) fn dir() -> Option<PathBuf> {
 }
 
 /// Saves the profiles in [`dir`], and returns it. Never overwrites a file.
-#[expect(clippy::disallowed_methods, reason = "saves the profiles")]
 pub(crate) fn save(setup: &Setup) -> anyhow::Result<PathBuf> {
+    save_in(setup, dir())
+}
+
+/// [`save`] into `dir`, the folder that [`dir`] finds, if any.
+#[expect(clippy::disallowed_methods, reason = "saves the profiles")]
+fn save_in(setup: &Setup, dir: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     use std::{fs, io::Write};
     setup.check()?;
     setup.check_folders()?;
-    let dir = dir().ok_or(Error::NoDir)?;
+    let dir = dir.ok_or(Error::NoDir)?;
     fs::create_dir_all(&dir)?;
     let profiles = setup.profiles();
     if let Some(path) = profiles.iter().map(|(file, _)| dir.join(file)).find(|p| p.exists()) {
