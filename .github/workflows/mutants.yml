@@ -1,20 +1,22 @@
 name: Mutants
 
-# Lists the mutations of the library that no test catches: weekly, or on a PR's changed lines when it gets the
-# `mutants` label. Adding the label again runs it again.
+# Lists the mutations of the library that no test catches: weekly, or on the changed lines of a PR with the
+# `mutants` label, again at each push. The `mutants` job reports for every PR, so that it can be a required check:
+# it passes at once without the label.
 on:
   schedule:
     - cron: "0 19 * * 5"
   workflow_dispatch:
   pull_request:
-    types: [labeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 permissions:
   contents: read
 
+# A PR's newer push replaces its run. The full runs wait for each other.
 concurrency:
-  group: mutants
-  cancel-in-progress: false
+  group: mutants-${{ github.event.pull_request.number || 'main' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,7 +29,7 @@ jobs:
   # Builds the dependencies once, for every shard to restore rather than build.
   build:
     name: build tests
-    if: github.event_name != 'pull_request' || github.event.label.name == 'mutants'
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'mutants')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -94,14 +96,31 @@ jobs:
         run: |
           git diff "$BASE...HEAD" > "$RUNNER_TEMP/pr.diff"
           echo "IN_DIFF=--in-diff=$RUNNER_TEMP/pr.diff" >> "$GITHUB_ENV"
+          # The PR's tests already ran in CI.
+          echo "BASELINE=--baseline=skip" >> "$GITHUB_ENV"
       - name: Mutate the library
         env:
           SHARD: ${{ matrix.shard }}
           SHARDS: ${{ strategy.job-total }}
-        run: cargo mutants -vV --in-place --test-tool nextest --shard "$SHARD/$SHARDS" --no-shuffle ${IN_DIFF:+"$IN_DIFF"}
+        run: cargo mutants -vV --in-place --test-tool nextest --shard "$SHARD/$SHARDS" --no-shuffle ${IN_DIFF:+"$IN_DIFF"} ${BASELINE:+"$BASELINE"}
       - name: Upload what the tests missed
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: mutants-${{ matrix.shard }}
           path: mutants.out
+
+  # The required check: fails if a shard missed a mutant or did not finish. Without the label, nothing ran: it passes.
+  gate:
+    name: mutants
+    needs: [build, mutants]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every mutant caught
+        env:
+          BUILD: ${{ needs.build.result }}
+          SHARDS: ${{ needs.mutants.result }}
+        run: |
+          echo "build: $BUILD, shards: $SHARDS"
+          [ "$BUILD" != failure ] && [ "$BUILD" != cancelled ] && [ "$SHARDS" != failure ] && [ "$SHARDS" != cancelled ]
