@@ -301,3 +301,18 @@ fn a_source_behind_a_link_loop_is_given_up_on() {
     sb.backup_profile("Docs", &[&["a"]], &[], "");
     sb.run(&["restore", "--all", "--dry-run"]).assert_exit(1);
 }
+
+/// A folder this computer refuses fails the restore: another repository would write to it the same way.
+#[test]
+fn a_restore_into_a_refused_folder_does_not_fall_back() {
+    let sb = docs_with_remote("");
+    sb.write("docs/a.txt", "a");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    // A file where the restore needs a folder.
+    sb.write("blocked", "a file");
+    let to = sb.path("source").join("blocked").join("out").display().to_string();
+    sb.run(&["restore", "--all", "--to", &to])
+        .assert_exit(1)
+        .assert_no_result("falling-back", json!({}))
+        .assert_no_result("restored", json!({}));
+}
