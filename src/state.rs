@@ -565,8 +565,8 @@ impl Store {
         self.write(Shown::Nothing, |w| Ok(w.open_table(SESSIONS)?.remove(hash).map(drop)?))
     }
 
-    pub(crate) fn notified(&self, collection: &str) -> Notified {
-        self.read(|r| notified(&r.open_table(NOTIFIED)?, collection)).unwrap_or_default()
+    pub(crate) fn notified(&self, collection: &str) -> Result<Notified> {
+        self.read(|r| notified(&r.open_table(NOTIFIED)?, collection))
     }
 
     /// Replaces the collection's [`Notified`] with what `f` makes of it, in one transaction, so that other
@@ -578,7 +578,7 @@ impl Store {
         f: impl Fn(&Notified) -> Notified,
     ) -> Result<Option<Notified>> {
         let changed = |old: Notified| Some(f(&old)).filter(|new| *new != old);
-        if changed(self.notified(collection)).is_none() {
+        if changed(self.notified(collection)?).is_none() {
             return Ok(None);
         }
         self.write(Shown::Of(collection), |w| {
@@ -686,7 +686,7 @@ mod tests {
             let failure = |_: &Notified| Notified { level: Level::Failure, ..Notified::default() };
             assert!(b.update_notified("Docs", failure).unwrap().is_some());
             assert!(a.update_notified("Docs", failure).unwrap().is_none(), "already notified");
-            assert_eq!(a.notified("Docs").level, Level::Failure);
+            assert_eq!(a.notified("Docs").unwrap().level, Level::Failure);
         }
         fs::remove_dir_all(&a.dir).unwrap();
     }

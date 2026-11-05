@@ -43,12 +43,13 @@ esac
     ];
     let mut changed = Vec::new();
     for (file, line, create) in files {
-        let text = std::fs::read_to_string(&file).unwrap_or_default();
-        if (!create && !file.exists()) || text.contains(line.trim()) {
+        // As bytes: a file that is not UTF-8 still shows whether it has the line.
+        let text = std::fs::read(&file).unwrap_or_default();
+        if (!create && !file.exists()) || text.windows(line.trim().len()).any(|w| w == line.trim().as_bytes()) {
             continue;
         }
         std::fs::create_dir_all(file.parent().unwrap_or(&file))?;
-        let separator = if text.is_empty() || text.ends_with('\n') { "" } else { "\n" };
+        let separator = if text.is_empty() || text.ends_with(b"\n") { "" } else { "\n" };
         std::fs::OpenOptions::new()
             .create(true)
             .append(true)

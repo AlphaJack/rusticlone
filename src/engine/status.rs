@@ -313,8 +313,9 @@ impl Engine {
             .filter_map(|s| s.as_ref()?.error.clone())
             .collect();
         issues.extend(invalid.into_iter().map(|error| Issue::InvalidSchedule { error }));
-        if settings::NOTIFY.get(&[p]).is_some() {
-            let notified = self.store.notified(&p.name);
+        if settings::NOTIFY.get(&[p]).is_some()
+            && let Ok(notified) = self.store.notified(&p.name)
+        {
             issues.extend(notified.error.filter(|_| notified.failures > 0).map(|error| Issue::Undelivered { error }));
         }
         // A missing repository is the one issue its steps' failures and warnings repeat, and those of the copies
