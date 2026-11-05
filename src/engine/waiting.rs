@@ -50,7 +50,7 @@ pub(super) fn wait_while(run: &Run<'_>, mut now: impl FnMut() -> Option<Waiting>
     let Some(live) = run.live.as_deref().filter(|l| l.trigger() == Trigger::Schedule) else { return false };
     let (step, mut waited) = (run.cx.step(), None);
     loop {
-        let seen = clock::wakes();
+        let seen = clock::WAKES.seen();
         let Some(now) = now().filter(|_| !run.cx.stopping()) else { break };
         if waited != Some(now) {
             let resource = now.resource().to_owned();
@@ -58,7 +58,7 @@ pub(super) fn wait_while(run: &Run<'_>, mut now: impl FnMut() -> Option<Waiting>
             live.set_holds(step, Holds { using: Vec::new(), waiting_for: Some(resource) });
             waited = Some(now);
         }
-        clock::wait(seen);
+        clock::WAKES.wait(seen);
     }
     waited.is_some()
 }

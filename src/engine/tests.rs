@@ -183,7 +183,7 @@ fn a_scheduled_run_waits_for_power_then_an_unmetered_network() {
         (vec![None, Some(Waiting::UnmeteredNetwork), Some(Waiting::PowerSupply)], Vec::new());
     let waited = wait_while(&run, || {
         // As the system would tell each change.
-        crate::clock::wake();
+        crate::clock::WAKES.wake();
         shown.push(scheduled.live.activities().into_iter().find_map(|a| a.doing).map(|d| d.to_string()));
         answers.pop().flatten()
     });

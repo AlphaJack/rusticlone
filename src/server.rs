@@ -392,7 +392,7 @@ async fn run(build: Build, listen: &str, open: bool, tray: Option<Tray>) -> Resu
     if [&settings::SKIP_ON_BATTERY, &settings::SKIP_ON_METERED].iter().any(|s| s.enabled().unwrap_or_default()) {
         let app = app.clone();
         crate::sys::watch_conditions(move || {
-            crate::clock::wake();
+            crate::clock::WAKES.wake();
             app.pages.changed();
         });
     }
