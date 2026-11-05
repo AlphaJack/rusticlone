@@ -120,6 +120,11 @@ fn snapshots_can_be_browsed_and_downloaded() {
     assert!(file.head.contains("filename=\"a.txt\""), "{}", file.head);
     let zip = server.get(&format!("{base}/download?path={docs}/sub&dir=true"));
     assert!(zip.body.contains("PK") && zip.head.contains("sub.zip"), "{}", zip.head);
+    // A download ends with its last chunk only once rustic succeeded: else it is cut short.
+    let complete = |body: &str| body.ends_with("0\r\n\r\n");
+    assert!(complete(&file.body) && complete(&zip.body), "{:?}", file.body);
+    let failed = server.get(&format!("{base}/download?path={docs}/nowhere.txt"));
+    assert!(!complete(&failed.body), "{:?}", failed.body);
     // Ids reach rustic as arguments, never as options.
     assert_eq!(server.get("/collections/Docs/repos/Docs/snapshots/--help").code, 400);
 }
