@@ -200,19 +200,25 @@ pub(crate) fn load_env_file() -> Result<()> {
 /// Writes `value` for `setting` into the env file, created readable by its owner only, and returns its path.
 pub(crate) fn write_env_file(setting: &Setting, value: &str) -> Result<PathBuf> {
     let path = env_file().ok_or(Error::NoConfigDir)?;
-    let text = match std::fs::read_to_string(&path) {
+    set_in_env_file(&path, setting.key, value)?;
+    Ok(path)
+}
+
+#[cfg(all(feature = "desktop", feature = "self-update"))]
+/// Writes `key=value` into the env file at `path`, created readable by its owner only.
+fn set_in_env_file(path: &std::path::Path, key: &str, value: &str) -> std::io::Result<()> {
+    let text = match std::fs::read_to_string(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
         text => text?,
     };
-    std::fs::create_dir_all(path.parent().unwrap_or(&path))?;
+    std::fs::create_dir_all(path.parent().unwrap_or(path))?;
     let mut file = std::fs::OpenOptions::new();
     // It may hold secrets.
     crate::sys::only_owner(&mut file);
     std::io::Write::write_all(
-        &mut file.write(true).create(true).truncate(true).open(&path)?,
-        with_line(&text, setting.key, value).as_bytes(),
-    )?;
-    Ok(path)
+        &mut file.write(true).create(true).truncate(true).open(path)?,
+        with_line(&text, key, value).as_bytes(),
+    )
 }
 
 /// Whether the env file switches `setting` on, which the next start reads unless the environment sets it.
