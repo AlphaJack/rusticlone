@@ -672,3 +672,22 @@ pub(crate) fn wait_for(secs: u64, what: &str, mut done: impl FnMut() -> bool) {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 }
+
+/// A rustic first in `PATH` that runs `before` in the shell when called with `command`, then the real rustic, as the
+/// `PATH` variable to run rusticlone with.
+#[cfg(unix)]
+pub(crate) fn wrapped_rustic(sb: &Sandbox, command: &str, before: &str) -> (String, String) {
+    use std::os::unix::fs::PermissionsExt;
+    let path = env::var_os("PATH").unwrap();
+    let rustic = env::split_paths(&path).map(|d| d.join("rustic")).find(|p| p.is_file()).unwrap();
+    let dir = sb.path("wrapped");
+    fs::create_dir_all(&dir).unwrap();
+    // Quoted, so that a path with spaces, as macOS's Application Support, stays one word.
+    let quoted = rustic.display().to_string().replace('\'', r"'\''");
+    let script = format!("#!/bin/sh\ncase \" $* \" in *\" {command} \"*) {before};; esac\nexec '{quoted}' \"$@\"\n");
+    let wrapper = dir.join("rustic");
+    fs::write(&wrapper, script).unwrap();
+    fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+    let path = env::join_paths(std::iter::once(dir).chain(env::split_paths(&path))).unwrap();
+    ("PATH".to_owned(), path.into_string().unwrap())
+}

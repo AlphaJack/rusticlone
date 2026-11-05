@@ -143,6 +143,19 @@ fn silent_rustic_is_killed() {
     sb.run_with(&["backup", "--all"], envs).assert_exit(1).assert_result("failed", json!({}));
 }
 
+/// Rustic that exits while a process it started still holds its output is not waited for: that process may run
+/// for long, as a mount that a hook started. Its last line, without a newline, is read all the same.
+#[cfg(unix)]
+#[test]
+fn rustic_is_not_waited_for_past_its_exit() {
+    let sb = docs_with_remote("");
+    sb.run(&["backup", "--all"]).assert_exit(0);
+    let (key, path) = crate::common::wrapped_rustic(&sb, "snapshots", "sleep 30 &");
+    let started = Instant::now();
+    sb.run_with(&["collections", "--refresh"], &[(&key, &path)]).assert_exit(0);
+    assert!(started.elapsed() < Duration::from_secs(15), "{:?}", started.elapsed());
+}
+
 #[test]
 fn a_killed_run_leaves_its_locks_with_rustic() {
     let sb = Sandbox::new();
