@@ -42,8 +42,14 @@ fn over_dbus(target: &str, page: bool) -> std::io::Result<()> {
             bus.call_method(Some(fm), "/org/freedesktop/FileManager1", Some(fm), "ShowFolders", &(folders, "")).await
         }
     };
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-    runtime.block_on(call).map(drop).map_err(std::io::Error::other)
+    // On a thread of its own: the web UI and the tray call this from a runtime, inside which no other may block.
+    std::thread::scope(|scope| {
+        let calling = scope.spawn(|| {
+            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+            runtime.block_on(call).map(drop).map_err(std::io::Error::other)
+        });
+        crate::thread::joined(calling.join())
+    })
 }
 
 /// `path` as a URI's path: each byte but a letter, a digit, `/` and `-._~` percent-encoded.
