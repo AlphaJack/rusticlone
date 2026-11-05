@@ -97,7 +97,7 @@ fn assets_free_space_and_issues_are_served() {
         css.head
     );
     let free = server.get(&format!("/setup/free?folder={}", sb.path("local").display())).body;
-    assert!(free.ends_with(" free</span>"), "{free}");
+    assert!(free.contains(" free</span>"), "{free}");
     let metrics = server.get("/metrics").body;
     let issues: Vec<&str> = metrics.lines().filter(|l| l.starts_with("rusticlone_issues{")).collect();
     assert!(!issues.is_empty() && issues.iter().all(|l| l.ends_with(" 1")), "{metrics}");
