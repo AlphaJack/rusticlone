@@ -26,6 +26,7 @@ pub(crate) fn needs_disk_access(_: &str) -> bool {
 }
 
 /// From sysfs, which also reports the disks under LVM and dm-crypt.
+#[cfg_attr(test, mutants::skip)] // The test machine's disk decides; `solid_state_in` is tested with a sysfs of its own.
 pub(super) fn solid_state(path: &Path) -> Option<bool> {
     let dev = device(path)?;
     solid_state_in(Path::new("/sys"), libc::major(dev), libc::minor(dev))
