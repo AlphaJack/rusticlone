@@ -216,6 +216,8 @@ fn runs_are_kept_with_their_log() {
     );
     let picked = card(&server.get(&format!("/collections/Docs/runs/{}", ids[1])).body, "log");
     assert!(picked.contains("[Docs] rustic backup"), "{picked}");
+    // Run ids are times: no run has 1, and its page is not another run's.
+    assert_eq!(server.get("/collections/Docs/runs/1").code, 404);
     let page = server.get("/collections/Docs").body;
     assert!(page.matches(r#"id="log""#).count() == 1, "{page}");
     // The overview's runs link to them.
