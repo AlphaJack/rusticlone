@@ -572,6 +572,27 @@ fn a_command_s_locks_show_in_the_server() {
     wait_for(10, "them to go with it", || !runs().contains(r#"<span class="tag">cpu</span>"#));
 }
 
+/// A queued run says what it waits for, as its own request names it: a copy waits for the backup, which copies too.
+#[test]
+fn a_queued_copy_says_it_waits_for_the_backup() {
+    let sb = Sandbox::new();
+    slow_profile(&sb, "Slow", 20, "[copy]\ntargets = ['Slow-remote']\n");
+    sb.target("Slow-remote", "Slow", "");
+    let server = sb.server(&[]);
+    server.post_form("/collections/Slow/runs", "kind=backup");
+    wait_for(20, "the backup", || server.collection("Slow")["running"][0]["activities"][0]["on"][0] == "Slow");
+    let queued = || {
+        let store = sb.store();
+        store.unfinished(Some("Slow")).iter().any(|r| r.status == Status::Queued && store.alive(r))
+    };
+    let mut copy = sb.spawn(&["copy", "--collection", "Slow"], &[]);
+    wait_for(10, "the copy to wait", queued);
+    let runs = card(&server.get("/collections/Slow").body, "runs");
+    copy.kill().unwrap();
+    copy.wait().unwrap();
+    assert!(runs.contains("(copy to every target, running)"), "{runs}");
+}
+
 /// A command waiting for the server's run shows there as queued, until it ends.
 #[test]
 fn a_waiting_command_shows_as_queued() {
