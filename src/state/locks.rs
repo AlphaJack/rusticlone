@@ -3,6 +3,7 @@
 use std::{
     collections::BTreeMap,
     fs::{File, OpenOptions, TryLockError},
+    io::Write,
     path::PathBuf,
     thread::{self, JoinHandle},
 };
@@ -57,14 +58,14 @@ impl Drop for RepoLocks<'_> {
 }
 
 impl Store {
-    /// Takes all `keys`. The first key is taken only after earlier requests for it (`behind` returns the
+    /// Takes all `keys`, each with its mode and the name it is shown with. The first key is taken only after earlier requests for it (`behind` returns the
     /// lock of the run ahead, or fails to end the wait). While one key is busy, no other key is held, so
     /// that two runs never wait for each other. `waiting` receives the busy key. The wait ends when the
     /// busy lock is freed or the state changes, and fails when the run or the process stops.
     pub fn lock<'a>(
         &self,
         cx: &'a Ctx,
-        keys: &[(&str, Mode)],
+        keys: &[(&str, Mode, &str)],
         waiting: impl Fn(&str),
         behind: impl Fn() -> Result<Option<String>>,
     ) -> Result<RepoLocks<'a>> {
@@ -72,7 +73,7 @@ impl Store {
         loop {
             let seen = clock::WAKES.seen();
             let (shown, busy) = match (keys.first(), behind()?) {
-                (Some((first, _)), Some(ahead)) => (*first, (ahead, Mode::Exclusive)),
+                (Some((first, ..)), Some(ahead)) => (*first, (ahead, Mode::Exclusive)),
                 _ => match self.lock_rest(keys, &mut held)? {
                     Some((busy, mode)) => (busy, (busy.to_owned(), mode)),
                     None => break,
@@ -108,7 +109,7 @@ impl Store {
     }
 
     /// `None` if a key is busy.
-    pub fn try_lock<'a>(&self, cx: &'a Ctx, keys: &[(&str, Mode)]) -> Result<Option<RepoLocks<'a>>> {
+    pub fn try_lock<'a>(&self, cx: &'a Ctx, keys: &[(&str, Mode, &str)]) -> Result<Option<RepoLocks<'a>>> {
         let mut held = Vec::new();
         Ok(self.lock_rest(keys, &mut held)?.is_none().then(|| RepoLocks::new(cx, held)))
     }
@@ -116,16 +117,19 @@ impl Store {
     /// Takes the keys not held yet, without waiting. Returns the first busy one.
     fn lock_rest<'k>(
         &self,
-        keys: &[(&'k str, Mode)],
+        keys: &[(&'k str, Mode, &str)],
         held: &mut Vec<(&'k str, File)>,
     ) -> Result<Option<(&'k str, Mode)>> {
-        for &(key, mode) in keys {
+        for &(key, mode, name) in keys {
             if held.iter().any(|(h, _)| *h == key) {
                 continue;
             }
             let file = self.lock_file(key)?;
             match if mode == Mode::Shared { file.try_lock_shared() } else { file.try_lock() } {
-                Ok(()) => held.push((key, file)),
+                Ok(()) => {
+                    named(&file, name);
+                    held.push((key, file));
+                }
                 Err(TryLockError::WouldBlock) => return Ok(Some((key, mode))),
                 Err(TryLockError::Error(e)) => return Err(e.into()),
             }
@@ -133,14 +137,29 @@ impl Store {
         Ok(None)
     }
 
+    /// Named after `key` as far as a file name can be, and told apart by its hash.
     pub(super) fn lock_path(&self, key: &str) -> PathBuf {
-        self.dir.join("locks").join(format!("{:016x}.lock", sys::fnv1a(key.as_bytes())))
+        self.dir.join("locks").join(format!("{}-{:016x}.lock", readable(key), sys::fnv1a(key.as_bytes())))
     }
 
     #[expect(clippy::disallowed_methods, reason = "creates lock files")]
     pub(super) fn lock_file(&self, key: &str) -> std::io::Result<File> {
         OpenOptions::new().create(true).truncate(false).write(true).open(self.lock_path(key))
     }
+}
+
+/// The start of `key`, with what no file system takes in a name as `-`.
+fn readable(key: &str) -> String {
+    const LONGEST: usize = 40;
+    let safe = |c: char| if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-') { c } else { '-' };
+    key.chars().map(safe).take(LONGEST).collect::<String>().trim_matches('-').to_owned()
+}
+
+/// Writes `name` into a lock file just taken, so that whoever finds it held can tell what it locks. Best
+/// effort: the lock itself is what counts.
+pub(super) fn named(file: &File, name: &str) {
+    let mut file = file;
+    _ = file.set_len(0).and_then(|()| file.write_all(name.as_bytes()));
 }
 
 #[cfg(test)]
@@ -181,7 +200,12 @@ mod tests {
         thread::scope(|scope| {
             let locking = scope.spawn(|| {
                 let behind = || Ok(still.load(std::sync::atomic::Ordering::Relaxed).then(|| "run:Docs:1".to_owned()));
-                store.lock(&cx, &[("Docs", Mode::Exclusive)], |busy| told.send(busy.to_owned()).unwrap(), behind)
+                store.lock(
+                    &cx,
+                    &[("Docs", Mode::Exclusive, "Docs")],
+                    |busy| told.send(busy.to_owned()).unwrap(),
+                    behind,
+                )
             });
             assert_eq!(waiting.recv_timeout(Duration::from_secs(10)).expect("waits for the run ahead"), "Docs");
             still.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -193,6 +217,23 @@ mod tests {
             drop(locks);
             assert!(cx.held().is_empty());
         });
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A lock file is named after its key, and holds the name of what it locks while taken.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "reads a lock file")]
+    fn a_lock_file_is_named_after_its_key_and_holds_its_name() {
+        let store = store("lock-names-test");
+        let file = |key: &str| store.lock_path(key).file_name().unwrap().to_string_lossy().into_owned();
+        assert_eq!(file("disk:64772"), format!("disk-64772-{:016x}.lock", sys::fnv1a(b"disk:64772")));
+        assert!(file("run:My Docs/usb:backup").starts_with("run-My-Docs-usb-backup-"));
+        assert_ne!(file("run:a b"), file("run:a/b"), "told apart by the hash");
+        let cx = Ctx::default();
+        let held = store.try_lock(&cx, &[("disk:64772", Mode::Exclusive, "disk:/backup")]).unwrap();
+        assert!(held.is_some());
+        assert_eq!(std::fs::read_to_string(store.lock_path("disk:64772")).unwrap(), "disk:/backup");
+        drop(held);
         std::fs::remove_dir_all(&store.dir).unwrap();
     }
 }

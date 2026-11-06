@@ -60,7 +60,7 @@ impl Engine {
         }
         keys.sort_by(|a, b| a.0.cmp(&b.0));
         keys.dedup_by(|a, b| a.0 == b.0);
-        let held: Vec<(&str, Mode)> = keys.iter().map(|(k, m, ..)| (k.as_str(), *m)).collect();
+        let held: Vec<(&str, Mode, &str)> = keys.iter().map(|(k, m, n)| (k.as_str(), *m, n.as_str())).collect();
         let (last, since) = (RefCell::new(None), self.store.now());
         let (live, step) = (run.live.as_deref(), run.cx.step());
         let locks = self.store.lock(
@@ -107,7 +107,7 @@ impl Engine {
         queued: Option<&RunRecord>,
     ) -> Option<RepoLocks<'c>> {
         let held = request_locks(collection.name(), request);
-        let keys: Vec<(&str, Mode)> = held.iter().map(|k| (k.as_str(), Mode::Exclusive)).collect();
+        let keys: Vec<(&str, Mode, &str)> = held.iter().map(|k| (k.as_str(), Mode::Exclusive, k.as_str())).collect();
         let last = RefCell::new(None);
         let waiting = |own: &RunRecord| {
             let doing = self.queued_wait(&self.store.queue(Some(collection.name())), own, request);
@@ -138,7 +138,7 @@ impl Engine {
     #[cfg(feature = "server")]
     pub(crate) fn runs_already(&self, collection: &Collection<'_>, request: &Request) -> bool {
         let held = request_locks(collection.name(), request);
-        let keys: Vec<(&str, Mode)> = held.iter().map(|k| (k.as_str(), Mode::Exclusive)).collect();
+        let keys: Vec<(&str, Mode, &str)> = held.iter().map(|k| (k.as_str(), Mode::Exclusive, k.as_str())).collect();
         matches!(self.store.try_lock(&Ctx::default(), &keys), Ok(None))
     }
 }
