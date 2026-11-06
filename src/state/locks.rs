@@ -59,23 +59,29 @@ impl Drop for RepoLocks<'_> {
 impl Store {
     /// Takes all `keys`. The first key is taken only after earlier requests for it (`behind` returns the
     /// lock of the run ahead, or fails to end the wait). While one key is busy, no other key is held, so
-    /// that two runs never wait for each other. `waiting` receives the busy key. The wait ends when the
-    /// busy lock is freed or the state changes, and fails when the run or the process stops.
+    /// that two runs never wait for each other. A key that a run ahead waits for (`queued_ahead`) is left to it,
+    /// even while free. `waiting` receives the busy key. The wait ends when the busy lock is freed or the state
+    /// changes, and fails when the run or the process stops.
     pub fn lock<'a>(
         &self,
         cx: &'a Ctx,
         keys: &[(&str, Mode)],
         waiting: impl Fn(&str),
         behind: impl Fn() -> Result<Option<String>>,
+        queued_ahead: impl Fn(&str) -> bool,
     ) -> Result<RepoLocks<'a>> {
         let (mut held, mut freed, mut watcher) = (Vec::new(), BTreeMap::new(), None);
         loop {
             let seen = clock::WAKES.seen();
             let (shown, busy) = match (keys.first(), behind()?) {
-                (Some((first, _)), Some(ahead)) => (*first, (ahead, Mode::Exclusive)),
-                _ => match self.lock_rest(keys, &mut held)? {
-                    Some((busy, mode)) => (busy, (busy.to_owned(), mode)),
-                    None => break,
+                (Some((first, _)), Some(ahead)) => (*first, Some((ahead, Mode::Exclusive))),
+                // The run ahead takes it once free, which changes the state and wakes this.
+                _ => match keys.iter().find(|(key, _)| queued_ahead(key)) {
+                    Some((key, _)) => (*key, None),
+                    None => match self.lock_rest(keys, &mut held)? {
+                        Some((busy, mode)) => (busy, Some((busy.to_owned(), mode))),
+                        None => break,
+                    },
                 },
             };
             held.clear();
@@ -86,9 +92,11 @@ impl Store {
             if let Some(stop) = cx.stop() {
                 return Err(Error::Stopped { stop }.into());
             }
-            if freed.get(&busy.0).is_none_or(JoinHandle::is_finished) {
-                let file = self.lock_file(&busy.0)?;
-                freed.insert(busy.0, thread::spawn(move || lock_blocking(&file, busy.1).map(|()| clock::WAKES.wake())));
+            if let Some((key, mode)) = busy
+                && freed.get(&key).is_none_or(JoinHandle::is_finished)
+            {
+                let file = self.lock_file(&key)?;
+                freed.insert(key, thread::spawn(move || lock_blocking(&file, mode).map(|()| clock::WAKES.wake())));
             }
             clock::WAKES.wait(seen);
         }
@@ -181,7 +189,13 @@ mod tests {
         thread::scope(|scope| {
             let locking = scope.spawn(|| {
                 let behind = || Ok(still.load(std::sync::atomic::Ordering::Relaxed).then(|| "run:Docs:1".to_owned()));
-                store.lock(&cx, &[("Docs", Mode::Exclusive)], |busy| told.send(busy.to_owned()).unwrap(), behind)
+                store.lock(
+                    &cx,
+                    &[("Docs", Mode::Exclusive)],
+                    |busy| told.send(busy.to_owned()).unwrap(),
+                    behind,
+                    |_| false,
+                )
             });
             assert_eq!(waiting.recv_timeout(Duration::from_secs(10)).expect("waits for the run ahead"), "Docs");
             still.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -192,6 +206,29 @@ mod tests {
             assert_eq!(cx.held().len(), one);
             drop(locks);
             assert!(cx.held().is_empty());
+        });
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A free key that a run ahead waits for is left to it: the wait ends once that run no longer waits.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
+    fn a_free_key_is_left_to_the_run_ahead() {
+        let store = store("lock-queued-ahead-test");
+        let cx = Ctx::default();
+        let (told, waiting) = mpsc::channel();
+        let ahead = std::sync::atomic::AtomicBool::new(true);
+        thread::scope(|scope| {
+            let locking = scope.spawn(|| {
+                let queued_ahead = |_: &str| ahead.load(std::sync::atomic::Ordering::Relaxed);
+                let waiting = |busy: &str| told.send(busy.to_owned()).unwrap();
+                store.lock(&cx, &[("disk", Mode::Exclusive)], waiting, || Ok(None), queued_ahead)
+            });
+            assert_eq!(waiting.recv_timeout(Duration::from_secs(10)).expect("waits while free"), "disk");
+            assert!(store.try_lock(&Ctx::default(), &[("disk", Mode::Exclusive)]).unwrap().is_some(), "still free");
+            ahead.store(false, std::sync::atomic::Ordering::Relaxed);
+            clock::WAKES.wake();
+            drop(locking.join().unwrap().unwrap());
         });
         std::fs::remove_dir_all(&store.dir).unwrap();
     }
