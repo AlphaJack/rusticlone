@@ -280,7 +280,8 @@ pub(crate) fn serve(
                 return restart(&exe);
             }
         }
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+        // Its threads are what `ps` and systemd show: by default tokio names them `tokio-rt-worker`.
+        let runtime = tokio::runtime::Builder::new_current_thread().thread_name(crate::NAME).enable_all().build()?;
         runtime.block_on(run(Arc::new(build), &listen, open, tray))
     };
     // The system service runs without a desktop, so without a tray.
