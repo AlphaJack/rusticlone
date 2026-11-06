@@ -192,6 +192,7 @@ impl Engine {
         &self,
         p: &RusticProfile,
         r: &RusticProfile,
+        exists: bool,
         state: &Ledger,
         now: Timestamp,
         failing: &dyn Fn(&LastStep) -> bool,
@@ -207,7 +208,7 @@ impl Engine {
         let copy = if primary { None } else { last(StepKey::Copy(p.name.clone(), r.name.clone())) };
         let latest_snapshot = state.latest.get(&r.name).copied();
         let shown = |t: &Option<LastStep>, newer| Last::shown(t.as_ref(), newer, failing);
-        let (copied, missing) = (shown(&copy, latest_snapshot), !r.exists());
+        let (copied, missing) = (shown(&copy, latest_snapshot), !exists);
         let lag = state.lag(&p.name, &r.name).cloned().filter(|_| !primary);
         let behind = lag.as_ref().and_then(|l| l.behind_since);
         // It had snapshots once: a backed-up primary, or a target that was copied to or listed with snapshots.
@@ -271,7 +272,7 @@ impl Engine {
             }
             t.failing(now, !running.is_empty())
         };
-        let repo = |r: &RusticProfile| self.repo_status(p, r, state, now, &failing);
+        let repo = |r: &RusticProfile| self.repo_status(p, r, collection.exists(r), state, now, &failing);
         let primary = repo(p);
         let targets: Vec<RepoOverview> = collection.targets.iter().map(|t| repo(t)).collect();
         let mut issues: Vec<Issue> =

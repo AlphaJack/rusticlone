@@ -124,8 +124,13 @@ mod tests {
         // Only usb forgets: cloud keeps every snapshot, so it has no forget step.
         let usb = profile::parse("usb", "[repository]\nrepository = \"rest:http://u\"\n[forget]\nkeep-last = 3\n");
         let cloud = profile::parse("cloud", "[repository]\nrepository = \"rest:http://c\"\n");
-        let collection =
-            Collection { primary: &docs, title: "Docs", targets: vec![&usb, &cloud], missing_targets: Vec::new() };
+        let collection = Collection {
+            primary: &docs,
+            title: "Docs",
+            targets: vec![&usb, &cloud],
+            missing_targets: Vec::new(),
+            existing: std::sync::OnceLock::new(),
+        };
         let requests = [
             Request::Backup,
             Request::Copy("Docs".into()),

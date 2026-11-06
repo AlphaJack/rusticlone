@@ -53,8 +53,8 @@ fn the_agenda_wakes_when_a_pending_failure_is_reported() {
     let until = engine.store.load().last_step(&key).unwrap().pending_until().unwrap();
     let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
     assert_eq!(changes, Some(until), "the status changes then");
-    assert_eq!(engine.agenda(engine.store.now()).1, Some(until));
-    assert_eq!(engine.agenda(until).1, None);
+    assert_eq!(engine.agenda(&engine.collections(), engine.store.now()).1, Some(until));
+    assert_eq!(engine.agenda(&engine.collections(), until).1, None);
     engine.store.wait(until.duration_since(engine.store.now()).unsigned_abs(), &|| false);
     let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
     assert_eq!(changes, None, "reported: nothing changes any more");
@@ -68,8 +68,8 @@ fn the_agenda_wakes_when_a_repository_becomes_stale() {
     let engine = engine("agenda-stale", &Replay::new());
     attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
     let week = at("2026-10-23T12:00:00Z");
-    assert_eq!(engine.agenda(engine.store.now()).1, Some(week));
-    assert_eq!(engine.agenda(week).1, None);
+    assert_eq!(engine.agenda(&engine.collections(), engine.store.now()).1, Some(week));
+    assert_eq!(engine.agenda(&engine.collections(), week).1, None);
     engine.store.wait(week.duration_since(engine.store.now()).unsigned_abs(), &|| false);
     let (_, changes) = crate::clock::next_change(|| engine.status_of(&engine.collections()[0]));
     assert_eq!(changes, None, "stale: nothing changes any more");
@@ -89,6 +89,6 @@ fn the_next_time_is_after_now() {
         .store
         .apply(&[Event::Attempted { key, started, at: started, result: (&backed_up()).into(), by: None }])
         .unwrap();
-    let (_, next) = engine.agenda(now);
+    let (_, next) = engine.agenda(&engine.collections(), now);
     assert_eq!(next, None);
 }
