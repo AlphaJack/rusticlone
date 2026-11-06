@@ -92,3 +92,28 @@ fn the_next_time_is_after_now() {
     let (_, next) = engine.agenda(now);
     assert_eq!(next, None);
 }
+
+/// A check that the agenda found due is no longer due once its run was cancelled: the scheduler reads the
+/// agenda, then finds the run ended, and must not request the check again before its next scheduled time.
+#[cfg(feature = "server")]
+#[test]
+fn a_check_cancelled_after_the_agenda_is_no_longer_due() {
+    use crate::{live::Guard, request::Step, rustic::Reading, state::RunLog};
+    let engine = engine_with("check-cancelled", &Replay::new(), &docs_with(&[(&crate::settings::CHECK, "@daily")]));
+    let collections = engine.collections();
+    let collection = &collections[0];
+    assert!(engine.next_due(collection).is_some(), "first seen now");
+    engine.store.wait(std::time::Duration::from_hours(36), &|| false);
+    let check = Request::Check(vec![("Docs".into(), None)]);
+    let (due, _) = engine.agenda(engine.store.now());
+    assert!(due.contains(&("Docs".into(), check.clone())), "overdue");
+    assert!(engine.still_due(collection, &check));
+    let runs = Runs::new(|_| {});
+    let guard = Guard::start(&runs, RunLog::new(&engine.store, "Docs", check.clone(), Trigger::Schedule));
+    let run = crate::engine::Run::new(collection, Some(guard.live.clone()));
+    let step = Step::Check { repo: "Docs".into(), reading: Reading::Subset { n: 1, of: 5 } };
+    *run.shared.steps.lock() = vec![step.clone()];
+    guard.live.cancel();
+    engine.maintain(&run.for_step(0), collection.primary, &step);
+    assert!(!engine.still_due(collection, &check), "cancelled: due at its next scheduled time");
+}
