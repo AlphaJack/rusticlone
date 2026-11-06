@@ -81,7 +81,11 @@ impl RunLog {
     }
 
     fn with_id(store: &Store, collection: &str, id: i64, request: Request, trigger: Trigger, status: Status) -> Self {
-        let held = store.lock_file(&run_lock(collection, id)).ok().filter(|f| f.try_lock().is_ok());
+        let lock = run_lock(collection, id);
+        let held = store.lock_file(&lock).ok().filter(|f| f.try_lock().is_ok());
+        if let Some(file) = &held {
+            super::locks::named(file, &lock);
+        }
         let mut record = RunRecord {
             id,
             collection: collection.to_owned(),
@@ -312,7 +316,7 @@ impl Store {
     /// Waits until `run` ends, or its process does.
     pub fn wait_for(&self, cx: &Ctx, run: &RunRecord, waiting: impl Fn(&str)) -> Result<()> {
         let lock = run_lock(&run.collection, run.id);
-        self.lock(cx, &[(&lock, Mode::Exclusive)], waiting, || Ok(None)).map(drop)
+        self.lock(cx, &[(&lock, Mode::Exclusive, &lock)], waiting, || Ok(None)).map(drop)
     }
 
     /// The lock of the queued run of `request` that came before `run`, if its process is still waiting.
