@@ -224,6 +224,15 @@ impl Engine {
         (due, later.into_iter().filter(|at| *at > now).min())
     }
 
+    /// Whether `request` is due now, as the state says now. The agenda may be older than the end of a run that
+    /// postponed it, as a cancelled one does.
+    #[cfg(feature = "server")]
+    pub(crate) fn still_due(&self, collection: &Collection<'_>, request: &Request) -> bool {
+        let now = self.store.now();
+        let requests = self.due_requests(collection, &self.store.load(), now).unwrap_or_default();
+        requests.iter().any(|(r, at)| r == request && at.is_some_and(|at| at <= now))
+    }
+
     /// The request due next after now, and when: what `due` says when nothing is due yet.
     pub(crate) fn next_due(&self, collection: &Collection<'_>) -> Option<(Request, Timestamp)> {
         let now = self.store.now();
