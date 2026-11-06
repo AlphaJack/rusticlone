@@ -404,10 +404,12 @@ async fn run(build: Build, listen: &str, open: bool, tray: Option<Tray>) -> Resu
     loop {
         let scheduler = app.clone();
         let next = tokio::task::spawn_blocking(move || {
-            let next = scheduler.ask_due();
-            // Notifies stale collections too, not only failed runs, and retries failed notifications.
+            // One set of collections for both, so that each repository is looked up once.
             let engine = scheduler.engine();
-            engine.collections().iter().filter_map(|j| engine.notify(j)).chain(next).min()
+            let collections = engine.collections();
+            let next = scheduler.ask_due(&engine, &collections);
+            // Notifies stale collections too, not only failed runs, and retries failed notifications.
+            collections.iter().filter_map(|j| engine.notify(j)).chain(next).min()
         })
         .await
         .unwrap_or_default();

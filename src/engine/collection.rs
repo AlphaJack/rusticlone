@@ -1,5 +1,7 @@
 //! A collection: a backup profile and its copy targets.
 
+use std::sync::OnceLock;
+
 use anyhow::Result;
 
 use super::Error;
@@ -14,6 +16,8 @@ pub(crate) struct Collection<'a> {
     pub title: &'a str,
     pub targets: Vec<&'a RusticProfile>,
     pub missing_targets: Vec<String>,
+    /// Which of [`Self::repos`] exist, looked up once: each look at a disk that mounts on access may wait for it.
+    pub(super) existing: OnceLock<Vec<bool>>,
 }
 
 impl<'a> Collection<'a> {
@@ -62,6 +66,12 @@ impl<'a> Collection<'a> {
         std::iter::once(self.primary).chain(self.targets.iter().copied())
     }
 
+    /// Whether `repo`, one of [`Self::repos`], exists, as first looked up.
+    pub(crate) fn exists(&self, repo: &RusticProfile) -> bool {
+        let existing = self.existing.get_or_init(|| self.repos().map(RusticProfile::exists).collect());
+        self.repos().position(|r| r.name == repo.name).map_or_else(|| repo.exists(), |i| existing[i])
+    }
+
     /// The names of [`Self::repos`].
     #[cfg(feature = "server")]
     pub(crate) fn repo_names(&self) -> Vec<String> {
@@ -92,7 +102,7 @@ impl<'a> Collection<'a> {
     pub(crate) fn copy_blocked(&self) -> Option<Blocked> {
         if self.targets.is_empty() {
             Some(Blocked::NoTargets)
-        } else if !self.primary.exists() {
+        } else if !self.exists(self.primary) {
             Some(Blocked::PrimaryMissing)
         } else {
             None
@@ -130,7 +140,29 @@ pub(crate) enum Blocked {
 
 #[cfg(test)]
 mod tests {
-    use super::title;
+    use std::sync::OnceLock;
+
+    use super::{Collection, title};
+
+    /// A repository is looked up once: each look at a disk that mounts on access may wait for it.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "writes and removes a repository's config file")]
+    fn a_repository_is_looked_up_once() {
+        let dir = crate::sys::test_dir("looked-up-once");
+        std::fs::write(dir.join("config"), "").unwrap();
+        let docs = crate::profile::parse("Docs", &format!("[repository]\nrepository = '{}'\n", dir.display()));
+        let collection = Collection {
+            primary: &docs,
+            title: "Docs",
+            targets: Vec::new(),
+            missing_targets: Vec::new(),
+            existing: OnceLock::new(),
+        };
+        assert!(collection.exists(&docs));
+        std::fs::remove_file(dir.join("config")).unwrap();
+        assert!(collection.exists(&docs), "as first looked up");
+        assert!(!docs.exists(), "gone since");
+    }
 
     #[test]
     fn a_title_is_the_start_that_only_the_collection_shares() {

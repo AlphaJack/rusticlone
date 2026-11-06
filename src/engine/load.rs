@@ -127,6 +127,7 @@ impl Engine {
                 title: title(&p.name, &p.targets, &self.profiles),
                 targets: targets.into_iter().map(|t| &self.rustic_profiles[t]).collect(),
                 missing_targets: missing.into_iter().cloned().collect(),
+                existing: std::sync::OnceLock::new(),
             }
         })
     }

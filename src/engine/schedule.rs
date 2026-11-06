@@ -61,7 +61,7 @@ pub(super) fn due(collection: &Collection<'_>, state: &Ledger, now: Timestamp, t
     });
     due.requests.push((Request::Copy(p.name.clone()), copy.min()));
     // Nothing to maintain until it exists.
-    for repo in collection.repos().filter(|r| r.exists()) {
+    for repo in collection.repos().filter(|r| collection.exists(r)) {
         let name = || repo.name.clone();
         for (request, key) in [
             (Request::Prune(vec![name()]), StepKey::Prune(name())),
@@ -199,15 +199,19 @@ impl Engine {
     /// The requests due now, and the next time something is due: a run, or a collection becoming stale or a failure
     /// being reported, which is notified.
     #[cfg(feature = "server")]
-    pub(crate) fn agenda(&self, now: Timestamp) -> (Vec<(String, Request)>, Option<Timestamp>) {
+    pub(crate) fn agenda(
+        &self,
+        collections: &[Collection<'_>],
+        now: Timestamp,
+    ) -> (Vec<(String, Request)>, Option<Timestamp>) {
         let state = self.store.load();
         // A failure is reported once its pending ends, unless a retry made it pass.
         let pending = state.last_steps.values().filter_map(crate::state::LastStep::pending_until);
         let (mut due, mut later): (_, Vec<Timestamp>) = (Vec::new(), pending.collect());
-        for collection in self.collections() {
+        for collection in collections {
             let (_, last_backup) = backups(collection.primary, &state);
             later.extend(collection.repos().filter_map(|r| self.stale_at(collection.primary, r, &state, last_backup)));
-            let requests = self.due_requests(&collection, &state, now).unwrap_or_else(|e| {
+            let requests = self.due_requests(collection, &state, now).unwrap_or_else(|e| {
                 crate::log::event(
                     Some(collection.name()),
                     &crate::log::Logged::NotScheduled { error: format!("{e:#}") },
@@ -313,8 +317,13 @@ mod tests {
         ];
         for (name, env, state) in cases {
             let [docs, usb] = collections(env);
-            let collection =
-                Collection { primary: &docs, title: "Docs", targets: vec![&usb], missing_targets: Vec::new() };
+            let collection = Collection {
+                primary: &docs,
+                title: "Docs",
+                targets: vec![&usb],
+                missing_targets: Vec::new(),
+                existing: std::sync::OnceLock::new(),
+            };
             let due = due(&collection, &state, ts("2026-10-16T12:00:00Z"), &TimeZone::UTC);
             insta::assert_json_snapshot!(name, due);
         }

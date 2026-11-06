@@ -15,7 +15,7 @@ use jiff::Timestamp;
 use super::{App, Logged, notice::Notice};
 use crate::{
     clock,
-    engine::{Asked, Batch, Engine},
+    engine::{Asked, Batch, Collection, Engine},
     log::{self, Level, Message},
     request::{Request, RestoreOptions, RunKind, Selection, Trigger},
     result::{RunResults, Status, StepResult},
@@ -129,9 +129,8 @@ impl App {
     }
 
     /// Requests what is due, and returns when to check again.
-    pub(super) fn ask_due(self: &Arc<Self>) -> Option<Timestamp> {
-        let engine = self.engine();
-        let (due, next) = engine.agenda(engine.store.now());
+    pub(super) fn ask_due(self: &Arc<Self>, engine: &Engine, collections: &[Collection<'_>]) -> Option<Timestamp> {
+        let (due, next) = engine.agenda(collections, engine.store.now());
         for (collection, request) in due {
             // It would be skipped, and its record would wake this again: request it once that run ends.
             if engine.collection(&collection).is_some_and(|j| engine.runs_already(&j, &request)) {
