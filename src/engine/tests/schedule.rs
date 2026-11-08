@@ -92,3 +92,28 @@ fn the_next_time_is_after_now() {
     let (_, next) = engine.agenda(now);
     assert_eq!(next, None);
 }
+
+/// A repository recorded as missing has nothing to maintain until found again, and a local one only once it was
+/// created. Neither looks at the disk.
+#[test]
+fn maintenance_waits_for_a_repository_that_exists_as_the_state_says() {
+    use crate::{request::StepKey, state::Event};
+    let local =
+        docs_with(&[(&crate::settings::CHECK, "@daily")]).replace("rest:http://backup/docs", "/nonexistent/docs");
+    let engine = engine_with("maintain-existing", &Replay::new(), &local);
+    let collections = engine.collections();
+    let collection = &collections[0];
+    assert!(engine.next_due(collection).is_some(), "first seen now");
+    engine.store.wait(std::time::Duration::from_hours(36), &|| false);
+    let check = Request::Check(vec![("Docs".into(), None)]);
+    let due = |engine: &Engine| engine.due_next(collection, &[]).unwrap() == Some(check.clone());
+    assert!(!due(&engine), "a local repository never created");
+    attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    assert!(engine.next_due(collection).is_some(), "its schedule first seen once created");
+    engine.store.wait(std::time::Duration::from_hours(36), &|| false);
+    assert!(due(&engine), "created");
+    engine.store.apply(&[Event::Missing { repo: "Docs".into(), missing: true }]).unwrap();
+    assert!(!due(&engine), "missing");
+    engine.store.apply(&[Event::Missing { repo: "Docs".into(), missing: false }]).unwrap();
+    assert!(due(&engine), "found again");
+}
