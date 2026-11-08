@@ -14,3 +14,7 @@ pub(super) fn one_at_a_time() -> parking_lot::ReentrantMutexGuard<'static, ()> {
     static STATE: parking_lot::ReentrantMutex<()> = parking_lot::ReentrantMutex::new(());
     STATE.lock()
 }
+
+/// Windows lets no one read a held lock file, so its name stays hidden while it is taken.
+#[cfg(test)]
+pub(super) const HELD_LOCK_READABLE: bool = false;

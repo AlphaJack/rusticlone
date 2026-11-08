@@ -13,3 +13,7 @@ pub(super) struct Concurrent;
 pub(super) fn one_at_a_time() -> Concurrent {
     Concurrent
 }
+
+/// Unix lets another reader see a held lock file, so its name shows.
+#[cfg(test)]
+pub(super) const HELD_LOCK_READABLE: bool = true;
