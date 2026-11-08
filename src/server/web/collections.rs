@@ -165,7 +165,8 @@ impl CollectionInput {
         let name = overview.primary.name.clone();
         let repos: Vec<&RusticProfile> = collection.into_iter().flat_map(Collection::repos).collect();
         let listings = repos.iter().filter_map(|r| Some((r.name.clone(), app.listing(&name, &r.name)?))).collect();
-        let existing = repos.iter().filter(|r| r.exists()).map(|r| r.name.clone()).collect();
+        let missing = engine.store.load().missing;
+        let existing = repos.iter().filter(|r| !missing.contains(&r.name)).map(|r| r.name.clone()).collect();
         let remote = repos.iter().filter(|r| r.is_remote()).map(|r| r.name.clone()).collect();
         let kept = repos.iter().filter(|r| !r.has_keep).map(|r| r.name.clone()).collect();
         let primary = collection.map(|j| j.primary);

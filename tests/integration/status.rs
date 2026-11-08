@@ -47,6 +47,9 @@ fn a_target_seen_with_snapshots_is_missing_once_gone() {
     sb.remove("store");
     sb.run(&["collections", "--refresh"]).assert_exit(0);
     sb.remove("remote/Docs");
+    // Not looked at: the status is the state's, until a refresh or a run finds it gone.
+    sb.run(&["collections"]).assert_exit(0);
+    sb.run(&["collections", "--refresh"]).assert_exit(2).assert_result("missing", json!({"repo": "Docs-remote"}));
     sb.run(&["collections"]).assert_exit(2).assert_result("missing", json!({"repo": "Docs-remote"}));
 }
 

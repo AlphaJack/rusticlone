@@ -70,6 +70,13 @@ pub enum Event {
         /// The target that caught up.
         target: String,
     },
+    /// Whether a repository was found where its profile says, by whoever looked: a run that needs it, or a refresh.
+    Missing {
+        /// The repository.
+        repo: String,
+        /// Not found.
+        missing: bool,
+    },
     /// The newest snapshot seen in a repository.
     Newest {
         /// The repository.
@@ -160,6 +167,10 @@ pub struct Ledger {
     /// Snapshots each target's forget removed, by collection and target.
     #[serde(with = "entries")]
     pub dropped: BTreeMap<(String, String), Vec<(SnapshotId, Timestamp)>>,
+    /// Repositories that were not where their profile says when last looked at. The status reads this, and never
+    /// the disk, which looking at may mount.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub missing: BTreeSet<String>,
 }
 
 impl Versioned for Event {
@@ -174,6 +185,16 @@ impl Versioned for Ledger {
 }
 
 impl Ledger {
+    fn found(&mut self, repo: String, found: bool) {
+        _ = if found { self.missing.remove(&repo) } else { self.missing.insert(repo) };
+    }
+
+    /// Its snapshots were listed: it is there.
+    fn newest(&mut self, repo: String, at: Timestamp) {
+        self.found(repo.clone(), true);
+        self.latest.insert(repo, at);
+    }
+
     /// A stored ledger in this version's shape. `None` if unreadable.
     pub(super) fn from_stored(text: &str) -> Option<Self> {
         shape::read(serde_json::from_str(text).ok()?)
@@ -255,7 +276,8 @@ impl Ledger {
                 self.pending.extend(targets.into_iter().map(|t| (collection.clone(), t)));
             }
             Event::Copied { collection, target } => _ = self.pending.remove(&(collection, target)),
-            Event::Newest { repo, at } => _ = self.latest.insert(repo, at),
+            Event::Missing { repo, missing } => self.found(repo, !missing),
+            Event::Newest { repo, at } => self.newest(repo, at),
             Event::Lag { collection, target, at, behind } => {
                 let pair = (collection, target);
                 let behind_since = match behind {
@@ -330,6 +352,20 @@ mod tests {
     }
 
     /// With fewer subsets, those owed beyond the new count no longer exist: the next check reads one that does.
+    /// A repository found missing stays so until found again, or until its snapshots are listed.
+    #[test]
+    fn a_missing_repository_is_there_once_found_or_listed() {
+        let mut ledger = Ledger::default();
+        let missing = |missing| Event::Missing { repo: "Docs".into(), missing };
+        ledger.apply(&missing(true));
+        assert!(ledger.missing.contains("Docs"));
+        ledger.apply(&missing(false));
+        assert!(ledger.missing.is_empty(), "found");
+        ledger.apply(&missing(true));
+        ledger.apply(&Event::Newest { repo: "Docs".into(), at: "2026-10-16T03:00:00Z".parse().unwrap() });
+        assert!(ledger.missing.is_empty(), "listed");
+    }
+
     #[test]
     fn fewer_subsets_drop_those_owed_beyond_them() {
         let repo = "Docs".to_owned();
