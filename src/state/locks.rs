@@ -232,9 +232,9 @@ mod tests {
         let cx = Ctx::default();
         let held = store.try_lock(&cx, &[("disk:64772", Mode::Exclusive, "disk:/backup")]).unwrap();
         assert!(held.is_some());
-        // Windows lets no one read a held lock, so only the other systems show its name.
-        #[cfg(not(windows))]
-        assert_eq!(std::fs::read_to_string(store.lock_path("disk:64772")).unwrap(), "disk:/backup");
+        if super::super::os::HELD_LOCK_READABLE {
+            assert_eq!(std::fs::read_to_string(store.lock_path("disk:64772")).unwrap(), "disk:/backup");
+        }
         drop(held);
         std::fs::remove_dir_all(&store.dir).unwrap();
     }
