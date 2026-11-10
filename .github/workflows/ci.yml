@@ -65,7 +65,7 @@ jobs:
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Install cargo-hack
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-hack
       # Without features, then with each alone: code that only another feature uses is dead there.
@@ -110,11 +110,11 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest
       - name: Install cargo-binstall
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-binstall
       # The rustic pinned in Cargo.toml, which the tests run.
@@ -174,7 +174,7 @@ jobs:
           shared-key: test
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install cargo-nextest
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest
       - name: Build the tests
@@ -210,7 +210,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install cargo-nextest and cargo-binstall
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: cargo-nextest,cargo-binstall
       # The rustic pinned in Cargo.toml, which the tests run.
@@ -294,7 +294,7 @@ jobs:
           persist-credentials: false
 
       - name: Install zizmor
-        uses: taiki-e/install-action@c509219cf42fba86913069efd0ade2458c59337b # v2.90.1
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
         with:
           tool: zizmor
 
