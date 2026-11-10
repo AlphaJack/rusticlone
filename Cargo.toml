@@ -109,7 +109,7 @@ semver = { version = "1.0.28", features = ["serde"] }
 self-replace = { version = "1.5.1", optional = true }
 ring = "0.17.14"
 # GitHub's build attestations of rusticlone's releases.
-sigstore-verify = { version = "0.15.1", default-features = false, optional = true }
+sigstore-verify = { version = "0.16.0", default-features = false, optional = true }
 fluent = "0.17.0"
 # Picks the catalog for the languages asked for, and a page's from its Accept-Language header.
 fluent-langneg = "0.13.1"
