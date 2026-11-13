@@ -2540,7 +2540,7 @@ dependencies = [
 
 [[package]]
 name = "rusticlone"
-version = "2.0.4"
+version = "2.0.5"
 dependencies = [
  "anyhow",
  "askama",
@@ -2607,7 +2607,7 @@ dependencies = [
 
 [[package]]
 name = "rusticlone-macros"
-version = "2.0.4"
+version = "2.0.5"
 dependencies = [
  "fluent-syntax",
  "heck 0.5.0",

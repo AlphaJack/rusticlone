@@ -114,7 +114,7 @@ fluent = "0.17.0"
 fluent-langneg = "0.14.0"
 # The languages that macOS's and Windows's settings list, when no LANG or LC_* variable asks for one.
 sys-locale = "0.3.2"
-rusticlone-macros = { path = "macros", version = "2.0.4" }
+rusticlone-macros = { path = "macros", version = "2.0.5" }
 # The catalogs, in debug builds too, which run on other computers than the one that builds them.
 rust-embed = { version = "8.13.0", features = ["debug-embed"] }
 
@@ -213,7 +213,7 @@ dist = true
 members = ["macros", "xtask"]
 
 [workspace.package]
-version = "2.0.4"
+version = "2.0.5"
 edition = "2024"
 rust-version = "1.95"
 license = "AGPL-3.0-or-later"
