@@ -1,4 +1,3 @@
-#![expect(clippy::panic, reason = "missing HTML sections fail the test")]
 
 use std::{
     fs, thread,
