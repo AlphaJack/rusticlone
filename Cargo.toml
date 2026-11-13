@@ -303,6 +303,8 @@ bare_urls = "deny"
 redundant_explicit_links = "deny"
 
 [workspace.lints.clippy]
+# A module with children is `foo.rs` next to `foo/`. It is never `foo/mod.rs`.
+mod_module_files = "deny"
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
 # Nursery lints that fight this code base's choices.
