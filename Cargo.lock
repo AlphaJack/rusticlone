@@ -2598,7 +2598,6 @@ dependencies = [
  "tokio-util",
  "toml_edit 0.25.19+spec-1.1.0",
  "tray-icon",
- "unic-langid",
  "windows-service",
  "windows-sys 0.61.2",
  "winresource",
