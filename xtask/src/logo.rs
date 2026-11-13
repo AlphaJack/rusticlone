@@ -77,7 +77,7 @@ pub(crate) fn render() -> Result<()> {
 /// The drawing, without the margins of its view box, centered in a square `side` pixels wide.
 #[expect(clippy::cast_precision_loss, reason = "a few pixels")]
 fn fitted(tree: &Tree, side: u32) -> Result<Pixmap> {
-    let (drawn, side_f) = (tree.root().abs_stroke_bounding_box(), side as f32);
+    let (drawn, side_f) = (tree.root().abs_stroke_bounding_box().context("empty logo")?, side as f32);
     let scale = side_f / drawn.width().max(drawn.height());
     let mut pixmap = Pixmap::new(side, side).context("empty logo")?;
     let transform = Transform::from_translate(-drawn.x(), -drawn.y())
