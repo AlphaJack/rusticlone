@@ -1,4 +1,3 @@
-
 use std::{
     fs, thread,
     time::{Duration, Instant},
