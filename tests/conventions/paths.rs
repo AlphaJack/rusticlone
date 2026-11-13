@@ -1,7 +1,6 @@
 //! Paths are joined a component at a time: `dir.join("a").join("b")`, not `dir.join("a/b")`, which Windows shows
 //! as `C:\dir\a/b`. An absolute Unix path starts from its first component: `Path::new("/usr").join("bin")`.
 
-#![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
 
 use std::{fs, path::Path};
