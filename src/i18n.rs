@@ -11,8 +11,8 @@ use std::{
 };
 
 use fluent::{FluentArgs, FluentResource, FluentValue, concurrent::FluentBundle};
+use fluent_langneg::LanguageIdentifier;
 pub(crate) use rusticlone_macros::{Fluent, t};
-use unic_langid::LanguageIdentifier;
 
 mod catalogs {
     rusticlone_macros::catalogs!();
@@ -82,7 +82,8 @@ impl Loader {
         .map(Arc::new);
         let bundles = chain.into_iter().filter_map(|language| {
             let resource = catalog(&language)?;
-            let mut bundle = FluentBundle::new_concurrent(vec![language]);
+            // Fluent still names languages with unic-langid's type, which reads the same tags.
+            let mut bundle = FluentBundle::new_concurrent(language.to_string().parse().into_iter().collect());
             // Fluent wraps each argument in Unicode isolation marks, which terminals and notifiers print.
             bundle.set_use_isolating(false);
             bundle.add_resource_overriding(Arc::clone(&resource));
@@ -92,11 +93,6 @@ impl Loader {
             Some(bundle)
         });
         Self { bundles: bundles.collect() }
-    }
-
-    /// The language that its messages are in.
-    fn language(&self) -> LanguageIdentifier {
-        (self.bundles.first()).and_then(|bundle| bundle.locales.first().cloned()).unwrap_or_else(fallback)
     }
 
     /// Message `id` with `args`, from the first catalog that has it, else `id`.
@@ -170,7 +166,10 @@ impl Language {
 /// Its tag, `en`, for `<html lang>` and `Content-Language`.
 impl std::fmt::Display for Language {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.0.language().fmt(f)
+        match (self.0.bundles.first()).and_then(|bundle| bundle.locales.first()) {
+            Some(language) => language.fmt(f),
+            None => FALLBACK.fmt(f),
+        }
     }
 }
 

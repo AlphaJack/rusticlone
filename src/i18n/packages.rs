@@ -14,7 +14,7 @@ pub(crate) fn translations(id: &str) -> Vec<(String, String)> {
     // A loader's first bundle is its own language's catalog, English's behind it.
     let own = |loader: &super::Loader| loader.bundles.first().is_some_and(|bundle| bundle.has_message(id));
     (LOADERS.iter())
-        .filter(|(language, loader)| *language != FALLBACK && own(loader))
+        .filter(|(language, loader)| !language.normalizing_eq(FALLBACK) && own(loader))
         .map(|(language, loader)| (language.to_string(), loader.text(id, None)))
         .collect()
 }
