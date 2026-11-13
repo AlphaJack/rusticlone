@@ -1,6 +1,5 @@
 //! What reaches the system says so where it does: a function at a time, not a whole module.
 
-#![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
 
 use std::{fs, path::Path};
