@@ -73,8 +73,12 @@ jobs:
         run: cargo hack clippy -p rusticlone --each-feature --all-targets --locked -- -D warnings
       - name: Rustdoc
         run: cargo doc --workspace --no-deps --all-features --document-private-items --locked
+      - name: Install cargo-acyclic
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-acyclic
       - name: Modules are acyclic
-        run: cargo xtask acyclic
+        run: cargo acyclic
 
   test:
     name: test (${{ matrix.os }})
