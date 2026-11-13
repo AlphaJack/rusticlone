@@ -3,7 +3,6 @@
 //! `[workspace.metadata.htmx]` of `Cargo.toml`, which the server's tests compare the files with.
 //! `cargo xtask vendor --check`: verifies that the files match the locked version.
 //! `cargo xtask fixtures`: see [`fixtures`].
-//! `cargo xtask acyclic [--mermaid]`: see [`acyclic`].
 //! `cargo xtask logo`: see [`logo`].
 //! `cargo xtask translations`: see [`translations`].
 //! `cargo xtask generate`: writes anew every generated file: the logo's renderings, and the files of the
@@ -14,7 +13,6 @@
 #![expect(clippy::disallowed_methods, reason = "developer tool using files, processes and the network")]
 #![expect(clippy::disallowed_macros, reason = "developer tool: errors are printed, not handled")]
 
-mod acyclic;
 mod fixtures;
 mod logo;
 mod translations;
@@ -41,14 +39,12 @@ fn main() -> Result<()> {
         ["vendor", "--check"] => vendor(None, true),
         ["vendor", version] => vendor(Some(version), false),
         ["fixtures"] => fixtures::record(),
-        ["acyclic"] => acyclic::check(false),
-        ["acyclic", "--mermaid"] => acyclic::check(true),
         ["logo"] => logo::render(),
         ["translations"] => translations::report(),
         ["generate"] => generate(),
         ["screenshots", ref options @ ..] => screenshots(options),
         _ => bail!(
-            "usage: cargo xtask vendor [VERSION | --check] | cargo xtask fixtures | cargo xtask acyclic [--mermaid] | cargo xtask logo | cargo xtask translations | cargo xtask generate | cargo xtask screenshots [--setup | --only NAME... | --teardown]"
+            "usage: cargo xtask vendor [VERSION | --check] | cargo xtask fixtures | cargo xtask logo | cargo xtask translations | cargo xtask generate | cargo xtask screenshots [--setup | --only NAME... | --teardown]"
         ),
     }
 }
