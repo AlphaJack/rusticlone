@@ -1,5 +1,4 @@
 //! End-to-end tests driving the real `rustic` binary (needs `rustic` in PATH).
-#![expect(clippy::unwrap_used, reason = "test assertions and helpers fail loudly")]
 #![expect(clippy::disallowed_methods, reason = "end-to-end tests with sandboxes and real binaries")]
 
 mod common;

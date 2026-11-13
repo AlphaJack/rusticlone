@@ -5,7 +5,6 @@
 //! - read a field, as `self.calls.lock().clone()` does, or pass fields on, as `retry_at(self.at, self.failures)`
 //! - compare with a constant, as `|r| r.level() == Level::Failure` does
 
-#![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
 
 use std::{collections::BTreeMap, fs, path::Path, str::FromStr};

@@ -3,7 +3,6 @@
 //! functions, so no other code tells the systems apart. A system is picked by a `target_*` key, by `unix` or
 //! `windows`, or by a cfg that `build.rs` declares for the target, such as `tray`.
 
-#![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
 
 use std::{fs, path::Path};

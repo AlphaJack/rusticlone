@@ -5,7 +5,6 @@
 //! except -1, 0, 1, 2 and 100: identities, pairs and halves, percent, and C's error return. Code
 //! elsewhere passes values.
 
-#![expect(clippy::unwrap_used, reason = "a test fails loudly")]
 #![expect(clippy::disallowed_methods, reason = "reads the sources")]
 
 use std::{fs, path::Path};
