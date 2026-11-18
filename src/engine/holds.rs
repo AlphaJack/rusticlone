@@ -63,23 +63,28 @@ impl Engine {
         let held: Vec<(&str, Mode)> = keys.iter().map(|(k, m, ..)| (k.as_str(), *m)).collect();
         let (last, since) = (RefCell::new(None), self.store.now());
         let (live, step) = (run.live.as_deref(), run.cx.step());
+        let own = live.map(Live::record);
         let locks = self.store.lock(
             &run.cx,
             &held,
             |busy| {
                 let Some((.., name)) = keys.iter().find(|(k, ..)| k == busy) else { return };
-                // Every lock that other runs hold, not only the one it waits for first.
-                let held = keys.iter().flat_map(|(.., n)| self.store.holding(n).into_iter().map(move |r| (r, n)));
-                let what = Doing::WaitingFor { lock: name.clone(), by: holders(held, false) };
-                if !wait_changed(&last, run.collection.title, &what) {
-                    return;
-                }
-                run.activity(Some(what), false);
+                // Shown to the runs that wait for it too, which take their turn by it.
                 if let Some(l) = live {
                     l.set_holds(step, Holds { using: Vec::new(), waiting_for: Some(name.clone()) });
                 }
+                // Every lock that other runs hold, not only the one it waits for first.
+                let held = keys.iter().flat_map(|(.., n)| self.store.holding(n).into_iter().map(move |r| (r, n)));
+                let what = Doing::WaitingFor { lock: name.clone(), by: holders(held, false) };
+                if wait_changed(&last, run.collection.title, &what) {
+                    run.activity(Some(what), false);
+                }
             },
             || Ok(None),
+            |key| {
+                let (Some(own), Some((.., name))) = (&own, keys.iter().find(|(k, ..)| k == key)) else { return false };
+                ahead_of(own, &self.store.waiting_for(name))
+            },
         );
         run.idle();
         if let Some(l) = live {
@@ -118,7 +123,7 @@ impl Engine {
         let lock = match queued {
             None => self.store.try_lock(cx, &keys),
             Some(run) => {
-                let lock = self.store.lock(cx, &keys, |_| waiting(run), || self.store.ahead(run, request));
+                let lock = self.store.lock(cx, &keys, |_| waiting(run), || self.store.ahead(run, request), |_| false);
                 self.runs.wait(collection.name(), run.id, None);
                 lock.map(Some)
             }
@@ -187,6 +192,13 @@ impl Engine {
         let lock = request.label(&own.collection);
         Doing::WaitingFor { by: holders(ahead.map(|q| (q.record.clone(), &lock)), true), lock }
     }
+}
+
+/// Whether a run in `waiting`, other than `own`, takes a resource that they both wait for first: a backup or
+/// another run before a prune or a check, then the run queued first.
+fn ahead_of(own: &RunRecord, waiting: &[RunRecord]) -> bool {
+    let turn = |r: &RunRecord| (r.kind.maintains(), r.id);
+    waiting.iter().any(|r| (&r.collection, r.id) != (&own.collection, own.id) && turn(r) < turn(own))
 }
 
 /// The lock of `local`'s disk and its name, if the disk spins: one run at a time reads or writes it.
@@ -266,7 +278,7 @@ pub(super) enum Use {
 mod tests {
     use std::cell::RefCell;
 
-    use super::{holders, wait_changed};
+    use super::{ahead_of, holders, wait_changed};
     use crate::{
         request::{Request, Trigger},
         result::{Doing, Holder},
@@ -285,6 +297,19 @@ mod tests {
         );
         let held: Vec<(Trigger, Vec<String>)> = by.into_iter().map(|h: Holder| (h.trigger, h.locks)).collect();
         assert_eq!(held, [(Trigger::Cli, vec![a.clone(), b]), (Trigger::Web, vec![a])]);
+    }
+
+    /// A backup takes a resource before a prune or a check, whenever queued. Otherwise the run queued first does.
+    #[test]
+    fn runs_take_a_resource_in_turn_backups_first() {
+        let store = Store::at(crate::sys::test_dir("turns")).unwrap();
+        let run = |request| RunLog::new(&store, "Docs", request, Trigger::Schedule).record.clone();
+        let check = run(Request::Check(vec![("Docs".into(), None)]));
+        let (backup, later_check) = (run(Request::Backup), run(Request::Check(vec![("Docs".into(), None)])));
+        assert!(ahead_of(&check, std::slice::from_ref(&backup)), "a backup goes first");
+        assert!(!ahead_of(&backup, &[check.clone(), later_check.clone()]), "before any check");
+        assert!(ahead_of(&later_check, std::slice::from_ref(&check)), "queued first");
+        assert!(!ahead_of(&check, &[check.clone(), later_check]), "nor itself");
     }
 
     /// A wait is shown when it starts or changes. Not again, nor once its holders are gone: the lock is

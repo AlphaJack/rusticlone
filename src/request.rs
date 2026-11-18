@@ -39,6 +39,11 @@ impl RunKind {
         t!("run-kind-doing", kind = <&str>::from(self))
     }
 
+    /// A prune or a check: it lets the other runs that wait for a resource of this computer go first.
+    pub(crate) const fn maintains(self) -> bool {
+        matches!(self, Self::Prune | Self::Check)
+    }
+
     pub(crate) fn schedule(self) -> Option<&'static Setting> {
         match self {
             Self::Backup => Some(&settings::BACKUP),

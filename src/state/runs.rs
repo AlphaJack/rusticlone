@@ -303,6 +303,12 @@ impl Store {
         }
     }
 
+    /// The live runs, of any collection and process, whose running step waits for the resource `name`.
+    pub fn waiting_for(&self, name: &str) -> Vec<RunRecord> {
+        let waits = |r: &RunRecord| r.holds().waiting_for.as_deref() == Some(name);
+        self.unfinished(None).into_iter().filter(|r| waits(r) && self.alive(r)).collect()
+    }
+
     /// The live runs, of any collection and process, whose running step holds the resource `name`.
     pub fn holding(&self, name: &str) -> Vec<RunRecord> {
         let holds = |r: &RunRecord| r.holds().using.iter().any(|u| u == name);
@@ -312,7 +318,7 @@ impl Store {
     /// Waits until `run` ends, or its process does.
     pub fn wait_for(&self, cx: &Ctx, run: &RunRecord, waiting: impl Fn(&str)) -> Result<()> {
         let lock = run_lock(&run.collection, run.id);
-        self.lock(cx, &[(&lock, Mode::Exclusive)], waiting, || Ok(None)).map(drop)
+        self.lock(cx, &[(&lock, Mode::Exclusive)], waiting, || Ok(None), |_| false).map(drop)
     }
 
     /// The lock of the queued run of `request` that came before `run`, if its process is still waiting.
