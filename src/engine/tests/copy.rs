@@ -266,7 +266,7 @@ fn a_forget_on_a_repository_it_cannot_list_fails() {
     let collections = engine.collections();
     let run = crate::engine::Run::new(&collections[0], None);
     engine.forget(&run, collections[0].repo("Docs-usb").unwrap(), &[]);
-    assert_eq!(failures(&run), 1, "{:?}", run.results_of(None));
+    assert_eq!(run.failures(), 1, "{:?}", run.results_of(None));
 }
 
 /// The primary's forget keeps what no copy has reached yet.

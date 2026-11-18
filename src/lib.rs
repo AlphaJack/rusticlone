@@ -25,6 +25,7 @@ mod health;
 mod i18n;
 #[cfg(any(feature = "desktop", feature = "self-update"))]
 mod install;
+mod kit;
 mod live;
 mod log;
 mod notification;

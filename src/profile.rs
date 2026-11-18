@@ -221,6 +221,11 @@ fn search_path(cwd: Option<PathBuf>) -> Result<Vec<PathBuf>> {
     Ok(sys::config_dirs("rustic")?.into_iter().chain(cwd).filter(|d| seen.insert(d.clone())).collect())
 }
 
+/// Whether a profile's name may have `c`: a letter, a digit, `-`, `_` or `.`.
+pub(crate) fn name_char(c: char) -> bool {
+    c.is_alphanumeric() || "-_.".contains(c)
+}
+
 /// The directory profiles are saved in: the system's for root or an elevated Windows process, else the
 /// user's.
 #[expect(clippy::disallowed_methods, reason = "the real folder, which callers pass on")]

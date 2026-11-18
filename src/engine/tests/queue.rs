@@ -82,7 +82,7 @@ fn a_run_keeps_each_result_once_and_counts_failures() {
     run.push_once(backed_up());
     assert_eq!(run.results_of(None), [failed(), backed_up()]);
     run.push(failed());
-    assert_eq!(failures(&run), 2);
+    assert_eq!(run.failures(), 2);
     run.activity(Some(Doing::WaitingForListing { repo: "Docs".into() }), false);
     assert_eq!(guard.live.activities().len(), 1);
     run.idle();

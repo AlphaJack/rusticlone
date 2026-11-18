@@ -8,6 +8,12 @@
   </div>
   {% if let Some(unconfigured) = unconfigured %}<div class="notice {{ unconfigured.level() }}">{{ unconfigured }}</div>{% endif %}
   {% if empty.writable %}<p>{{ Hint::CreateProfilesIn { dir: empty.dir } }}</p>{% else %}<p>{{ Hint::WriteProfilesIn { dir: empty.dir } }}</p>{% endif %}
+  <div class="actions">
+    {% if empty.here %}<button type="button" class="btn" hx-post="{{ base }}{{ Route::ProfileFolder }}" hx-swap="none">{{ m::icon("folder") }}{{ Button::OpenFolder }}</button>
+    {% else %}<button type="button" class="btn" data-copy="{{ empty.dir }}" title="{{ empty.dir }}">{{ m::icon("folder") }}{{ Button::CopyFolderPath }}</button>{% endif %}
+    {% if empty.writable %}<label class="btn">{{ m::icon("restore") }}{{ Button::RestoreFromKit }}<input type="file" class="sr" accept=".zip,application/zip" data-upload="{{ base }}{{ Route::Kit }}" data-not-sent="{{ Hint::NotSent }}"></label>{% endif %}
+  </div>
+  {% if empty.writable %}<p>{{ Hint::UploadKit { file: crate::kit::FILE } }}</p>{% endif %}
 </section>
 {% else %}
 <nav class="crumbs"></nav>

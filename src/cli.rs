@@ -175,6 +175,13 @@ fn real_main(cli: Cli) -> Result<Level> {
         args::command().print_help()?;
         return Ok(Level::Success);
     };
+    // Into the working folder, as a folder of profiles in a disaster recovery: they stay where the server reads
+    // them only if they fit this computer, which the restore offers to do.
+    if let Some(kit) = &cli.kit {
+        let dir = std::env::current_dir()?;
+        let saved = crate::kit::unpack_path(kit, &dir)? as u64;
+        log::event(None, &Logged::KitUnpacked { saved, dir: dir.display().to_string() });
+    }
     let dry_run = command.dry_run();
     #[cfg(feature = "self-update")]
     if matches!(command, Command::Update { .. }) {
@@ -244,7 +251,7 @@ fn real_main(cli: Cli) -> Result<Level> {
             let options = RestoreOptions { at, snapshot, path, to, missing, ..none };
             let engine = engine()?;
             let level = run(&engine, RunKind::Restore, &options, source.as_deref())?;
-            keep_profiles(&engine, dry_run)?;
+            fitting_profiles(&engine, dry_run)?;
             Ok(level)
         }
     }
@@ -254,6 +261,21 @@ fn real_main(cli: Cli) -> Result<Level> {
 #[fluent(prefix = "cli-ask")]
 enum Ask {
     Keep { files: String, dir: String },
+}
+
+/// After a restore: profiles that [fit](Engine::fits) this computer can go on backing up. Others describe another
+/// computer, as after a restore below `--to` on a new one, or one that failed: their sources and repositories need
+/// their places here first, which this says instead of offering to keep them.
+fn fitting_profiles(engine: &Engine, dry_run: bool) -> Result<()> {
+    let collections = engine.collections();
+    let elsewhere: Vec<String> = (collections.iter().filter(|j| !engine.fits(j)))
+        .flat_map(|j| j.repos().filter_map(|p| Some(p.files().first()?.display().to_string())))
+        .collect();
+    if elsewhere.is_empty() {
+        return keep_profiles(engine, dry_run);
+    }
+    log::event(None, &Logged::ProfilesElsewhere { files: elsewhere.join(", ") });
+    Ok(())
 }
 
 /// After a restore with profiles from the working directory, as in a disaster recovery, offers to copy

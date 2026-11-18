@@ -196,6 +196,7 @@
   /* no taller than the text beside it, so a row keeps its height when it appears */
   .table .icon-btn.small { margin-block: -4px; vertical-align: middle; }
   .icon-btn.plain { border: 0; color: var(--muted-foreground); margin-right: 4px; }
+  .btn:has(:focus-visible) { outline: 2px solid var(--ring, var(--primary)); outline-offset: 2px; }
   .btn:hover, .icon-btn:hover { background: var(--accent); text-decoration: none; }
   .btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
   .btn.primary:hover { opacity: .9; }

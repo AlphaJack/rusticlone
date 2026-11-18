@@ -32,6 +32,20 @@ pub(crate) enum Notice {
     },
     TestNotified,
     FolderNotOpened,
+    /// The profiles of an uploaded kit, saved in `dir`.
+    KitSaved {
+        saved: u64,
+        dir: String,
+    },
+    /// [`Self::KitSaved`], and the restores it started.
+    KitRestoring {
+        saved: u64,
+        dir: String,
+        collections: String,
+    },
+    KitNotSaved {
+        error: String,
+    },
     TestNotNotified {
         error: String,
     },
@@ -76,7 +90,9 @@ impl Notice {
             | Self::RefreshingRepo { .. }
             | Self::Dismissed { .. }
             | Self::Notified { .. }
-            | Self::TestNotified => Level::Success,
+            | Self::TestNotified
+            | Self::KitSaved { .. }
+            | Self::KitRestoring { .. } => Level::Success,
             Self::Stopping { .. } => Level::Warning,
             Self::RunFailed { .. }
             | Self::DestinationNotAbsolute
@@ -90,6 +106,7 @@ impl Notice {
             | Self::NotNotified { .. }
             | Self::TestNotNotified { .. }
             | Self::FolderNotOpened
+            | Self::KitNotSaved { .. }
             | Self::CannotStop { .. }
             | Self::CannotDismiss { .. } => Level::Failure,
         }

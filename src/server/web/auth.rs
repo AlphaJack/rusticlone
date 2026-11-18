@@ -218,7 +218,7 @@ struct Login<'a> {
 }
 
 fn login_form(app: &App, failed: bool, base: &Base) -> Response {
-    let host = crate::sys::hostname().map_or_else(|| super::Label::ThisComputer.to_string(), ToOwned::to_owned);
+    let host = super::label::this_host();
     let main = render_str(&Login { failed, file: app.tokens.file.as_deref(), host }, base);
     let title = format!("{} | {}", Button::LogIn, super::APP_NAME);
     render(&Layout { title, live: None, logout: false, main }, base)

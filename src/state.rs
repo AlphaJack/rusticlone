@@ -18,6 +18,8 @@ mod runs;
 mod step;
 
 pub use event::Event;
+#[cfg(test)]
+pub(crate) use event::Hold;
 pub(crate) use event::{Behind, Ledger, Read};
 use kept::{Kept, reparse};
 pub(crate) use locks::{Mode, RepoLocks};

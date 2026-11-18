@@ -17,6 +17,8 @@ pub(in crate::server) enum Route<'a> {
     SetupFree,
     /// Opens the folder of the saved profiles on this computer's desktop.
     ProfileFolder,
+    /// Every profile in one file to keep away from this computer.
+    Kit,
     /// The runs of every collection.
     Runs,
     Refresh,
@@ -66,6 +68,7 @@ impl Route<'_> {
             Self::SetupNotifications => vec![Word("setup"), Word("notifications")],
             Self::SetupFree => vec![Word("setup"), Word("free")],
             Self::ProfileFolder => vec![Word("setup"), Word("folder")],
+            Self::Kit => vec![Word("kit")],
             Self::Runs => vec![Word("runs")],
             Self::Refresh => vec![Word("refresh")],
             Self::Collection(c) => collection(c),

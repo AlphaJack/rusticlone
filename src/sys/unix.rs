@@ -11,6 +11,10 @@ pub(crate) fn replace(from: &Path, to: &Path) -> std::io::Result<()> {
     std::fs::rename(from, to)
 }
 
+/// What a command needs before it to run as root, as a command line for an administrator shows it.
+#[cfg(feature = "server")]
+pub(crate) const AS_ROOT: &str = "sudo ";
+
 /// `app`'s configuration directory for the system.
 #[expect(clippy::unnecessary_wraps, reason = "Windows's may be unknown")]
 pub(crate) fn system_config_dir(app: &str) -> Option<PathBuf> {
