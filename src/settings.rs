@@ -99,7 +99,7 @@ impl Setting {
     }
 
     /// `true` or `false`, in any case.
-    #[cfg(all(feature = "server", feature = "self-update"))]
+    #[cfg(feature = "server")]
     pub(crate) fn enabled(&self) -> Result<bool, Error> {
         self.get(&[]).unwrap_or_default().to_lowercase().parse().map_err(|e| self.invalid(e))
     }
@@ -141,6 +141,8 @@ settings! {
     BACKUP = "BACKUP_CRON", None, Scope::Collection;
     CHECK = "CHECK_CRON", None, Scope::Repository;
     CHECK_SUBSETS = "CHECK_SUBSETS", Some("10"), Scope::Repository;
+    #[cfg(feature = "server")]
+    KEEP_AWAKE = "KEEP_AWAKE", Some("true"), Scope::Environment;
     #[cfg(feature = "server")]
     LISTEN = "LISTEN", Some("127.0.0.1:32110"), Scope::Environment;
     #[cfg(feature = "server")]
