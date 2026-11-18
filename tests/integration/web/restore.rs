@@ -144,12 +144,13 @@ fn lost_repositories_are_re_created_by_copying() {
 
     // A copy target is lost, then re-created by a copy.
     sb.remove("remote/Docs");
-    // Missing, also after it is listed again, with rustic's reason.
+    // Missing once listed again, with rustic's reason. Not before: the status never looks at the disk.
     let missing = || server.collection("Docs")["targets"][0]["status"]["kind"] == "missing";
-    wait_for(10, "the status", missing);
+    assert!(!missing());
+    server.post("/collections/Docs/repos/Docs-remote/refresh");
+    wait_for(30, "the status", missing);
     let issues = server.collection("Docs")["issues"].to_string();
     assert!(json_has(&issues, &json!({"kind": "missing", "repo": "Docs-remote"})), "{issues}");
-    server.post("/collections/Docs/repos/Docs-remote/refresh");
     wait_for(30, "the listing", || {
         server.get("/collections/Docs/repos/Docs-remote").body.contains("No repository config file found")
     });
@@ -159,7 +160,8 @@ fn lost_repositories_are_re_created_by_copying() {
 
     // The primary is lost too, and comes back from the target.
     sb.remove("local/Docs");
-    wait_for(10, "the status", || repos().contains(r##"<use href="#recreate"/>"##));
+    server.post("/collections/Docs/repos/Docs/refresh");
+    wait_for(30, "the status", || repos().contains(r##"<use href="#recreate"/>"##));
     // Re-create is offered, and there is no Copy from a primary that is gone.
     assert!(!repos().contains(r##"<use href="#copy"/>"##));
     assert_eq!(server.post_form("/collections/Docs/repos/Docs/runs", "kind=copy").code, 422);

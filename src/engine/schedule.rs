@@ -60,8 +60,9 @@ pub(super) fn due(collection: &Collection<'_>, state: &Ledger, now: Timestamp, t
         if key.failures > 0 { key.retry_at() } else { (lacking && !key.cancelled).then_some(now) }
     });
     due.requests.push((Request::Copy(p.name.clone()), copy.min()));
-    // Nothing to maintain until it exists.
-    for repo in collection.repos().filter(|r| r.exists()) {
+    // Nothing to maintain until it exists, as the state says: a run that looks finds it missing.
+    let exists = |r: &RusticProfile| !state.missing.contains(&r.name) && (r.out_of_sight() || created(p, r, state));
+    for repo in collection.repos().filter(|r| exists(r)) {
         let name = || repo.name.clone();
         for (request, key) in [
             (Request::Prune(vec![name()]), StepKey::Prune(name())),
@@ -125,6 +126,16 @@ impl Due {
         };
         cron.next_after(since, tz)
     }
+}
+
+/// Whether `r`, `p` or one of its targets, had snapshots once: a backed-up primary, or a target that was copied to or
+/// listed with snapshots.
+pub(super) fn created(p: &RusticProfile, r: &RusticProfile, state: &Ledger) -> bool {
+    if r.name == p.name {
+        return backups(p, state).0.is_some();
+    }
+    let copied = state.last_step(&StepKey::Copy(p.name.clone(), r.name.clone())).is_some_and(|c| c.last_ok.is_some());
+    state.latest.contains_key(&r.name) || copied
 }
 
 /// `None` when not scheduled.

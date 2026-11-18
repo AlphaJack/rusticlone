@@ -18,7 +18,7 @@ impl Engine {
         let collection = run.collection;
         let started = self.store.now();
         let reading = if let Step::Check { reading, .. } = step { Some(*reading) } else { None };
-        if !repo.exists() {
+        if !self.found(repo) {
             if let Some(reading) = reading {
                 self.check_read(collection, &repo.name, reading, Read::Not);
             }
