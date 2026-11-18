@@ -4,7 +4,7 @@
 {% macro command(line) %}<div class="field-row"><input type="text" class="command" readonly value="{{ line }}" aria-label="{{ line }}">{{ m::copyable("copy", line) }}</div>{% endmacro %}
 <section class="card setup-saved">
   <h1>{{ Heading::ProfilesSaved }}</h1>
-  {% if here %}
+  {% if local_browser %}
   <p><button type="button" class="btn" hx-post="{{ base }}{{ Route::ProfileFolder }}" hx-swap="none">{{ m::icon("folder") }}{{ Button::OpenFolder }}</button></p>
   {% else %}
   <p><button type="button" class="btn" data-copy="{{ dir }}" title="{{ dir }}">{{ m::icon("folder") }}{{ Button::CopyFolderPath }}</button></p>
