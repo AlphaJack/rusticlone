@@ -133,8 +133,12 @@ impl App {
         let engine = self.engine();
         let (due, next) = engine.agenda(engine.store.now());
         for (collection, request) in due {
-            // It would be skipped, and its record would wake this again: request it once that run ends.
-            if engine.collection(&collection).is_some_and(|j| engine.runs_already(&j, &request)) {
+            // It would be skipped, and its record would wake this again: request it once that run ends. A run that
+            // ended since the agenda was read, cancelled, may have postponed it.
+            if engine
+                .collection(&collection)
+                .is_some_and(|j| engine.runs_already(&j, &request) || !engine.still_due(&j, &request))
+            {
                 continue;
             }
             if let Err(e) = self.ask(&engine, &collection, &request, Trigger::Schedule) {
