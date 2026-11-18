@@ -14,6 +14,8 @@ pub(crate) enum Key {
     /// A variable in `[global.env]`.
     #[fluent(transparent)]
     Env(&'static str),
+    /// A repository that refuses deletes, ticked: it gets no `[forget]`, so it is never forgotten or pruned.
+    Immutable,
 }
 
 impl Key {
@@ -114,6 +116,11 @@ pub(crate) fn password() -> String {
     crate::i18n::t!("field-repository-password")
 }
 
+/// A repository that refuses deletes, under its name for this kind.
+const fn immutable(label: &'static str) -> Field {
+    Field { required: false, ..field(Key::Immutable, label, "") }
+}
+
 /// `root`: where in the service the repository is.
 const ROOT: Field = Field { required: false, ..field(Key::Option("root"), "path", "/backup") };
 
@@ -152,6 +159,7 @@ impl Kind {
                         ROOT,
                         field(Key::Option("access_key_id"), "access-key", ""),
                         secret(Key::Option("secret_access_key"), "secret-key"),
+                        immutable("object-lock"),
                     ]
                 }
             }
@@ -178,7 +186,14 @@ impl Kind {
                     ]
                 }
             }
-            Self::Rest => const { &[field(Key::Repository, "url", "https://me:password@backup.example.com:8000/me")] },
+            Self::Rest => {
+                const {
+                    &[
+                        field(Key::Repository, "url", "https://me:password@backup.example.com:8000/me"),
+                        immutable("append-only"),
+                    ]
+                }
+            }
             Self::Gdrive => const { &rclone("gdrive:backup") },
             Self::Onedrive => const { &rclone("onedrive:backup") },
             Self::Dropbox => const { &rclone("dropbox:backup") },

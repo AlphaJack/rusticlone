@@ -72,6 +72,13 @@ impl Setup {
         backup["snapshots"] = Item::ArrayOfTables(snapshots.collect());
         primary["backup"] = Item::Table(backup);
         primary["repository"] = self.repository(Role::Primary, section(Question::WhereSaved));
+        let forget = (!self.keep().rules().is_empty()).then(|| {
+            let mut forget = section(Question::HowLongKeep);
+            for (keep, n) in self.keep().rules() {
+                forget[keep] = value(*n);
+            }
+            Item::Table(forget)
+        });
         let target = (self.target != Kind::None).then(|| {
             let name = self.profile_name(Role::Target);
             let mut copy = section(Question::WhereCopied);
@@ -79,18 +86,18 @@ impl Setup {
             primary["copy"] = Item::Table(copy);
             let mut target = DocumentMut::new();
             target["repository"] = self.repository(Role::Target, section(Question::WhereCopied));
+            // Kept as long as the backups, and checked and pruned on their schedules, which it inherits.
+            if let Some(forget) = forget.clone().filter(|_| !self.immutable(Role::Target)) {
+                target["forget"] = forget;
+            }
             let env: Table = self.env(Role::Target).collect();
             if !env.is_empty() {
                 target["global"] = implicit([("env", Item::Table(env))]);
             }
             (format!("{name}.toml"), target.to_string())
         });
-        if !self.keep.rules().is_empty() {
-            let mut forget = section(Question::HowLongKeep);
-            for (keep, n) in self.keep.rules() {
-                forget[keep] = value(*n);
-            }
-            primary["forget"] = Item::Table(forget);
+        if let Some(forget) = forget.filter(|_| !self.immutable(Role::Primary)) {
+            primary["forget"] = forget;
         }
         let mut vars = Table::new();
         vars.decor_mut().set_prefix("\n");

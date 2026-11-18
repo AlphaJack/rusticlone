@@ -116,6 +116,28 @@ fn paths_copied_from_file_explorer_lose_their_quotes() {
 }
 
 #[test]
+fn a_repository_keeps_as_long_as_the_backups_unless_it_refuses_deletes() {
+    let keeps = |setup: &Setup| profile::parse("Documents-rest", &setup.profiles()[1].1).has_keep;
+    let rest = target(Kind::Rest, &[("repository", "http://h/r")]);
+    assert!(rest.profiles()[1].1.contains("keep-last = 10"), "{:?}", rest.profiles());
+    assert!(!keeps(&Setup { keep: Keep::All, ..rest }));
+    assert!(!keeps(&target(Kind::Rest, &[("repository", "http://h/r"), ("immutable", "on")])));
+    let object_lock = target(Kind::S3, &[("endpoint", "https://s3"), ("immutable", "on")]);
+    let text = &object_lock.profiles()[1].1;
+    assert!(!text.contains("forget") && !text.contains("immutable"), "{text}");
+    let mut locked = target(Kind::Rest, &[("repository", "http://h/r")]);
+    locked.primary = Kind::S3;
+    locked.values.insert("primary.s3.immutable".into(), "on".into());
+    let profiles = locked.profiles();
+    assert!(!profiles[0].1.contains("keep-") && profiles[1].1.contains("keep-last"), "{profiles:?}");
+    // Neither forgets, so how long to keep is not asked and nothing is pruned.
+    locked.values.insert("target.rest.immutable".into(), "on".into());
+    assert!(!locked.forgets());
+    let profiles = locked.profiles();
+    assert!(profiles.iter().all(|(_, t)| !t.contains("keep-") && !t.contains(settings::PRUNE.key)), "{profiles:?}");
+}
+
+#[test]
 fn profiles_read_back_as_written() {
     let setup = target(Kind::Sftp, &[("user", "me"), ("endpoint", "ssh://nas:22")]);
     let profiles = setup.profiles();
@@ -145,18 +167,23 @@ fn profiles_read_back_as_written() {
     assert!(primary.contains(&format!("{} = \"@monthly\"", settings::PRUNE.key)), "{primary}");
     let month = Setup { keep: Keep::Month, ..setup.clone() }.profiles();
     assert!(month[0].1.contains(&format!("{} = \"@weekly\"", settings::PRUNE.key)), "{}", month[0].1);
-    let manual = Setup { keep: Keep::All, check: Every::Manual, ..setup.clone() }.profiles();
+    let manual = Setup { keep: Keep::All, every: Every::Manual, ..setup.clone() }.profiles();
     assert!(!manual[0].1.contains(settings::PRUNE.key), "{}", manual[0].1);
     assert!(!manual[0].1.contains(settings::CHECK_SUBSETS.key), "{}", manual[0].1);
-    let mut custom = Setup { check: Every::Custom, ..setup.clone() };
+    let mut custom = Setup { every: Every::Custom, ..setup.clone() };
     assert!(matches!(custom.check(), Err(Error::NoCustom)));
     let signal = Setup { notify: "signal://localhost/+1 555 123 4567 macosx://".into(), ..setup.clone() };
     assert!(signal.check().is_ok(), "{:?}", signal.check());
     for notify in ["tgram://{bot_token}", "tgram://only-a-token"] {
         assert!(matches!(Setup { notify: notify.into(), ..setup.clone() }.check(), Err(Error::Notify(_))), "{notify}");
     }
-    custom.values.insert("check.custom".into(), "0 3 * * 1".into());
-    assert!(custom.profiles()[0].1.contains(&format!("{} = \"0 3 * * 1\"", settings::CHECK.key)));
+    custom.values.insert("every.custom".into(), "0 3 * * 1".into());
+    let custom = &custom.profiles()[0].1;
+    assert!(custom.contains(&format!("{} = \"0 3 * * 1\"", settings::BACKUP.key)), "{custom}");
+    // Checks follow the backups: weekly for a custom schedule and monthly for weekly backups.
+    assert!(custom.contains(&format!("{} = \"@weekly\"", settings::CHECK.key)), "{custom}");
+    let weekly = &Setup { every: Every::Weekly, ..setup.clone() }.profiles()[0].1;
+    assert!(weekly.contains(&format!("{} = \"@monthly\"", settings::CHECK.key)), "{weekly}");
     assert!(<Every as strum::IntoEnumIterator>::iter().all(|e| Every::try_from(e.id()).is_ok_and(|c| c == e)));
     assert!(setup.check().is_ok());
     assert!(matches!(
