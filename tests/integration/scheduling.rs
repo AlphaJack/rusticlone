@@ -121,7 +121,7 @@ fn run_skips_a_job_that_is_busy() {
     let hash = "run:Docs:backup"
         .bytes()
         .fold(0xcbf2_9ce4_8422_2325_u64, |h, b| (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3));
-    let lock = File::create(sb.path(&format!("store/locks/{hash:016x}.lock"))).unwrap();
+    let lock = File::create(sb.path(&format!("store/locks/run-Docs-backup-{hash:016x}.lock"))).unwrap();
     lock.lock().unwrap();
     sb.common_env(&[("BACKUP_CRON", EVERY_MINUTE)]);
     sb.run(&["due", "--all"]).assert_exit(0).assert_result("running-already", json!({}));
