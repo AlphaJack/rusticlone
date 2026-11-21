@@ -22,6 +22,7 @@ server = [
     "dep:socket2",
     "dep:tokio",
     "dep:tokio-util",
+    "dep:zbus",
 ]
 
 desktop = [
@@ -36,7 +37,6 @@ desktop = [
     "dep:dispatch2",
     "dep:objc2-service-management",
     "dep:ksni",
-    "dep:zbus",
     "dep:winresource",
 ]
 
@@ -199,6 +199,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_JobObjects",
     "Win32_System_LibraryLoader",
     "Win32_System_Ioctl",
+    "Win32_System_Power",
     "Win32_System_Registry",
     "Win32_System_SystemInformation",
     "Win32_System_Threading",

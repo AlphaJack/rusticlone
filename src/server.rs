@@ -134,6 +134,9 @@ pub(crate) enum Logged {
     NoWallClock {
         error: String,
     },
+    NotKeptAwake {
+        error: String,
+    },
     /// Runs stored in a shape this version cannot read: `3 runs`.
     RunsUnread {
         runs: u64,
@@ -181,6 +184,7 @@ impl Message for Logged {
             | Self::DirNotCreated { .. }
             | Self::NoWallClock { .. }
             | Self::NotOpened { .. }
+            | Self::NotKeptAwake { .. }
             | Self::RunsUnread { .. } => Level::Warning,
         }
     }
