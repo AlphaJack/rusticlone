@@ -96,7 +96,10 @@ fn assets_free_space_and_issues_are_served() {
         "{}",
         css.head
     );
-    let free = server.get(&format!("/setup/free?folder={}", sb.path("local").display())).body;
+    // An empty folder, which a repository may go to.
+    let empty = sb.path("empty");
+    std::fs::create_dir_all(&empty).unwrap();
+    let free = server.get(&format!("/setup/free?folder={}", empty.display())).body;
     assert!(free.ends_with(" free</span>"), "{free}");
     let metrics = server.get("/metrics").body;
     let issues: Vec<&str> = metrics.lines().filter(|l| l.starts_with("rusticlone_issues{")).collect();
