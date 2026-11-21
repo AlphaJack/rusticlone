@@ -3,52 +3,54 @@
 use std::{collections::BTreeMap, path::Path};
 
 use jiff::Timestamp;
+use serde::Deserialize;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Node {
     pub name: String,
     pub kind: NodeKind,
     pub size: u64,
-    /// To the minute.
     pub mtime: Option<Timestamp>,
 }
 
-/// Also the name of its icon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::Display)]
+/// Also the name of its icon. Devices, pipes and sockets show as files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, strum::Display, Deserialize)]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub(crate) enum NodeKind {
     Dir,
-    File,
     Symlink,
+    #[serde(other)]
+    File,
+}
+
+/// An entry of `ls --json --long`. Directories that rustic made above the sources have no size or time.
+#[derive(Deserialize)]
+struct Listed {
+    path: String,
+    #[serde(rename = "type")]
+    kind: NodeKind,
+    #[serde(default)]
+    size: u64,
+    mtime: Option<Timestamp>,
 }
 
 /// Directory entries by path below the snapshot root (`""` for the root).
 pub(crate) type Dirs = BTreeMap<String, Vec<Node>>;
 
-/// Parses `ls --long --recursive` of rustic 0.11, because `--json` has neither sizes nor times. A
-/// line is `MODE USER GROUP SIZE TIME "PATH"`, with the time in UTC (`15 Oct 2026 13:20`) or `?`.
-pub(super) fn dirs(listing: &str) -> Dirs {
+/// Parses `ls --json --long --recursive`.
+pub(super) fn dirs(listing: &str) -> serde_json::Result<Dirs> {
     let mut dirs = Dirs::new();
-    for line in listing.lines() {
-        let Some((info, path)) = quoted(line) else { continue };
-        let fields: Vec<&str> = info.split_whitespace().collect();
-        let [mode, _, _, size, time @ ..] = fields.as_slice() else { continue };
-        let kind = match mode.chars().next() {
-            Some('d') => NodeKind::Dir,
-            Some('l') => NodeKind::Symlink,
-            _ => NodeKind::File,
-        };
-        let mtime = jiff::civil::DateTime::strptime("%d %b %Y %H:%M", time.join(" ")).ok();
-        let mtime = mtime.and_then(|t| t.to_zoned(jiff::tz::TimeZone::UTC).ok()).map(|t| t.timestamp());
+    for Listed { path, kind, size, mtime } in serde_json::from_str::<Vec<Listed>>(listing)? {
         let (parent, name) = path.rsplit_once('/').unwrap_or(("", &path));
-        let node = Node { name: name.to_owned(), kind, size: size.parse().unwrap_or(0), mtime };
+        let node = Node { name: name.to_owned(), kind, size, mtime };
         dirs.entry(parent.to_owned()).or_default().push(node);
         // Lists empty directories too.
         if kind == NodeKind::Dir {
-            dirs.entry(path.clone()).or_default();
+            dirs.entry(path).or_default();
         }
     }
-    dirs
+    Ok(dirs)
 }
 
 const HEX: u32 = 16;
@@ -221,7 +223,9 @@ mod tests {
     #[test]
     fn a_long_listing_by_directory() {
         for (_, listing) in crate::rustic::fixtures("ls.stdout") {
-            insta::assert_debug_snapshot!("ls", dirs(&listing));
+            insta::assert_debug_snapshot!("ls", dirs(&listing).unwrap());
         }
+        let device = dirs(r#"[{"path":"dev/null","type":"chardev","mode":8630}]"#).unwrap();
+        assert_eq!(device["dev"][0].kind, NodeKind::File);
     }
 }
