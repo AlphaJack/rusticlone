@@ -1,8 +1,94 @@
-drwxr-xr-x        ?        ?         0                 ? "fixture" 
-drwxr-xr-x        ?        ?         0                 ? "fixture/src" 
-drwxr-xr-x        ?        ?         0                 ? "fixture/src/docs" 
--rw-r--r--       me       me         5 15 Oct 2026 13:20 "fixture/src/docs/a \"x\"\tb\\c.txt" 
-drwxr-xr-x       me       me         0 15 Oct 2026 13:20 "fixture/src/docs/empty" 
-lrwxrwxrwx       me       me         9 15 Oct 2026 13:21 "fixture/src/docs/link" -> sub/b.txt
-drwxr-xr-x       me       me         0 15 Oct 2026 13:20 "fixture/src/docs/sub" 
--rw-r--r--       me       me         3 15 Oct 2026 13:20 "fixture/src/docs/sub/b.txt" 
+[
+  {
+    "mode": 493,
+    "path": "fixture",
+    "type": "dir"
+  },
+  {
+    "mode": 493,
+    "path": "fixture/src",
+    "type": "dir"
+  },
+  {
+    "mode": 493,
+    "path": "fixture/src/docs",
+    "type": "dir"
+  },
+  {
+    "atime": "2026-10-15T13:20:00+00:00",
+    "ctime": "2026-10-15T13:20:00+00:00",
+    "extended_attributes": [],
+    "gid": 1000,
+    "group": "me",
+    "inode": 1000,
+    "links": 1,
+    "mode": 420,
+    "mtime": "2026-10-15T13:20:00+00:00",
+    "path": "fixture/src/docs/a \"x\"\tb\\c.txt",
+    "size": 5,
+    "type": "file",
+    "uid": 1000,
+    "user": "me"
+  },
+  {
+    "atime": "2026-10-15T13:20:00+00:00",
+    "ctime": "2026-10-15T13:20:00+00:00",
+    "extended_attributes": [],
+    "gid": 1000,
+    "group": "me",
+    "inode": 1000,
+    "mode": 2147484141,
+    "mtime": "2026-10-15T13:20:00+00:00",
+    "path": "fixture/src/docs/empty",
+    "type": "dir",
+    "uid": 1000,
+    "user": "me"
+  },
+  {
+    "atime": "2026-10-15T13:20:00+00:00",
+    "ctime": "2026-10-15T13:20:00+00:00",
+    "extended_attributes": [],
+    "gid": 1000,
+    "group": "me",
+    "inode": 1000,
+    "links": 1,
+    "linktarget": "sub/b.txt",
+    "mode": 134218239,
+    "mtime": "2026-10-15T13:21:00+00:00",
+    "path": "fixture/src/docs/link",
+    "size": 9,
+    "type": "symlink",
+    "uid": 1000,
+    "user": "me"
+  },
+  {
+    "atime": "2026-10-15T13:20:00+00:00",
+    "ctime": "2026-10-15T13:20:00+00:00",
+    "extended_attributes": [],
+    "gid": 1000,
+    "group": "me",
+    "inode": 1000,
+    "mode": 2147484141,
+    "mtime": "2026-10-15T13:20:00+00:00",
+    "path": "fixture/src/docs/sub",
+    "type": "dir",
+    "uid": 1000,
+    "user": "me"
+  },
+  {
+    "atime": "2026-10-15T13:20:00+00:00",
+    "ctime": "2026-10-15T13:20:00+00:00",
+    "extended_attributes": [],
+    "gid": 1000,
+    "group": "me",
+    "inode": 1000,
+    "links": 1,
+    "mode": 420,
+    "mtime": "2026-10-15T13:20:00+00:00",
+    "path": "fixture/src/docs/sub/b.txt",
+    "size": 3,
+    "type": "file",
+    "uid": 1000,
+    "user": "me"
+  }
+]

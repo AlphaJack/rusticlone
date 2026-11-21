@@ -339,8 +339,8 @@ impl Rustic {
     /// All directories of a snapshot, in one call.
     #[cfg(feature = "server")]
     pub(crate) fn ls(&self, p: &RusticProfile, id: &SnapshotId) -> Result<super::Dirs> {
-        let out = self.run(&Ctx::default(), p, &["ls", "--long", "--recursive", id.as_str()], None)?;
-        Ok(super::dirs(&with_slashes(&out.stdout)))
+        let out = self.run(&Ctx::default(), p, &["ls", "--json", "--long", "--recursive", id.as_str()], None)?;
+        Ok(super::dirs(&with_slashes(&out.stdout))?)
     }
 
     /// Snapshots of these groups with a path that contains `name`, ignoring case.
