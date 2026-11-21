@@ -215,6 +215,12 @@ fn local_repo(repository: &str, options: &BTreeMap<String, String>, dir: &Path) 
     Some(resolve(&dir.join(path)))
 }
 
+/// Whether rustic's option `key` says how it reaches a repository, rather than which one it is: its retries,
+/// connections, bandwidth and timeouts, and its HTTP settings such as `http-cacert`.
+fn connection(key: &str) -> bool {
+    ["timeout", "retry", "connections", "throttle"].contains(&key) || key.starts_with("http-")
+}
+
 /// Rustic's profile directories in its search order, each once: user, system, then `cwd`.
 fn search_path(cwd: Option<PathBuf>) -> Result<Vec<PathBuf>> {
     let mut seen = BTreeSet::new();
@@ -408,10 +414,11 @@ fn from_config(name: &str, dir: &Path, config: &Config) -> RusticProfile {
         k.starts_with("keep-") && !matches!(v, Value::Bool(false)) && !v.as_array().is_some_and(Vec::is_empty)
     });
     let repository = get(&["repository", "repository"]).and_then(Value::as_str);
-    // Options also identify the repository: a bucket, the `root` of `opendal:fs`.
+    // Options also identify the repository: a bucket, the `root` of `opendal:fs`. Not those of the connection.
     let options: BTreeMap<String, String> = ["options", "options-cold"]
         .iter()
         .flat_map(|t| table(&["repository", t]))
+        .filter(|(k, _)| !connection(k))
         .map(|(k, v)| (k.clone(), v.as_str().map_or_else(|| v.to_string(), str::to_owned)))
         .collect();
     let local = repository.and_then(|r| local_repo(r, &options, dir));
@@ -701,5 +708,8 @@ mod tests {
         };
         assert_eq!(with("opendal:fs", "root = '/nonexistent/r'"), at("/nonexistent/r"));
         assert_ne!(with("opendal:s3", "bucket = 'a'"), with("opendal:s3", "bucket = 'b'"));
+        // How rustic reaches it is no part of which repository it is.
+        let reached = "timeout = '1h'\nretry = '3'\nconnections = '2'\nthrottle = '1MB,2MB'\nhttp-read-timeout = '1m'";
+        assert_eq!(with("opendal:s3", &format!("bucket = 'a'\n{reached}")), with("opendal:s3", "bucket = 'a'"));
     }
 }
