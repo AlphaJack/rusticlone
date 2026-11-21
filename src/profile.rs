@@ -185,10 +185,17 @@ impl RusticProfile {
         self.repository_hooks || self.local.as_ref().is_none_or(|p| p.parent().is_some_and(Path::is_dir))
     }
 
-    /// Whether a local repository has its `config` file. Always true for a remote one.
+    /// Whether rusticlone cannot tell from the disk whether it exists: a remote repository, or one that hooks may
+    /// mount. It counts as there.
+    pub(crate) fn out_of_sight(&self) -> bool {
+        self.repository_hooks || self.global_hooks || self.local.is_none()
+    }
+
+    /// Whether a local repository has its `config` file, which may mount its disk. Always true for one
+    /// [out of sight](Self::out_of_sight).
     #[expect(clippy::disallowed_methods, reason = "finds and resolves profiles on disk")]
     pub(crate) fn exists(&self) -> bool {
-        self.repository_hooks || self.global_hooks || self.local.as_ref().is_none_or(|p| p.join("config").is_file())
+        self.out_of_sight() || self.local.as_ref().is_some_and(|p| p.join("config").is_file())
     }
 
     /// Its files in rustic's search path, then in the directory rusticlone was started in, which a user may
