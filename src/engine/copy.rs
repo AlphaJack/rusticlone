@@ -136,7 +136,6 @@ impl Engine {
             run.tracked(None, |progress| self.rustic.copy(&run.cx, collection.primary, &ids, &t.name, false, progress));
         run.changed(t);
         let said = said?;
-        // Rustic exits 0 even when a target fails.
         let Ok(after) = self.listed_with(run, t, &missing) else { return Err(rustic::Error::Failed(said).into()) };
         let failed = missing.iter().filter(|s| !after.iter().any(|a| a.same(s))).count();
         if failed > 0 {

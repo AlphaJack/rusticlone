@@ -1,9 +1,13 @@
 [INFO] using config /home/me/.config/rustic/Docs.toml
 [INFO] using backup sources from config file.
 [INFO] repository local:/backup/Docs: password is correct.
-[INFO] reading index...: 1 done in 1.24ms
-[INFO] using no parent
+[INFO] using parents 58e93de7
 [INFO] starting to backup ["/home/me/docs"] ...
+[INFO] Files:       1 new, 0 changed, 1 unchanged
+[INFO] Dirs:        0 new, 3 changed, 0 unchanged
+[INFO] Added to the repo: 1.8 KiB (raw: 2.1 KiB)
+[INFO] processed 2 files, 8 B
+[INFO] snapshot a5565359 successfully saved.
 [INFO] backup of /home/me/docs done.
 [ERROR] error backing up /home/me/gone: error sanitizing source=s"PathList(["/home/me/gone"])"
 error: Not all snapshots were generated successfully!
