@@ -27,9 +27,8 @@ fn a_backup_is_copied_then_forgotten_where_every_target_has_it() {
     insta::assert_json_snapshot!(forgets_sorted(outcome(&replay, &report, &engine, &collections[0])));
 }
 
-/// Rustic exits 0 when a copy target fails. Listed afterwards, and again because a remote's listing may
-/// lag, the target still lacks the snapshot: the copy failed, its forget is skipped, and the
-/// primary's forget waits.
+/// Rustic reports a copy done. Listed afterwards, and again because a remote's listing may lag, the target
+/// still lacks the snapshot: the copy failed, its forget is skipped, and the primary's forget waits.
 #[test]
 fn an_unconfirmed_copy_holds_back_the_forgets() {
     let lacking = recorded("snapshots-copied.stdout");

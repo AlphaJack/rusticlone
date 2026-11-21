@@ -1,0 +1,11 @@
+[INFO] using config ./a.toml
+[INFO] using backup sources from config file.
+[INFO] repository local:/fixture/repo: password is correct.
+[INFO] using no cache
+[INFO] using parents 22222222
+[INFO] starting to backup ["/fixture/src/docs"] ...
+[WARN] ignoring error /fixture/src/docs/sub: IO error for operation on /fixture/src/docs/sub: Permission denied (os error 13)
+{"message_type":"error","error":{"message":"Error: Failed to read source path `/fixture/src/docs/sub`. (kind: related to input/output operations): caused by: /fixture/src/docs/sub: IO error for operation on /fixture/src/docs/sub: Permission denied (os error 13)"},"during":"scan","item":"/fixture/src/docs/sub"}
+{"message_type":"error","error":{"message":"Error: Failed to open ReadSourceOpen at `/fixture/src/docs/secret`\nFailed to open file at `/fixture/src/docs/secret`. Please make sure the file exists and is accessible. (kind: related to input/output operations): caused by: Permission denied (os error 13)"},"during":"archival","item":"/fixture/src/docs/secret"}
+[INFO] backup of /fixture/src/docs done.
+{"message_type":"exit_error","code":3,"message":"Warning: at least one source file could not be read"}

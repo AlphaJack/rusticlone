@@ -2,7 +2,7 @@
 ARG NAME=rusticlone
 ARG VERSION
 ARG REPOSITORY=AlphaJack/rusticlone
-ARG RUSTIC=v0.11.4
+ARG RUSTIC=v0.12.0
 
 FROM --platform=$BUILDPLATFORM alpine:latest AS fetch
 ARG NAME

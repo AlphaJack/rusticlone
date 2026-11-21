@@ -1,10 +1,10 @@
 //! The rustic commands that are run. Their arguments are defined only here, and their output
 //! is parsed into values. A failed command returns rustic's explanation as the error.
 
-use super::Output;
 pub(crate) use super::os::tree_path;
 #[cfg(feature = "server")]
 use super::os::with_slashes;
+use super::{Output, output::INCOMPLETE};
 use std::path::Path;
 
 use anyhow::Result;
@@ -189,8 +189,8 @@ impl Rustic {
         let args: &[&str] = if init { &["backup", "--json", "--init"] } else { &["backup", "--json"] };
         let out = self.exec(cx, &p.name, &p.dir, args, Some(progress), Stdout::Text)?.0;
         let not_backed_up = out.not_backed_up();
-        // A failure that no source explains is rustic's own.
-        let out = if not_backed_up.is_empty() { ok(out)? } else { out };
+        // A failure that no source and no unreadable item explain is rustic's own.
+        let out = if not_backed_up.is_empty() && out.code != Some(INCOMPLETE) { ok(out)? } else { out };
         Ok(Backup {
             snapshots: out.summary_snapshot_ids(),
             not_backed_up,
@@ -218,7 +218,7 @@ impl Rustic {
 
     /// Copies `ids` from `from` to the profile `to`. With no ids, it only creates `to` (`init`) with
     /// `from`'s chunker: `--filter-last 0` matches no snapshot. `rustic init` cannot do that: it picks a random
-    /// chunker, and copies need matching ones. Rustic exits 0 even when the target fails, so the caller must list the target.
+    /// chunker, and copies need matching ones. The caller lists the target to learn which snapshots arrived.
     /// Returns rustic's own error text, to explain missing snapshots.
     pub(crate) fn copy(
         &self,
