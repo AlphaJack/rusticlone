@@ -8,35 +8,37 @@ use crate::{profile, sys};
 impl Setup {
     /// Refuses a repository folder that a source holds or that holds a source. Refuses one with other files but no
     /// repository's `config` too. The folder of an existing repository is kept to back up into it again.
-    #[expect(clippy::disallowed_methods, reason = "saves the profiles")]
     pub(super) fn check_folders(&self) -> Result<(), Error> {
-        use std::path::{Path, PathBuf};
-        // As written and as the disk resolves it, up to its nearest folder that exists: `/tmp` is a link to
-        // `/private/tmp` on macOS, and `/users/new` is `/Users/new` on a disk that ignores case.
-        let resolved = |p: &Path| -> Option<PathBuf> {
-            let base = p.ancestors().find_map(|a| Some((a, a.canonicalize().ok()?)))?;
-            Some(base.1.join(p.strip_prefix(base.0).ok()?))
-        };
-        let forms = |p: &str| [Some(Path::new(p).to_path_buf()), resolved(Path::new(p))];
         let sources = self.sources();
-        for folder in <Role as strum::IntoEnumIterator>::iter().filter_map(|role| self.folder(role)) {
-            for source in &sources {
-                let nested = forms(&folder)
-                    .iter()
-                    .flatten()
-                    .any(|f| forms(source).iter().flatten().any(|s| f.starts_with(s) || s.starts_with(f)));
-                if nested {
-                    return Err(Error::Inside);
-                }
-            }
-            let dir = Path::new(&folder);
-            let others = std::fs::read_dir(dir).is_ok_and(|mut entries| entries.next().is_some());
-            if others && !dir.join("config").is_file() {
-                return Err(Error::NotEmpty { folder });
-            }
-        }
-        Ok(())
+        let mut folders = <Role as strum::IntoEnumIterator>::iter().filter_map(|role| self.folder(role));
+        folders.find_map(|folder| refused_folder(&folder, &sources)).map_or(Ok(()), Err)
     }
+}
+
+/// Why backups cannot go to `folder`: it is inside one of `sources` or holds one, or it holds other files.
+#[cfg(feature = "server")]
+#[expect(clippy::disallowed_methods, reason = "looks at what the folder holds")]
+pub(crate) fn refused_folder(folder: &str, sources: &[String]) -> Option<Error> {
+    use std::path::{Path, PathBuf};
+    // As written and as the disk resolves it, up to its nearest folder that exists: `/tmp` is a link to
+    // `/private/tmp` on macOS, and `/users/new` is `/Users/new` on a disk that ignores case.
+    let resolved = |p: &Path| -> Option<PathBuf> {
+        let base = p.ancestors().find_map(|a| Some((a, a.canonicalize().ok()?)))?;
+        Some(base.1.join(p.strip_prefix(base.0).ok()?))
+    };
+    let forms = |p: &str| [Some(Path::new(p).to_path_buf()), resolved(Path::new(p))];
+    let nested = |source: &String| {
+        forms(folder)
+            .iter()
+            .flatten()
+            .any(|f| forms(source).iter().flatten().any(|s| f.starts_with(s) || s.starts_with(f)))
+    };
+    if sources.iter().any(nested) {
+        return Some(Error::Inside);
+    }
+    let dir = Path::new(folder);
+    let others = std::fs::read_dir(dir).is_ok_and(|mut entries| entries.next().is_some());
+    (others && !dir.join("config").is_file()).then(|| Error::NotEmpty { folder: folder.to_owned() })
 }
 
 /// The folder the form saves to, if this process may write in it.
