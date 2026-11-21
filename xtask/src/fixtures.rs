@@ -170,7 +170,7 @@ fn capture(sb: &Sandbox, docs: &str) -> Result<Vec<(&'static str, String)>> {
 
     let source = format!("{ROOT}/src/docs");
     let mut files = vec![
-        ("backup.stdout", backup),
+        ("backup.stdout", last_progress_only(&backup)),
         ("snapshots.stdout", snapshots),
         // A copy has its own id, and the original's in `original`.
         ("snapshots-copied.stdout", sb.stdout_of("u", &["snapshots", "--json"])?),
@@ -259,6 +259,15 @@ fn anonymize(sb: &Sandbox, dir: &str, files: &mut [(&'static str, String)]) -> R
         *text = lines.join("\n") + if out.ends_with('\n') { "\n" } else { "" };
     }
     Ok(())
+}
+
+/// A backup's JSON lines with only the last progress line, which is at 100%. How many come before it, and how far
+/// each got, depends on timing.
+fn last_progress_only(out: &str) -> String {
+    let progress = |line: &str| line.contains(r#""message_type":"status""#);
+    let last = out.lines().enumerate().filter(|&(_, line)| progress(line)).last().map(|(i, _)| i);
+    let lines = out.lines().enumerate().filter(|&(i, line)| !progress(line) || Some(i) == last);
+    lines.map(|(_, line)| format!("{line}\n")).collect()
 }
 
 /// Oldest first.
