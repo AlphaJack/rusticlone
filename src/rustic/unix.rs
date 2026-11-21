@@ -1,6 +1,7 @@
 //! How rustic names paths in a snapshot's tree on Unix.
 
-/// Rustic's paths in a snapshot's tree, which it prints in `{:?}` form: with `/` between their parts here.
+/// Rustic's paths in a snapshot's tree, which it prints escaped, in `{:?}` form or as JSON: with `/` between their
+/// parts here.
 #[cfg(feature = "server")]
 pub(super) fn with_slashes(stdout: &str) -> std::borrow::Cow<'_, str> {
     stdout.into()

@@ -185,7 +185,7 @@ fn capture(sb: &Sandbox, docs: &str) -> Result<Vec<(&'static str, String)>> {
             "forget.stdout",
             sb.stdout(&["forget", "--json", "--dry-run", "--keep-last", "1", "--filter-paths-exact", &source])?,
         ),
-        ("ls.stdout", sb.stdout(&["ls", "--long", "--recursive", first])?),
+        ("ls.stdout", sb.stdout(&["ls", "--json", "--long", "--recursive", first])?),
         ("find.stdout", sb.stdout(&["find", "--iglob=*b.txt*", "--filter-paths-exact", &source])?),
         // The same file in both snapshots: reported once for both.
         ("find-unchanged.stdout", sb.stdout(&["find", "--iglob=*link*", "--filter-paths-exact", &source])?),
@@ -232,7 +232,8 @@ fn anonymize(sb: &Sandbox, dir: &str, files: &mut [(&'static str, String)]) -> R
     let home = env::var("HOME").unwrap_or_default();
     for (name, text) in files {
         let mut out = text.replace(dir, ROOT);
-        if let Some(json) = stable_json(&out).ok().filter(|_| name.ends_with(".stdout")) {
+        let varying = if *name == "ls.stdout" { LISTED } else { STORED };
+        if let Some(json) = stable_json(&out, varying).ok().filter(|_| name.ends_with(".stdout")) {
             out = json;
         }
         for (value, fixed) in &random {
@@ -275,48 +276,53 @@ fn snapshot_ids(json: &str) -> Result<Vec<String>> {
     Ok(snapshots.into_iter().map(|(_, id)| id).collect())
 }
 
-/// Replaces what varies between recordings with fixed values: tree ids, the time and duration of a
-/// backup, and sizes after compression and encryption. JSON lines stay single lines.
-fn stable_json(text: &str) -> Result<String> {
-    const VARYING: &[&str] = &[
-        "tree",
-        "backup_start",
-        "backup_end",
-        "backup_duration",
-        "total_duration",
-        "seconds_elapsed",
-        "total_dirsize_processed",
-        "data_added",
-        "data_added_packed",
-        "data_added_files",
-        "data_added_files_packed",
-        "data_added_trees",
-        "data_added_trees_packed",
-        "size",
-        "data_size",
-        "min_size",
-        "max_size",
-    ];
-    fn stable(value: &mut serde_json::Value) {
+/// What varies between recordings of a repository: tree ids, the time and duration of a backup, and sizes after
+/// compression and encryption.
+const STORED: &[&str] = &[
+    "tree",
+    "backup_start",
+    "backup_end",
+    "backup_duration",
+    "total_duration",
+    "seconds_elapsed",
+    "total_dirsize_processed",
+    "data_added",
+    "data_added_packed",
+    "data_added_files",
+    "data_added_files_packed",
+    "data_added_trees",
+    "data_added_trees_packed",
+    "size",
+    "data_size",
+    "min_size",
+    "max_size",
+];
+
+/// What varies between recordings of a listing: what `touch` cannot set, the user's ids and names, and extended
+/// attributes such as a container's security labels.
+const LISTED: &[&str] = &["atime", "ctime", "inode", "device", "uid", "gid", "user", "group", "extended_attributes"];
+
+/// Replaces the `varying` keys with fixed values. JSON lines stay single lines.
+fn stable_json(text: &str, varying: &[&str]) -> Result<String> {
+    fn stable(value: &mut serde_json::Value, varying: &[&str]) {
         match value {
             serde_json::Value::Object(map) => {
                 for (key, value) in map.iter_mut() {
-                    if !VARYING.contains(&key.as_str()) {
-                        stable(value);
+                    if !varying.contains(&key.as_str()) {
+                        stable(value, varying);
                         continue;
                     }
                     *value = match value {
                         serde_json::Value::Number(_) => 1000.into(),
                         serde_json::Value::String(_) if key == "tree" => "0".repeat(64).into(),
+                        serde_json::Value::String(_) if key == "user" || key == "group" => "me".into(),
                         serde_json::Value::String(_) => "2026-10-15T13:20:00+00:00".into(),
-                        serde_json::Value::Null
-                        | serde_json::Value::Bool(_)
-                        | serde_json::Value::Array(_)
-                        | serde_json::Value::Object(_) => continue,
+                        serde_json::Value::Array(_) => serde_json::Value::Array(Vec::new()),
+                        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Object(_) => continue,
                     };
                 }
             }
-            serde_json::Value::Array(items) => items.iter_mut().for_each(stable),
+            serde_json::Value::Array(items) => items.iter_mut().for_each(|item| stable(item, varying)),
             serde_json::Value::Null
             | serde_json::Value::Bool(_)
             | serde_json::Value::Number(_)
@@ -324,13 +330,13 @@ fn stable_json(text: &str) -> Result<String> {
         }
     }
     if let Ok(mut value) = serde_json::from_str::<serde_json::Value>(text) {
-        stable(&mut value);
+        stable(&mut value, varying);
         return Ok(serde_json::to_string_pretty(&value)? + "\n");
     }
     let mut lines = Vec::new();
     for line in text.lines() {
         let mut value: serde_json::Value = serde_json::from_str(line)?;
-        stable(&mut value);
+        stable(&mut value, varying);
         lines.push(serde_json::to_string(&value)?);
     }
     Ok(lines.join("\n") + "\n")
