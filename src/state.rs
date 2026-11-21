@@ -38,8 +38,8 @@ use anyhow::Result;
 use jiff::Timestamp;
 use parking_lot::Mutex;
 use redb::{
-    ConcurrencyMode, Database, DatabaseError, ReadOnlyDatabase, ReadTransaction, ReadableDatabase, ReadableTable,
-    StorageError, TableDefinition, WriteTransaction,
+    ConcurrencyMode, Database, DatabaseError, Legacy, ReadOnlyDatabase, ReadTransaction, ReadableDatabase,
+    ReadableTable, StorageError, TableDefinition, WriteTransaction,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
@@ -139,8 +139,9 @@ tables! {
     /// The paths rustic records for sources that hooks create, by profile and `sources`, as JSON.
     HOOKED_PATHS: (&str, &str) => &str = "hooked_paths";
     /// How many writes changed each collection, and all of them (`None`), so that the server re-renders only
-    /// the pages that show a change, also when another process made it.
-    CHANGES: Option<&str> => u64 = "changes";
+    /// the pages that show a change, also when another process made it. In redb 4's encoding of `Option`, which
+    /// state files already have.
+    CHANGES: Option<Legacy<&str>> => u64 = "changes";
 }
 
 /// What a write changes of what the web UI shows.
