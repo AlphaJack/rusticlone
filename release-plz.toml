@@ -32,6 +32,10 @@ git_release_body = """
 {%- endif %}
 """
 
+[[package]]
+name = "xtask"
+release = false
+
 [changelog]
 header = """
 # Changelog
