@@ -32,6 +32,11 @@ git_release_body = """
 {%- endif %}
 """
 
+# The workspace's own tooling, which is never released. With a second package, `version` is undefined in `pr_name`.
+[[package]]
+name = "xtask"
+release = false
+
 [changelog]
 header = """
 # Changelog
