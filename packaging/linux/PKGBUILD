@@ -11,7 +11,7 @@ pkgdesc="Scheduled 3-2-1-1-0 backups for desktops and servers built on rustic pr
 arch=('x86_64' 'aarch64')
 url="https://github.com/AlphaJack/rusticlone"
 license=('AGPL-3.0-or-later')
-depends=('rustic')
+depends=('rustic>=0.12')
 optdepends=('rclone: use rclone remotes for rustic repositories')
 provides=("$_name")
 conflicts=("$_name")

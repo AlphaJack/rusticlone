@@ -94,6 +94,8 @@ mod tests {
             ],
         );
         assert!(super::desktop_entry(r#"/a b/c"d%"#).contains(r#"Exec="/a b/c\\"d%%" serve --open"#));
+        let tested = format!("depends=('rustic>={}.{}')", crate::rustic::TESTED.major, crate::rustic::TESTED.minor);
+        assert!(pkgbuild().contains(&tested), "the release that the tests run, or later");
     }
 
     /// The Chocolatey package of the Windows archive that dist builds.
@@ -253,7 +255,7 @@ pkgdesc="{description}"
 arch=({arch})
 url="{url}"
 license=('{license}')
-depends=('rustic')
+depends=('rustic>={major}.{minor}')
 optdepends=('rclone: use rclone remotes for rustic repositories')
 provides=("$_name")
 conflicts=("$_name")
@@ -283,6 +285,9 @@ package(){{
 }}
 "#,
             name = crate::NAME,
+            // Older releases are refused.
+            major = crate::rustic::TESTED.major,
+            minor = crate::rustic::TESTED.minor,
             description = env!("CARGO_PKG_DESCRIPTION"),
             url = env!("CARGO_PKG_REPOSITORY"),
             license = env!("CARGO_PKG_LICENSE"),

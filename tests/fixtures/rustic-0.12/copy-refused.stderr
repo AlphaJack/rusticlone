@@ -6,3 +6,4 @@
 [INFO] repository local:/fixture/target: password is correct.
 [INFO] using no cache
 [ERROR] error copying to target: cannot copy to repository with different chunker parameter (re-chunking not implemented)!
+error: Copying failed for at least one target!

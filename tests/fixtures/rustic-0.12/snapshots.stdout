@@ -1,0 +1,97 @@
+[
+  {
+    "group_key": {
+      "hostname": "host",
+      "label": "",
+      "paths": [
+        "/fixture/src/docs"
+      ]
+    },
+    "snapshots": [
+      {
+        "gid": 0,
+        "hostname": "host",
+        "id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "original": "1111111111111111111111111111111111111111111111111111111111111111",
+        "paths": [
+          "/fixture/src/docs"
+        ],
+        "program_version": "rustic 0.12.0",
+        "summary": {
+          "backup_duration": 1000,
+          "backup_end": "2026-10-15T13:20:00+00:00",
+          "backup_start": "2026-10-15T13:20:00+00:00",
+          "command": "rustic --no-cache -P a backup --time 2026-10-15 13:20:00+0000",
+          "data_added": 1000,
+          "data_added_files": 1000,
+          "data_added_files_packed": 1000,
+          "data_added_packed": 1000,
+          "data_added_trees": 1000,
+          "data_added_trees_packed": 1000,
+          "data_blobs": 2,
+          "dirs_changed": 0,
+          "dirs_new": 6,
+          "dirs_unmodified": 0,
+          "files_changed": 0,
+          "files_new": 3,
+          "files_unmodified": 0,
+          "total_bytes_processed": 8,
+          "total_dirs_processed": 6,
+          "total_dirsize_processed": 1000,
+          "total_duration": 1000,
+          "total_files_processed": 3,
+          "tree_blobs": 6
+        },
+        "tags": [],
+        "time": "2026-10-15T13:20:00+00:00",
+        "tree": "0000000000000000000000000000000000000000000000000000000000000000",
+        "uid": 0,
+        "username": ""
+      },
+      {
+        "gid": 0,
+        "hostname": "host",
+        "id": "2222222222222222222222222222222222222222222222222222222222222222",
+        "original": "2222222222222222222222222222222222222222222222222222222222222222",
+        "parent": "1111111111111111111111111111111111111111111111111111111111111111",
+        "parents": [
+          "1111111111111111111111111111111111111111111111111111111111111111"
+        ],
+        "paths": [
+          "/fixture/src/docs"
+        ],
+        "program_version": "rustic 0.12.0",
+        "summary": {
+          "backup_duration": 1000,
+          "backup_end": "2026-10-15T13:20:00+00:00",
+          "backup_start": "2026-10-15T13:20:00+00:00",
+          "command": "rustic --no-cache -P a --json-progress --progress-interval 1s backup --json --time 2026-10-16 09:00:00+0000",
+          "data_added": 1000,
+          "data_added_files": 1000,
+          "data_added_files_packed": 1000,
+          "data_added_packed": 1000,
+          "data_added_trees": 1000,
+          "data_added_trees_packed": 1000,
+          "data_blobs": 2,
+          "dirs_changed": 5,
+          "dirs_new": 0,
+          "dirs_unmodified": 1,
+          "files_changed": 1,
+          "files_new": 1,
+          "files_unmodified": 1,
+          "total_bytes_processed": 15,
+          "total_dirs_processed": 6,
+          "total_dirsize_processed": 1000,
+          "total_duration": 1000,
+          "total_files_processed": 3,
+          "tree_blobs": 5
+        },
+        "tags": [],
+        "time": "2026-10-16T09:00:00+00:00",
+        "tree": "0000000000000000000000000000000000000000000000000000000000000000",
+        "uid": 0,
+        "username": ""
+      }
+    ]
+  }
+]

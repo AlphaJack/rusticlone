@@ -19,14 +19,19 @@ struct Sandbox {
 }
 
 impl Sandbox {
-    fn rustic(&self, profile: &str, args: &[&str]) -> Result<Output> {
+    /// Rustic's output, whatever its exit.
+    fn exec(&self, profile: &str, args: &[&str]) -> Result<Output> {
         let mut cmd = Command::new("rustic");
         cmd.args(["--no-cache", "-P", profile]).args(args).current_dir(&self.dir).env("TZ", "UTC").env("NO_COLOR", "1");
         // As the engine runs it: progress only when requested, as JSON.
         if !args.contains(&"--json-progress") {
             cmd.env("RUSTIC_NO_PROGRESS", "true");
         }
-        let out = cmd.output().context("cannot run rustic")?;
+        cmd.output().context("cannot run rustic")
+    }
+
+    fn rustic(&self, profile: &str, args: &[&str]) -> Result<Output> {
+        let out = self.exec(profile, args)?;
         if !out.status.success() {
             bail!("rustic {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr));
         }
@@ -41,20 +46,9 @@ impl Sandbox {
         Ok(String::from_utf8(self.rustic(profile, args)?.stdout)?)
     }
 
-    fn stderr(&self, args: &[&str]) -> Result<String> {
-        Ok(String::from_utf8(self.rustic("a", args)?.stderr)?)
-    }
-
     /// The log of a command that must fail.
     fn failing(&self, args: &[&str]) -> Result<String> {
-        let out = Command::new("rustic")
-            .args(["--no-cache", "-P", "a"])
-            .args(args)
-            .current_dir(&self.dir)
-            .env("TZ", "UTC")
-            .env("NO_COLOR", "1")
-            .env("RUSTIC_NO_PROGRESS", "true")
-            .output()?;
+        let out = self.exec("a", args)?;
         if out.status.success() {
             bail!("rustic {} succeeded", args.join(" "));
         }
@@ -176,7 +170,7 @@ fn capture(sb: &Sandbox, docs: &str) -> Result<Vec<(&'static str, String)>> {
 
     let source = format!("{ROOT}/src/docs");
     let mut files = vec![
-        ("backup.stdout", backup),
+        ("backup.stdout", last_progress_only(&backup)),
         ("snapshots.stdout", snapshots),
         // A copy has its own id, and the original's in `original`.
         ("snapshots-copied.stdout", sb.stdout_of("u", &["snapshots", "--json"])?),
@@ -203,10 +197,13 @@ fn capture(sb: &Sandbox, docs: &str) -> Result<Vec<(&'static str, String)>> {
     ];
     sb.file("src/docs/secret", "secret")?;
     sb.run("chmod", &["000", "src/docs/sub", "src/docs/secret"])?;
-    files.push(("backup-skipped.stderr", sb.stderr(&["backup", "--time", "2026-10-17 09:00:00+0000"])?));
+    // Rustic saves the snapshot and exits 3. With JSON progress, as the engine runs it, it reports each
+    // unreadable item as a JSON line.
+    let skipped =
+        ["--json-progress", "--progress-interval", "1h", "backup", "--json", "--time", "2026-10-17 09:00:00+0000"];
+    files.push(("backup-skipped.stderr", sb.failing(&skipped)?));
     sb.run("chmod", &["700", "src/docs/sub", "src/docs/secret"])?;
-    // Rustic exits 0 even so.
-    files.push(("copy-refused.stderr", sb.stderr(&["copy", "--target", "t"])?));
+    files.push(("copy-refused.stderr", sb.failing(&["copy", "--target", "t"])?));
     // An unreadable file: its path in the context, and the system's reason as the cause.
     sb.run("chmod", &["000", &format!("repo/snapshots/{first}")])?;
     files.push(("unreadable.stderr", sb.failing(&["snapshots", "--json"])?));
@@ -262,6 +259,15 @@ fn anonymize(sb: &Sandbox, dir: &str, files: &mut [(&'static str, String)]) -> R
         *text = lines.join("\n") + if out.ends_with('\n') { "\n" } else { "" };
     }
     Ok(())
+}
+
+/// A backup's JSON lines with only the last progress line, which is at 100%. How many come before it, and how far
+/// each got, depends on timing.
+fn last_progress_only(out: &str) -> String {
+    let progress = |line: &str| line.contains(r#""message_type":"status""#);
+    let last = out.lines().enumerate().filter(|&(_, line)| progress(line)).last().map(|(i, _)| i);
+    let lines = out.lines().enumerate().filter(|&(i, line)| !progress(line) || Some(i) == last);
+    lines.map(|(_, line)| format!("{line}\n")).collect()
 }
 
 /// Oldest first.
