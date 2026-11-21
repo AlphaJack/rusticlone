@@ -1,6 +1,7 @@
 //! Opening a page of the web UI, or a folder, on the desktop of the user who runs the server.
 //!
-//! Each system's way to open them is in a file of its own, used as `imp`.
+//! Each system's way to open them, and to select a file in the file manager, is in a file of its own, used as
+//! `imp`.
 
 #[cfg(not(feature = "desktop"))]
 mod headless;
@@ -35,6 +36,12 @@ pub(super) fn open_on_desktop(target: &str) -> bool {
 /// Whether `target` is a page rather than a folder.
 fn is_page(target: &str) -> bool {
     target.starts_with("http://") || target.starts_with("https://")
+}
+
+/// Whether the file manager showed `file` selected in its folder. Where it does not, as on a Linux desktop without
+/// the `FileManager1` service, it opens the folder.
+pub(crate) async fn reveal_on_desktop(file: &std::path::Path) -> bool {
+    imp::reveal(file).await || file.parent().is_some_and(|dir| open_on_desktop(&dir.display().to_string()))
 }
 
 #[cfg(test)]

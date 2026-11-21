@@ -59,6 +59,17 @@ fn encoded(path: &str) -> String {
         .collect()
 }
 
+/// The file manager's window of the folder, with `file` selected.
+pub(super) async fn reveal(file: &std::path::Path) -> bool {
+    let show = async {
+        let bus = zbus::Connection::session().await?;
+        let fm = "org.freedesktop.FileManager1";
+        let items = vec![format!("file://{}", encoded(&file.to_string_lossy()))];
+        bus.call_method(Some(fm), "/org/freedesktop/FileManager1", Some(fm), "ShowItems", &(items, "")).await
+    };
+    show.await.is_ok()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
