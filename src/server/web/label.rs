@@ -122,6 +122,8 @@ pub(super) enum Label<'a> {
     /// In place of a computer's name, which the system cannot tell.
     ThisComputer,
     Unknown,
+    AllFolders,
+    ASubfolder,
     Error,
     /// What `app.js` shows: the live dot's states.
     Live,
@@ -238,5 +240,6 @@ pub(super) enum Hint<'a> {
     NameOrPath,
     WhereItWas,
     Now,
+    SubfolderExample,
     Notify,
 }
