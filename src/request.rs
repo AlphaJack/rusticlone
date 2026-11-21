@@ -174,7 +174,7 @@ pub(crate) fn parse_at(s: &str) -> Result<Timestamp, NoTime> {
             .parse::<jiff::civil::DateTime>()
             .map_err(|source| NoTime { time: s.to_owned(), source })?,
     };
-    (jiff::tz::TimeZone::system().to_ambiguous_zoned(dt).compatible())
+    (jiff::tz::TimeZone::system().to_ambiguous_zoned_datetime(dt).compatible())
         .map(|z| z.timestamp())
         .map_err(|source| NoTime { time: s.to_owned(), source })
 }

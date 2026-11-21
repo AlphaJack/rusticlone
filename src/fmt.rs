@@ -43,7 +43,7 @@ pub(crate) fn human_age(since: Timestamp, now: Timestamp) -> String {
         crate::clock::changes_at(since + SignedDuration::from_mins(1));
         return Age::UnderAMinute.to_string();
     }
-    let (since, now) = (since.to_zoned(TimeZone::system()), now.to_zoned(TimeZone::system()));
+    let (since, now) = (since.to_zoned_datetime(TimeZone::system()), now.to_zoned_datetime(TimeZone::system()));
     let truncate = SpanRound::new().smallest(Unit::Minute).mode(RoundMode::Trunc).relative(&since);
     match since.until((Unit::Year, &now)).and_then(|span| span.round(truncate)) {
         Ok(span) => {
@@ -57,7 +57,7 @@ pub(crate) fn human_age(since: Timestamp, now: Timestamp) -> String {
 }
 
 /// When an age of `span` since `since`, shown in its largest unit, shows one more of it.
-fn turns_over(since: &jiff::Zoned, span: Span) -> Option<Timestamp> {
+fn turns_over(since: &jiff::ZonedDateTime, span: Span) -> Option<Timestamp> {
     let one_more = |n: i64| n.checked_add(1).unwrap_or(n);
     let next = match (span.get_years(), span.get_months(), span.get_days(), span.get_hours()) {
         (y, ..) if y != 0 => Span::new().try_years(one_more(y.into())),
@@ -83,13 +83,13 @@ pub(crate) fn capitalized(text: &str) -> String {
 
 /// `2026-10-22 11:03`, in local time.
 pub(crate) fn local(t: Timestamp) -> String {
-    t.to_zoned(TimeZone::system()).strftime("%Y-%m-%d %H:%M").to_string()
+    t.to_zoned_datetime(TimeZone::system()).strftime("%Y-%m-%d %H:%M").to_string()
 }
 
 /// `11:03:42`, in local time.
 #[cfg(feature = "server")]
 pub(crate) fn local_time(t: Timestamp) -> String {
-    t.to_zoned(TimeZone::system()).strftime("%H:%M:%S").to_string()
+    t.to_zoned_datetime(TimeZone::system()).strftime("%H:%M:%S").to_string()
 }
 
 /// Whether a URI keeps `b` as it is: a letter, a digit, `/` or `-._~`.
@@ -136,7 +136,7 @@ mod tests {
             let (_, next) = crate::clock::next_change(|| human_age(since, now));
             assert_eq!(
                 next,
-                Some(since.to_zoned(TimeZone::system()).checked_add(span).unwrap().timestamp()),
+                Some(since.to_zoned_datetime(TimeZone::system()).checked_add(span).unwrap().timestamp()),
                 "{ago} days"
             );
         };
