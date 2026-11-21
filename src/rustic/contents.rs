@@ -39,7 +39,7 @@ pub(super) fn dirs(listing: &str) -> Dirs {
             _ => NodeKind::File,
         };
         let mtime = jiff::civil::DateTime::strptime("%d %b %Y %H:%M", time.join(" ")).ok();
-        let mtime = mtime.and_then(|t| t.to_zoned(jiff::tz::TimeZone::UTC).ok()).map(|t| t.timestamp());
+        let mtime = mtime.and_then(|t| t.to_zoned_datetime(jiff::tz::TimeZone::UTC).ok()).map(|t| t.timestamp());
         let (parent, name) = path.rsplit_once('/').unwrap_or(("", &path));
         let node = Node { name: name.to_owned(), kind, size: size.parse().unwrap_or(0), mtime };
         dirs.entry(parent.to_owned()).or_default().push(node);
