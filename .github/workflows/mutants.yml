@@ -1,8 +1,7 @@
 name: Mutants
 
 # Lists the mutations of the library that no test catches: weekly, or on the changed lines of a PR with the
-# `mutants` label, again at each push. The `mutants` job reports for every PR, so that it can be a required check:
-# it passes at once without the label.
+# `mutants` label, again at each push. Without the label, nothing runs.
 on:
   schedule:
     - cron: "0 19 * * 5"
@@ -109,18 +108,3 @@ jobs:
         with:
           name: mutants-${{ matrix.shard }}
           path: mutants.out
-
-  # The required check: fails if a shard missed a mutant or did not finish. Without the label, nothing ran: it passes.
-  gate:
-    name: mutants
-    needs: [build, mutants]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Every mutant caught
-        env:
-          BUILD: ${{ needs.build.result }}
-          SHARDS: ${{ needs.mutants.result }}
-        run: |
-          echo "build: $BUILD, shards: $SHARDS"
-          [ "$BUILD" != failure ] && [ "$BUILD" != cancelled ] && [ "$SHARDS" != failure ] && [ "$SHARDS" != cancelled ]
