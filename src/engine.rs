@@ -17,6 +17,8 @@ mod snapshots;
 mod status;
 #[cfg(test)]
 mod tests;
+#[cfg(feature = "server")]
+pub(crate) mod waiting;
 
 pub(crate) use collection::{Blocked, Collection};
 use holds::Use;
@@ -335,6 +337,9 @@ pub(crate) struct Engine {
     /// What the command line names. Nothing named: every collection.
     pub named: Named,
     tz: TimeZone,
+    /// What scheduled runs may wait for.
+    #[cfg(feature = "server")]
+    pub conditions: &'static dyn crate::sys::Conditions,
 }
 
 impl Engine {

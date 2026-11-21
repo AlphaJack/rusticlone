@@ -7,6 +7,8 @@ use std::sync::LazyLock;
 
 #[cfg(feature = "server")]
 mod awake;
+#[cfg(feature = "server")]
+mod conditions;
 mod disk;
 mod hash;
 mod paths;
@@ -31,6 +33,8 @@ use windows as os;
 
 #[cfg(feature = "server")]
 pub(crate) use awake::stay_awake;
+#[cfg(feature = "server")]
+pub(crate) use conditions::{Conditions, ThisComputer, watch_conditions};
 pub(crate) use {disk::*, hash::*, os::*, paths::*};
 
 /// The longest host name, with its NUL.
