@@ -62,7 +62,7 @@ clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
 ctrlc = { version = "3.5.2", features = ["termination"] }
 dunce = "1.0.5"
 etcetera = "0.11.0"
-jiff = { version = "0.2.38", features = ["serde"] }
+jiff = { version = "1.0.0", features = ["serde"] }
 mercurio = { version = "0.2.5", default-features = false, features = [
     "transport-blocking",
     "bundle-certificates",
