@@ -84,7 +84,7 @@ mercurio = { version = "0.2.5", default-features = false, features = [
     "service-windows",
     "service-xml",
 ] }
-redb = { version = "4.4.0", features = ["experimental-multiprocess"] }
+redb = "5.0.0"
 # kqueue on macOS: FSEvents reports another process's writes to the state late or not at all, so a cancelled run kept waiting.
 notify = { version = "9.0.0", default-features = false, features = ["macos_kqueue"] }
 parking_lot = "0.13.0"
