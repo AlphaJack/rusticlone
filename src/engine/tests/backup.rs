@@ -106,3 +106,20 @@ fn a_backup_is_held_back_for_the_sources_it_would_empty() {
     let failed = BackupPlan { snapshots: Vec::new(), not_backed_up: vec![("docs,other".into(), "gone".into())] };
     assert_eq!(crate::engine::backup::emptied(&both, &failed), ["/docs"]);
 }
+
+/// A snapshot that rustic records with other paths than the sources resolve to would be found by no copy or
+/// restore: the backup fails.
+#[test]
+fn a_snapshot_that_matches_no_source_fails_the_backup() {
+    let replay = Replay::new()
+        .ok("Docs", &["cat", "config"], &recorded("cat-config.stdout"))
+        .ok("Docs", &["snapshots", "--json"], &recorded("snapshots.stdout"))
+        .ok("Docs", &["backup", "--json"], &recorded("backup.stdout"))
+        .ok("Docs", &["cat", "snapshot"], &recorded("cat-snapshot.stdout"));
+    let engine = engine_with("unexpected-paths", &replay, &DOCS.replace("/fixture/src/docs", "/elsewhere"));
+    let collections = engine.collections();
+    let report = asked(&engine, &collections[0], &Request::Backup);
+    let said: Vec<String> = report.results.iter().map(ToString::to_string).collect();
+    assert!(said.iter().any(|l| l.contains("but the sources resolve to {\"/elsewhere\"}")), "{said:?}");
+    assert!(replay.unused().is_empty(), "never asked: {:?}", replay.unused());
+}

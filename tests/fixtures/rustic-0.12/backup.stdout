@@ -1,0 +1,2 @@
+{"bytes_done":15,"error_count":0,"message_type":"status","percent_done":1.0,"seconds_elapsed":1000,"total_bytes":15}
+{"data_added":1000,"data_added_packed":1000,"data_blobs":2,"dirs_changed":5,"dirs_new":0,"dirs_unmodified":1,"files_changed":1,"files_new":1,"files_unmodified":1,"message_type":"summary","snapshot_id":"2222222222222222222222222222222222222222222222222222222222222222","total_bytes_processed":15,"total_duration":1000,"total_files_processed":3,"tree_blobs":5}

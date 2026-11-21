@@ -78,11 +78,13 @@ pub(crate) struct Output {
 }
 
 /// The parts of rustic's log that are read: `[WARN]` and `[ERROR]` entries with their
-/// continuation lines, and the explanation of a failure (the line after `Message:`, else the
-/// `error:` line).
+/// continuation lines, and the explanation of a failure: the line after `Message:` in rustic's final report.
 #[derive(Default)]
 pub(super) struct Log {
     error: Option<String>,
+    /// The final `error:` line. It may only say that something failed, such as `Copying failed for at least one
+    /// target!`, which an `[ERROR]` entry explains.
+    last: Option<String>,
     /// Details of the error: `- path: ...` and similar lines, and its cause.
     context: Vec<String>,
     cause: Option<String>,
@@ -92,8 +94,23 @@ pub(super) struct Log {
     errors: Vec<String>,
     /// `[INFO]` entries, where some commands report what they did.
     info: Vec<String>,
+    /// What a backup could not read, from `--json-progress`.
+    unread: Vec<Unread>,
     /// The entry that an unmarked line continues.
     continued: Option<Entry>,
+}
+
+/// An item that a backup could not read, as `--json-progress` reports it on its own line.
+#[derive(Deserialize)]
+#[serde(tag = "message_type", rename = "error")]
+struct Unread {
+    item: String,
+    error: Said,
+}
+
+#[derive(Deserialize)]
+struct Said {
+    message: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -112,6 +129,12 @@ enum Entry {
 impl Log {
     pub(super) fn line(&mut self, line: &str) {
         let line = line.trim().to_owned();
+        // A JSON line, such as an unreadable item, ends the entry before it.
+        if line.starts_with('{') {
+            self.unread.extend(serde_json::from_str(&line).ok());
+            self.continued = None;
+            return;
+        }
         if let Some(rest) = line.strip_prefix("[WARN] ") {
             self.warnings.push(rest.to_owned());
             self.continued = Some(Entry::Warning);
@@ -134,6 +157,10 @@ impl Log {
             entry.push('\n');
             entry.push_str(&line);
         }
+        // An entry's report is the entry's own, not the explanation of the command's failure.
+        if self.continued.is_some() {
+            return;
+        }
         match (self.section, line.as_str()) {
             (_, "Message:") => self.section = Some(Section::Message),
             (_, "Context:") => self.section = Some(Section::Context),
@@ -146,8 +173,8 @@ impl Log {
             (Some(Section::Cause), _) => (self.cause, self.section) = (Some(line), None),
             (_, _) => {
                 self.section = None;
-                if let Some(e) = line.strip_prefix("error:").filter(|_| self.error.is_none()) {
-                    self.error = Some(e.trim().to_owned());
+                if let Some(e) = line.strip_prefix("error:") {
+                    self.last = Some(e.trim().to_owned());
                 }
             }
         }
@@ -161,13 +188,8 @@ impl Log {
     }
 }
 
-/// Rustic's warning when a backup cannot read an item.
-const IGNORED: &str = "ignoring error";
 /// Rustic's warning when a backup cannot read the snapshot it compares with.
 const PARENT: &str = "ignoring error when loading parent tree";
-/// Rustic's warning when a file system has no extended attributes, as a container's mount of a macOS
-/// folder: the item is saved without them, so it is not left out.
-const XATTRS: &str = "Error getting xattrs";
 /// Rustic's error when a backup of one source fails: `error backing up <path>: <cause>`.
 const NOT_BACKED_UP: &str = "error backing up ";
 /// Rustic's cause when it cannot resolve a source's path.
@@ -176,6 +198,8 @@ const UNRESOLVED: &str = "error sanitizing source";
 const NO_TERMINAL: &str = "IO error: not a terminal";
 /// Rustic's sizes after a prune.
 const UNUSED: &str = "unused size after prune:";
+/// Rustic's exit code when a backup saved its snapshot without the items it could not read.
+pub(super) const INCOMPLETE: i32 = 3;
 /// Windows's errors for a file that another program holds open: a sharing or a lock violation.
 const IN_USE: [&str; 2] = ["(os error 32)", "(os error 33)"];
 
@@ -209,16 +233,20 @@ fn innermost(report: &str) -> String {
     }
 }
 
-/// The path in a warning, and its innermost cause without the OS error number, also from an error in
-/// Rust's debug form (`` `Os { code: 13, kind: PermissionDenied, message: "Permission denied" }` ``).
+/// The path in a warning, and its innermost cause.
 fn path_and_cause(warning: &str) -> Option<(String, String)> {
-    let path = first_path(warning)?;
-    let reason = warning.rsplit(": ").next().unwrap_or_default();
+    Some((first_path(warning)?, cause(warning)))
+}
+
+/// The innermost cause of an error without the OS error number, also from an error in Rust's debug form
+/// (`` `Os { code: 13, kind: PermissionDenied, message: "Permission denied" }` ``).
+fn cause(error: &str) -> String {
+    let reason = error.rsplit(": ").next().unwrap_or_default();
     let reason = match reason.strip_prefix('"').and_then(|r| r.split_once('"')) {
         Some((message, _)) => message,
         None => reason.split(" (os error").next().unwrap_or(reason),
     };
-    Some((path, reason.trim().to_owned()))
+    reason.trim().to_owned()
 }
 
 impl Output {
@@ -241,23 +269,23 @@ impl Output {
     }
 
     pub(crate) fn failure(&self) -> Failure {
-        let explained = self.stderr.explanation().filter(|_| !self.success);
+        let failed = !self.success;
+        let explained = self.stderr.explanation().filter(|_| failed);
         let said = explained.or_else(|| self.stderr.errors.last().map(|e| summary(e)));
+        let said = said.or_else(|| self.stderr.last.clone().filter(|_| failed));
         // Rustic asks for a missing password, which fails without a terminal.
         let said = said.map(|s| if s.contains(NO_TERMINAL) { t!("output-no-password") } else { s });
-        Failure { command: self.command.clone(), ended: (!self.success).then(|| self.ended()), said }
+        Failure { command: self.command.clone(), ended: failed.then(|| self.ended()), said }
     }
 
-    /// What a backup left out, and why. Rustic only logs it as `[WARN] ignoring error ...`, and saves the
-    /// snapshot anyway.
+    /// What a backup left out, and why. Rustic saves the snapshot anyway, and exits [`INCOMPLETE`].
     pub(crate) fn skipped(&self) -> Vec<(String, String)> {
         let mut skipped: Vec<(String, String)> = Vec::new();
-        let warnings = (self.stderr.warnings.iter())
-            .filter(|w| w.starts_with(IGNORED) && !w.starts_with(PARENT) && !w.contains(XATTRS));
-        for (warning, (path, reason)) in warnings.filter_map(|w| Some((w, path_and_cause(w)?))) {
-            let reason = if IN_USE.iter().any(|e| warning.contains(e)) { t!("output-in-use") } else { reason };
-            if !skipped.iter().any(|(p, _)| *p == path) {
-                skipped.push((path, reason));
+        for Unread { item, error } in &self.stderr.unread {
+            let said = &error.message;
+            let reason = if IN_USE.iter().any(|e| said.contains(e)) { t!("output-in-use") } else { cause(said) };
+            if !skipped.iter().any(|(p, _)| p == item) {
+                skipped.push((item.clone(), reason));
             }
         }
         skipped
@@ -401,13 +429,11 @@ mod tests {
         }
     }
 
-    /// As rustic 0.11 says it on Windows, in the language of the system.
+    /// As rustic 0.12 says it on Windows, in the language of the system.
     #[test]
     fn a_file_in_use_on_windows_is_skipped_with_what_to_do() {
-        let stderr = "[WARN] ignoring error: Error: Failed to open ReadSourceOpen at `C:\\Users\\me\\mail.pst`\n\
-             Failed to open file at `C:\\Users\\me\\mail.pst`. (kind: related to input/output operations): caused by: \
-             Der Prozess kann nicht auf die Datei zugreifen. (os error 32)\n";
-        let skipped = output("backup", stderr, true).skipped();
+        let stderr = r#"{"message_type":"error","error":{"message":"Error: Failed to open ReadSourceOpen at `C:\\Users\\me\\mail.pst`\nFailed to open file at `C:\\Users\\me\\mail.pst`. (kind: related to input/output operations): caused by: Der Prozess kann nicht auf die Datei zugreifen. (os error 32)"},"during":"archival","item":"C:\\Users\\me\\mail.pst"}"#;
+        let skipped = output("backup", stderr, false).skipped();
         assert_eq!(skipped, [(r"C:\Users\me\mail.pst".to_owned(), t!("output-in-use"))]);
         assert_eq!(first_path(r"at \\nas\share\a.txt: denied").as_deref(), Some(r"\\nas\share\a.txt"));
     }
@@ -415,18 +441,17 @@ mod tests {
     #[test]
     fn what_rustic_skipped_and_why() {
         for (_, stderr) in fixtures("backup-skipped.stderr") {
-            insta::assert_debug_snapshot!("backup_skipped", output("backup", &stderr, true).skipped());
+            insta::assert_debug_snapshot!("backup_skipped", output("backup", &stderr, false).skipped());
         }
     }
 
-    /// An item saved without extended attributes is not left out; an OS error in debug form gives its message.
+    /// An item saved without extended attributes is only a warning, which does not leave it out. An OS error in
+    /// debug form gives its message.
     #[test]
     fn missing_xattrs_are_not_skipped_items() {
-        let stderr = "[WARN] ignoring error obtaining xargs: Error getting xattrs for `\"/d/a\"`: `Os { code: 95, kind: \
-                      Unsupported, message: \"Not supported\" }`\n\
-                      [WARN] ignoring error: Failed to open `/d/b`: `Os { code: 13, kind: PermissionDenied, message: \
-                      \"Permission denied\" }`\n";
-        let skipped = output("backup", stderr, true).skipped();
+        let stderr = r#"[WARN] ignoring error obtaining xargs: Error getting xattrs for `"/d/a"`: `Os { code: 95, kind: Unsupported, message: "Not supported" }`
+{"message_type":"error","error":{"message":"Failed to open `/d/b`: `Os { code: 13, kind: PermissionDenied, message: \"Permission denied\" }`"},"during":"archival","item":"/d/b"}"#;
+        let skipped = output("backup", stderr, false).skipped();
         assert_eq!(skipped, [("/d/b".to_owned(), "Permission denied".to_owned())]);
     }
 
@@ -439,12 +464,14 @@ mod tests {
 
     #[test]
     fn failures_say_what_rustic_said() {
+        // The `[ERROR]` entry says why, where rustic's final error only says that the copy failed.
         for (_, stderr) in fixtures("copy-refused.stderr") {
-            insta::assert_snapshot!("copy_refused", output("copy", &stderr, true).failure().to_string());
+            insta::assert_snapshot!("copy_refused", output("copy", &stderr, false).failure().to_string());
         }
         for (_, stderr) in fixtures("copy-unreachable.stderr") {
-            let said = output("copy", &stderr, true).failure().to_string();
-            assert!(said.contains("error copying to target: Path `config` does not exist."), "{said}");
+            let said = output("copy", &stderr, false).failure().to_string();
+            let why = "error copying to target: Checking for the presence of `config` in the backend failed.";
+            assert!(said.contains(why), "{said}");
             assert!(
                 !said.contains("We believe") && !said.contains("Backtrace") && !said.contains("rustic_core"),
                 "{said}"

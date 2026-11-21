@@ -268,8 +268,8 @@ x86_64-pc-windows-msvc = "windows-latest"
 rustic = { stage = ["run"] }
 
 [workspace.metadata.rustic]
-version = "v0.11.4"
-sha256 = "628b26785f3787fa1d52e61b3289493f483230a1ed6e86a84ae9c76d7a41a81e"
+version = "v0.12.0"
+sha256 = "c7dc0772bb6e81f9acdcd7c2642c076c99455b20e3a57b2dfc1b7caee0035184"
 
 # written by `cargo xtask vendor`: the npm package htmx.org, its checksum, and the files taken from it
 [workspace.metadata.htmx]

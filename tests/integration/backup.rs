@@ -109,14 +109,13 @@ fn what_a_backup_could_not_read_is_reported_until_it_can() {
     sb.run(&["collections"]).assert_exit(0).assert_no_result("skipped", json!({}));
 }
 
-/// Rustic records nested sources as the outer one only. Its snapshot matches none of the collection's
-/// sources, which no copy or restore would find: the backup fails and says how to fix the profile.
+/// Rustic records nested sources as they are written, so a folder and one inside it make one snapshot.
 #[test]
-fn a_snapshot_that_matches_no_source_fails_the_backup() {
+fn nested_sources_are_backed_up() {
     let sb = Sandbox::new();
     sb.backup_profile("Docs", &[&["docs", "docs/sub"]], &[], "");
     sb.write("docs/sub/a.txt", "a");
-    sb.run(&["backup", "--all"]).assert_exit(1).assert_result("failed", json!({})).assert_output("outside the others");
+    sb.run(&["backup", "--all"]).assert_exit(0);
 }
 
 /// A `[snapshot-filter]` that hides the new snapshot from listings would hide it from copies and restores.

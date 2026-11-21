@@ -1,5 +1,5 @@
 ---
 source: src/rustic/output.rs
-expression: "output(\"copy\", &stderr, true).failure().to_string()"
+expression: "output(\"copy\", &stderr, false).failure().to_string()"
 ---
-rustic copy exited 0 without doing it: error copying to target: cannot copy to repository with different chunker parameter (re-chunking not implemented)!
+rustic copy failed (exit 1): error copying to target: cannot copy to repository with different chunker parameter (re-chunking not implemented)!
