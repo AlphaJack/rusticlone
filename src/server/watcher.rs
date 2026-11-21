@@ -110,10 +110,12 @@ enum File<'a> {
 }
 
 /// What `path` is, in the profile folders `dirs` or under the state's `runs` folder. A file in a profile folder is
-/// a profile when it is `.toml`, or whenever the folder's listing changed.
+/// a profile when it is `.toml`, or whenever the folder's listing changed. kqueue reports a file added to a profile
+/// folder or removed from it as a change of the folder itself.
 fn changed<'a>(path: &'a Path, listing_changed: bool, dirs: &[PathBuf], runs: &Path) -> File<'a> {
-    if dirs.iter().any(|d| path.parent() == Some(d))
-        && (listing_changed || path.extension().is_some_and(|e| e == "toml"))
+    if dirs.iter().any(|d| path == d)
+        || dirs.iter().any(|d| path.parent() == Some(d))
+            && (listing_changed || path.extension().is_some_and(|e| e == "toml"))
     {
         return File::Profile;
     }
@@ -183,6 +185,7 @@ mod tests {
         let (toml, old, nested) =
             (profiles.join("Docs.toml"), profiles.join("Docs.toml.old"), profiles.join("old").join("Docs.toml"));
         assert_eq!(changed(&toml, false, &dirs, &runs), File::Profile);
+        assert_eq!(changed(profiles, false, &dirs, &runs), File::Profile, "a file added or removed");
         assert_eq!(changed(&old, false, &dirs, &runs), File::Other, "only its data changed");
         assert_eq!(changed(&old, true, &dirs, &runs), File::Profile, "renamed away");
         assert_eq!(changed(&nested, true, &dirs, &runs), File::Other, "below a profile folder");
