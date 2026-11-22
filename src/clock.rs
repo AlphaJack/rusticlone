@@ -87,6 +87,7 @@ impl Wakes {
     }
 
     /// Waits until a wake comes after `seen` wakes.
+    #[cfg(any(test, feature = "server"))]
     pub(crate) fn wait(&self, seen: u64) {
         let mut count = self.count.lock();
         self.woken.wait_while(&mut count, |n| *n == seen);
