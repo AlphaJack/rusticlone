@@ -20,7 +20,7 @@ fn server_runs_jobs_independently() {
     stdin_profile(&sb, "Slow", &cmd::until_exists(&release), &global_env(&[("BACKUP_CRON", "@daily")]));
     sb.scheduled_long_ago(&["check:Fast"]);
     let server = sb.server(&[]);
-    let slow_runs = || server.collection("Slow")["running"][0]["activities"][0].is_object();
+    let slow_runs = || server.collection("Slow")["running"][0]["activities"][0]["on"][0] == "Slow";
     wait_for(30, "Slow's backup to start", slow_runs);
     // Fast's check does not wait for Slow's backup.
     wait_for(30, "Fast's check", || server.collection("Fast")["primary"]["check"]["last_ok"].is_string());
