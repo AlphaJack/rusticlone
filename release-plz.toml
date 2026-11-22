@@ -74,7 +74,7 @@ body = """
 commit_parsers = [
     { message = "^feat", group = "added" },
     { message = "^fix", group = "fixed" },
-    { message = "^perf", group = "performance" },
+    { message = "^perf", group = "optimized" },
     { message = "^i18n", group = "translated" },
     # Other types are invisible to users, unless they break something.
     { message = "^[a-z]+(\\([^)]*\\))?!:", group = "changed" },
