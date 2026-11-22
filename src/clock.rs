@@ -92,6 +92,12 @@ impl Wakes {
         self.woken.wait_while(&mut count, |n| *n == seen);
     }
 
+    /// Waits until a wake comes after `seen` wakes, or for `at_most`.
+    pub(crate) fn wait_at_most(&self, seen: u64, at_most: Duration) {
+        let mut count = self.count.lock();
+        _ = self.woken.wait_while_for(&mut count, |n| *n == seen, at_most);
+    }
+
     /// Waits for `for_`, or until `stop` returns true when woken.
     pub(crate) fn sleep(&self, for_: Duration, stop: &dyn Fn() -> bool) {
         let (mut count, until) = (self.count.lock(), Instant::now() + for_);

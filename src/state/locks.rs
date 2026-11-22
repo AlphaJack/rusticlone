@@ -6,6 +6,7 @@ use std::{
     io::Write,
     path::PathBuf,
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -57,6 +58,11 @@ impl Drop for RepoLocks<'_> {
     }
 }
 
+/// How often a wait for a lock reads the state again. A change that another process makes, such as cancelling this run,
+/// wakes it through the state file's watcher, which can miss it: Windows may report the write late, or before the
+/// watch started.
+const RECHECK: Duration = Duration::from_secs(1);
+
 impl Store {
     /// Takes all `keys`, each with its mode and the name it is shown with. The first key is taken only after earlier requests for it (`behind` returns the
     /// lock of the run ahead, or fails to end the wait). While one key is busy, no other key is held, so
@@ -99,7 +105,7 @@ impl Store {
                 let file = self.lock_file(&key)?;
                 freed.insert(key, thread::spawn(move || lock_blocking(&file, mode).map(|()| clock::WAKES.wake())));
             }
-            clock::WAKES.wait(seen);
+            clock::WAKES.wait_at_most(seen, RECHECK);
         }
         Ok(RepoLocks::new(cx, held))
     }
@@ -172,7 +178,7 @@ pub(super) fn named(file: &File, name: &str) {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc, time::Duration};
+    use std::sync::mpsc;
 
     use super::*;
     use crate::state::tests::store;
@@ -225,6 +231,35 @@ mod tests {
             assert_eq!(cx.held().len(), one);
             drop(locks);
             assert!(cx.held().is_empty());
+        });
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A run cancelled while it waits stops waiting within a second, even when nothing wakes it.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
+    fn a_cancelled_wait_ends_without_a_wake() {
+        let store = store("lock-cancelled-test");
+        let (cx, ahead) = (Ctx::default(), store.lock_file("run:Docs:1").unwrap());
+        ahead.lock().unwrap();
+        let (told, waiting) = mpsc::channel();
+        let (cancelled, (ended, end)) = (std::sync::atomic::AtomicBool::new(false), mpsc::channel());
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                let behind = || match cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+                    true => Err(Error::Dequeued.into()),
+                    false => Ok(Some("run:Docs:1".to_owned())),
+                };
+                let waiting = |busy: &str| told.send(busy.to_owned()).unwrap();
+                ended
+                    .send(store.lock(&cx, &[("Docs", Mode::Exclusive, "Docs")], waiting, behind, |_| false).is_err())
+                    .unwrap();
+            });
+            waiting.recv_timeout(Duration::from_secs(10)).expect("waits for the run ahead");
+            cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
+            let stopped = end.recv_timeout(Duration::from_secs(3));
+            ahead.unlock().unwrap();
+            assert_eq!(stopped, Ok(true), "still waiting for the run ahead");
         });
         std::fs::remove_dir_all(&store.dir).unwrap();
     }
