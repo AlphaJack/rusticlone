@@ -13,33 +13,9 @@ Rusticlone backs up your desktops and servers on a schedule, keeps copies in mor
 - Minimal configuration: add a few lines to your existing rustic profiles and you are good to go
 - Quiet and reliable: it notifies you only when there are issues, not at every run
 
-**[Read the documentation](https://alphajack.github.io/rusticlone/)**
-
-## Install
-
-Windows (PowerShell):
-
-```powershell
-irm https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.ps1 | iex; & "$HOME\.cargo\bin\rusticlone.exe" install --auto-update
-```
-
-macOS and Linux:
-
-```sh
-curl -LsSf https://github.com/AlphaJack/rusticlone/releases/latest/download/rusticlone-installer.sh | sh && $HOME/.cargo/bin/rusticlone install --auto-update
-```
-
-WinGet, Scoop, Chocolatey, Homebrew, AUR, Nix and Docker: see [Install](https://alphajack.github.io/rusticlone/install.html).
-
-## Getting started
-
-Run `rusticlone serve --open` to create your first rustic profiles from the web UI.
-
-**Keep a copy of your profiles away from the computer (e.g. password manager, cloud drive, private git repo), as you'll need them to restore your files in case of a disaster.**
-
-Next: [Getting started](https://alphajack.github.io/rusticlone/getting-started.html) and [Restore](https://alphajack.github.io/rusticlone/restore.html).
+Read the [documentation](https://alphajack.github.io/rusticlone/) to understand how to [install](https://alphajack.github.io/rusticlone/install.html), [backup](https://alphajack.github.io/rusticlone/getting-started.html) and [restore](https://alphajack.github.io/rusticlone/restore.html) your files.
 
 ## Contributions
 
-- Something is not clear or found a bug? Please open a detailed [issue](../../issues)
+- Something is not clear or found a bug? Please open an [issue](../../issues) or submit a pull request.
 - [CONTRIBUTING.md](CONTRIBUTING.md): developer guidelines to submit PRs
