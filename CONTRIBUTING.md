@@ -92,6 +92,7 @@ What lets a test catch a mutant:
 
 - A setting is a line of `settings!` in `src/settings.rs`. `packaging/rusticlone.env` is generated from the settings read at startup and committed. The book's settings page is generated from the same settings and their `setting-` messages. `documented_variables_exist` fails on a variable in the README or the book that no setting reads.
 - A table of the state is a line of `tables!` in `src/state.rs`.
+- A crate that more than one package uses is declared once, in `[workspace.dependencies]`. `tests/conventions/dependencies.rs` checks it, as Renovate fails to update a crate declared in two manifests.
 - Text for users is a message in `i18n/en/rusticlone.ftl`. `#[derive(Fluent)]` looks a message up by the name of the type and variant it describes, and `t!` by its id. Both fail the build on a missing message or argument, and `tests/conventions/literals.rs` fails on English in `src`. Another language is a folder beside `en`.
 
 ## Migrations
