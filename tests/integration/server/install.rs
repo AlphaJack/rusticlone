@@ -141,11 +141,13 @@ fn install_keeps_a_packaged_unit() {
 }
 
 /// `install` writes a login agent that runs the app it writes, signed, and loads it; `uninstall` unloads it
-/// and leaves nothing of either.
+/// and leaves nothing of either, not even in Launch Services.
 #[cfg(target_vendor = "apple")]
 #[test]
 fn install_loads_a_login_agent() {
     use rusticlone::APP_NAME;
+    const LSREGISTER: &str =
+        "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
     let sb = docs_with_remote("");
     let log = sb.path("launchctl.log");
     let Some(fake) = fake_service_manager(&sb, &log) else { return };
@@ -163,6 +165,8 @@ fn install_loads_a_login_agent() {
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
     assert_eq!(leftovers(&dir), Vec::<String>::new());
     assert_eq!(leftovers(&apps), Vec::<String>::new());
+    let registered = std::process::Command::new(LSREGISTER).arg("-dump").output().unwrap();
+    assert!(!String::from_utf8_lossy(&registered.stdout).contains(&app.display().to_string()), "still registered");
     assert!(fs::read_to_string(&log).unwrap().contains("bootout gui/"));
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0).assert_result("not-installed", json!({}));
 }

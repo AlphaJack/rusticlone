@@ -71,6 +71,10 @@ fn domain() -> String {
     if sys::is_root() { "system".into() } else { format!("gui/{uid}") }
 }
 
+/// Unregisters an app from Launch Services, which no public API does.
+const LSREGISTER: &str =
+    "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+
 /// The app that runs the server, so that Login Items shows its name and icon and Spotlight finds it, and
 /// that opens the web UI from Finder.
 fn app() -> Result<PathBuf> {
@@ -336,7 +340,10 @@ pub(super) fn uninstall() -> Result<Option<Removed>> {
     // Not loaded if it stopped, or after a reboot that failed to load it.
     _ = run("launchctl", &["bootout", &format!("{}/{NAME}", domain())]);
     std::fs::remove_file(&file)?;
-    _ = std::fs::remove_dir_all(app()?);
+    let app = app()?;
+    // Else Launch Services keeps the app, which Spotlight and Launchpad show without its icon.
+    _ = run(LSREGISTER, &["-u", &app.to_string_lossy()]);
+    _ = std::fs::remove_dir_all(app);
     Ok(Some(Removed { file: file.display().to_string(), running: false }))
 }
 
