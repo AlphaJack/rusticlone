@@ -461,6 +461,7 @@ button-show-profile = { $os ->
     [windows] Mostra il profilo in Esplora file
    *[other] Mostra il profilo nel file manager
 }
+button-new-collection = Nuova raccolta
 
 ## L'interfaccia web: parole e stati, nelle tabelle e nei percorsi di navigazione
 
@@ -542,6 +543,7 @@ hint-name-or-path = parte di un nome o di un percorso
 hint-where-it-was = dov'era, o una cartella come /tmp/restored
 hint-now = vuoto per adesso
 hint-subfolder-example = una cartella dentro il backup, come /home/me/Documenti/Tasse
+hint-measuring = Calcolo della dimensione…
 hint-notify = URL di notifica, o niente
 notice-started = { $collection }: { $what }
 notice-refreshing = { $collection }: aggiornamento in corso
@@ -569,7 +571,10 @@ missing-run = esecuzione non trovata
 missing-repository = archivio non trovato
 missing-snapshot = snapshot non trovato
 free-missing = cartella o disco non trovato
+free-short = meno delle cartelle da salvare
 free-bytes = { $size } liberi
+measured-missing = { free-missing }
+measured-bytes = { $size } in { $files } file
 
 ## L'aiuto delle metriche
 
@@ -623,6 +628,7 @@ keep-year = Un anno
 keep-month = Un mese
 keep-all = Per sempre
 setup-key-repository = archivio
+setup-key-immutable = immutable
 field-repository-password = Password dell'archivio
 field-server-key = Chiave del server
 field-choice-accept = Qualsiasi chiave
@@ -644,6 +650,8 @@ field-secret-key = Chiave segreta
 field-password = Password
 field-email = Email
 field-url = URL
+field-object-lock = Questo bucket ha Object Lock
+field-append-only = Questo server accetta solo aggiunte
 setup-guide = guida completa alla configurazione: { $url }
 setup-no-choice = nessuna scelta { $choice }
 setup-error-name = il nome deve iniziare con una lettera o una cifra; gli altri caratteri possono essere lettere, cifre, `-`, `_` o `.`

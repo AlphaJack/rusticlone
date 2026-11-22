@@ -167,10 +167,11 @@ fn issue_kinds_match_their_json() {
 /// copies that read it. Another repository's failures still show.
 #[test]
 fn a_missing_repository_hides_the_failures_it_causes() {
-    use crate::request::StepKey;
+    use crate::{request::StepKey, state::Event};
     let missing = DOCS.replace("rest:http://backup/docs", "/nonexistent/docs");
     let engine = engine_with("missing-hides", &Replay::new(), &missing);
     attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    engine.store.apply(&[Event::Missing { repo: "Docs".into(), missing: true }]).unwrap();
     for key in [
         StepKey::Check("Docs".into()),
         StepKey::Copy("Docs".into(), "Docs-usb".into()),
@@ -185,6 +186,20 @@ fn a_missing_repository_hides_the_failures_it_causes() {
     );
     let steps: Vec<_> = issues.iter().filter_map(crate::engine::report::Issue::step).collect();
     assert_eq!(steps, [&StepKey::Check("Docs-usb".into())]);
+}
+
+/// The status says a repository is missing as the state records it, and never looks at the disk, which may mount it:
+/// a local path that is gone counts as there until a run or a refresh finds it missing.
+#[test]
+fn the_status_reads_a_missing_repository_from_the_state() {
+    use crate::{engine::report::RepoStatus, request::StepKey};
+    let gone = DOCS.replace("rest:http://backup/docs", "/nonexistent/docs");
+    let engine = engine_with("missing-from-state", &Replay::new(), &gone);
+    attempted(&engine, StepKey::Snapshot("Docs".into()), &backed_up(), false);
+    let status = |engine: &Engine| engine.status_of(&engine.collections()[0]).primary.status;
+    assert_ne!(status(&engine), RepoStatus::Missing { primary: true }, "not looked at");
+    assert!(!engine.found(engine.collections()[0].primary), "a refresh or a run looks");
+    assert_eq!(status(&engine), RepoStatus::Missing { primary: true });
 }
 
 /// Listed without a snapshot: never backed up. Not before the first listing, which may find some.

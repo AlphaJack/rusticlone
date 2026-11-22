@@ -23,7 +23,7 @@
 - Refuse a backup folder inside a source or holding other files ([#75](https://github.com/AlphaJack/rusticlone/pull/75))
 - Treat browsers behind a proxy or tunnel as remote ([#74](https://github.com/AlphaJack/rusticlone/pull/74))
 
-### Performance
+### Optimized
 
 #### Web
 
