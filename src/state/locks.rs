@@ -6,6 +6,7 @@ use std::{
     io::Write,
     path::PathBuf,
     thread::{self, JoinHandle},
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -57,26 +58,37 @@ impl Drop for RepoLocks<'_> {
     }
 }
 
+/// How often a wait for a lock reads the state again. A change that another process makes, such as cancelling this run,
+/// wakes it through the state file's watcher, which can miss it: Windows may report the write late, or before the
+/// watch started.
+const RECHECK: Duration = Duration::from_secs(1);
+
 impl Store {
     /// Takes all `keys`, each with its mode and the name it is shown with. The first key is taken only after earlier requests for it (`behind` returns the
     /// lock of the run ahead, or fails to end the wait). While one key is busy, no other key is held, so
-    /// that two runs never wait for each other. `waiting` receives the busy key. The wait ends when the
-    /// busy lock is freed or the state changes, and fails when the run or the process stops.
+    /// that two runs never wait for each other. A key that a run ahead waits for (`queued_ahead`) is left to it,
+    /// even while free. `waiting` receives the busy key. The wait ends when the busy lock is freed or the state
+    /// changes, and fails when the run or the process stops.
     pub fn lock<'a>(
         &self,
         cx: &'a Ctx,
         keys: &[(&str, Mode, &str)],
         waiting: impl Fn(&str),
         behind: impl Fn() -> Result<Option<String>>,
+        queued_ahead: impl Fn(&str) -> bool,
     ) -> Result<RepoLocks<'a>> {
         let (mut held, mut freed, mut watcher) = (Vec::new(), BTreeMap::new(), None);
         loop {
             let seen = clock::WAKES.seen();
             let (shown, busy) = match (keys.first(), behind()?) {
-                (Some((first, ..)), Some(ahead)) => (*first, (ahead, Mode::Exclusive)),
-                _ => match self.lock_rest(keys, &mut held)? {
-                    Some((busy, mode)) => (busy, (busy.to_owned(), mode)),
-                    None => break,
+                (Some((first, ..)), Some(ahead)) => (*first, Some((ahead, Mode::Exclusive))),
+                // The run ahead takes it once free, which changes the state and wakes this.
+                _ => match keys.iter().find(|(key, ..)| queued_ahead(key)) {
+                    Some((key, ..)) => (*key, None),
+                    None => match self.lock_rest(keys, &mut held)? {
+                        Some((busy, mode)) => (busy, Some((busy.to_owned(), mode))),
+                        None => break,
+                    },
                 },
             };
             held.clear();
@@ -87,11 +99,13 @@ impl Store {
             if let Some(stop) = cx.stop() {
                 return Err(Error::Stopped { stop }.into());
             }
-            if freed.get(&busy.0).is_none_or(JoinHandle::is_finished) {
-                let file = self.lock_file(&busy.0)?;
-                freed.insert(busy.0, thread::spawn(move || lock_blocking(&file, busy.1).map(|()| clock::WAKES.wake())));
+            if let Some((key, mode)) = busy
+                && freed.get(&key).is_none_or(JoinHandle::is_finished)
+            {
+                let file = self.lock_file(&key)?;
+                freed.insert(key, thread::spawn(move || lock_blocking(&file, mode).map(|()| clock::WAKES.wake())));
             }
-            clock::WAKES.wait(seen);
+            clock::WAKES.wait_at_most(seen, RECHECK);
         }
         Ok(RepoLocks::new(cx, held))
     }
@@ -164,7 +178,7 @@ pub(super) fn named(file: &File, name: &str) {
 
 #[cfg(test)]
 mod tests {
-    use std::{sync::mpsc, time::Duration};
+    use std::sync::mpsc;
 
     use super::*;
     use crate::state::tests::store;
@@ -205,6 +219,7 @@ mod tests {
                     &[("Docs", Mode::Exclusive, "Docs")],
                     |busy| told.send(busy.to_owned()).unwrap(),
                     behind,
+                    |_| false,
                 )
             });
             assert_eq!(waiting.recv_timeout(Duration::from_secs(10)).expect("waits for the run ahead"), "Docs");
@@ -216,6 +231,35 @@ mod tests {
             assert_eq!(cx.held().len(), one);
             drop(locks);
             assert!(cx.held().is_empty());
+        });
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A run cancelled while it waits stops waiting within a second, even when nothing wakes it.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
+    fn a_cancelled_wait_ends_without_a_wake() {
+        let store = store("lock-cancelled-test");
+        let (cx, ahead) = (Ctx::default(), store.lock_file("run:Docs:1").unwrap());
+        ahead.lock().unwrap();
+        let (told, waiting) = mpsc::channel();
+        let (cancelled, (ended, end)) = (std::sync::atomic::AtomicBool::new(false), mpsc::channel());
+        thread::scope(|scope| {
+            scope.spawn(|| {
+                let behind = || match cancelled.load(std::sync::atomic::Ordering::Relaxed) {
+                    true => Err(Error::Dequeued.into()),
+                    false => Ok(Some("run:Docs:1".to_owned())),
+                };
+                let waiting = |busy: &str| told.send(busy.to_owned()).unwrap();
+                ended
+                    .send(store.lock(&cx, &[("Docs", Mode::Exclusive, "Docs")], waiting, behind, |_| false).is_err())
+                    .unwrap();
+            });
+            waiting.recv_timeout(Duration::from_secs(10)).expect("waits for the run ahead");
+            cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
+            let stopped = end.recv_timeout(Duration::from_secs(3));
+            ahead.unlock().unwrap();
+            assert_eq!(stopped, Ok(true), "still waiting for the run ahead");
         });
         std::fs::remove_dir_all(&store.dir).unwrap();
     }
@@ -236,6 +280,32 @@ mod tests {
             assert_eq!(std::fs::read_to_string(store.lock_path("disk:64772")).unwrap(), "disk:/backup");
         }
         drop(held);
+        std::fs::remove_dir_all(&store.dir).unwrap();
+    }
+
+    /// A free key that a run ahead waits for is left to it: the wait ends once that run no longer waits.
+    #[test]
+    #[expect(clippy::disallowed_methods, reason = "creates lock files")]
+    fn a_free_key_is_left_to_the_run_ahead() {
+        let store = store("lock-queued-ahead-test");
+        let cx = Ctx::default();
+        let (told, waiting) = mpsc::channel();
+        let ahead = std::sync::atomic::AtomicBool::new(true);
+        thread::scope(|scope| {
+            let locking = scope.spawn(|| {
+                let queued_ahead = |_: &str| ahead.load(std::sync::atomic::Ordering::Relaxed);
+                let waiting = |busy: &str| told.send(busy.to_owned()).unwrap();
+                store.lock(&cx, &[("disk", Mode::Exclusive, "disk")], waiting, || Ok(None), queued_ahead)
+            });
+            assert_eq!(waiting.recv_timeout(Duration::from_secs(10)).expect("waits while free"), "disk");
+            assert!(
+                store.try_lock(&Ctx::default(), &[("disk", Mode::Exclusive, "disk")]).unwrap().is_some(),
+                "still free"
+            );
+            ahead.store(false, std::sync::atomic::Ordering::Relaxed);
+            clock::WAKES.wake();
+            drop(locking.join().unwrap().unwrap());
+        });
         std::fs::remove_dir_all(&store.dir).unwrap();
     }
 }

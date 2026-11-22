@@ -193,7 +193,8 @@ impl CollectionInput {
         let name = overview.primary.name.clone();
         let repos: Vec<&RusticProfile> = collection.into_iter().flat_map(Collection::repos).collect();
         let listings = repos.iter().filter_map(|r| Some((r.name.clone(), app.listing(&name, &r.name)?))).collect();
-        let existing = repos.iter().filter(|r| r.exists()).map(|r| r.name.clone()).collect();
+        let missing = engine.store.load().missing;
+        let existing = repos.iter().filter(|r| !missing.contains(&r.name)).map(|r| r.name.clone()).collect();
         let remote = repos.iter().filter(|r| r.is_remote()).map(|r| r.name.clone()).collect();
         let kept = repos.iter().filter(|r| !r.has_keep).map(|r| r.name.clone()).collect();
         let primary = collection.map(|j| j.primary);
@@ -337,6 +338,8 @@ struct Overview {
     collections: Vec<CollectionView>,
     /// Some collection has actions.
     actions: bool,
+    /// The setup form can save another collection.
+    can_add: bool,
 }
 
 /// No collections yet: where to put them, and examples.
@@ -375,7 +378,8 @@ pub(super) fn index_main(app: &App) -> IndexMain {
     let blocked = crate::install::autostart::blocked().map(|b| b.to_string());
     #[cfg(not(feature = "desktop"))]
     let blocked = None;
-    let built = IndexMain::build(inputs).with(empty, engine.rustic.untested(), blocked, engine.unconfigured());
+    let mut built = IndexMain::build(inputs).with(empty, engine.rustic.untested(), blocked, engine.unconfigured());
+    built.overview.can_add = setup::dir().is_some();
     IndexMain { waiting: crate::engine::waiting::waiting(engine.conditions, true), ..built }
 }
 
@@ -399,7 +403,7 @@ impl IndexMain {
         let collections: Vec<CollectionView> = inputs.into_iter().map(CollectionView::build).collect();
         let actions = collections.iter().any(|j| j.configured);
         Self {
-            overview: Overview { collections, actions },
+            overview: Overview { collections, actions, can_add: false },
             runs,
             with_collection: true,
             empty: None,

@@ -33,6 +33,7 @@ impl Engine {
             // Started at once, beside the other repositories.
             scope.spawn(|| LazyLock::force(&primary));
             each(repos, |repo| {
+                self.found(repo);
                 let run = Run::new(collection, None);
                 let (snapshots, stats) = std::thread::scope(|scope| {
                     let stats = scope.spawn(|| self.rustic.stats(&run.cx, repo));
@@ -67,6 +68,14 @@ impl Engine {
                 done(repo);
             });
         });
+    }
+
+    /// Looks whether `repo` is where its profile says, which may mount its disk, and records what it found for the
+    /// status, which never looks.
+    pub(super) fn found(&self, repo: &RusticProfile) -> bool {
+        let exists = repo.exists();
+        self.emit(&repo.name, &[crate::state::Event::Missing { repo: repo.name.clone(), missing: !exists }]);
+        exists
     }
 
     /// Collections whose primary was never listed (a new state or a new collection): their status is
@@ -207,14 +216,10 @@ impl Engine {
         let copy = if primary { None } else { last(StepKey::Copy(p.name.clone(), r.name.clone())) };
         let latest_snapshot = state.latest.get(&r.name).copied();
         let shown = |t: &Option<LastStep>, newer| Last::shown(t.as_ref(), newer, failing);
-        let (copied, missing) = (shown(&copy, latest_snapshot), !r.exists());
+        let (copied, missing) = (shown(&copy, latest_snapshot), state.missing.contains(&r.name));
         let lag = state.lag(&p.name, &r.name).cloned().filter(|_| !primary);
         let behind = lag.as_ref().and_then(|l| l.behind_since);
-        // It had snapshots once: a backed-up primary, or a target that was copied to or listed with snapshots.
-        let created = match primary {
-            true => backed_up.is_some(),
-            false => latest_snapshot.is_some() || copy.as_ref().is_some_and(|c| c.last_ok.is_some()),
-        };
+        let created = schedule::created(p, r, state);
         let status = if missing && created {
             RepoStatus::Missing { primary }
         } else if matches!(copied, Last::Failing(_)) {
