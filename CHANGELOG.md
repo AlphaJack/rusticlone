@@ -1,5 +1,53 @@
 # Changelog
 
+## [2.1.0](https://github.com/AlphaJack/rusticlone/compare/v2.0.4...v2.1.0) - 2026-11-22
+
+### Added
+
+- Set the name of lock files based on what they lock and write its name inside ([#352](https://github.com/AlphaJack/rusticlone/pull/352))
+
+#### Backup
+
+- Let scheduled runs wait while metered or on battery ([#390](https://github.com/AlphaJack/rusticlone/pull/390))
+- Keep the computer awake during runs ([#88](https://github.com/AlphaJack/rusticlone/pull/88))
+
+#### Web
+
+- Make setup of additional collections easier ([#391](https://github.com/AlphaJack/rusticlone/pull/391))
+- Say why saving would refuse the backup folder as it is typed ([#96](https://github.com/AlphaJack/rusticlone/pull/96))
+- Choose what and when to restore in the restore dialog ([#85](https://github.com/AlphaJack/rusticlone/pull/85))
+- Show a repository's profile or a source in the file manager ([#84](https://github.com/AlphaJack/rusticlone/pull/84))
+
+### Fixed
+
+- Let the status read only the state, and only runs and refreshes look at repositories ([#394](https://github.com/AlphaJack/rusticlone/pull/394))
+- Derive repositories IDs from fewer properties ([#375](https://github.com/AlphaJack/rusticlone/pull/375))
+- Do not request a cancelled run's step again before its next scheduled time ([#351](https://github.com/AlphaJack/rusticlone/pull/351))
+- Name the server's threads rusticlone ([#349](https://github.com/AlphaJack/rusticlone/pull/349))
+- Give each run its own id, also when two start in the same millisecond ([#155](https://github.com/AlphaJack/rusticlone/pull/155))
+- Build with each feature alone ([#133](https://github.com/AlphaJack/rusticlone/pull/133))
+- Define tie_child once ([#127](https://github.com/AlphaJack/rusticlone/pull/127))
+
+#### Backup
+
+- Stop waiting at once when a queued run is cancelled ([#402](https://github.com/AlphaJack/rusticlone/pull/402))
+- Let runs take a busy resource in turn, giving precedence to backups ([#393](https://github.com/AlphaJack/rusticlone/pull/393))
+- Keep rustic's last line while a process it started holds its output ([#323](https://github.com/AlphaJack/rusticlone/pull/323))
+- Restore a source behind a link whose folder is gone ([#161](https://github.com/AlphaJack/rusticlone/pull/161))
+
+#### Deps
+
+- Support rustic 0.12 ([#373](https://github.com/AlphaJack/rusticlone/pull/373))
+
+#### Web
+
+- Open on the Linux desktop from the web UI and the tray without crashing ([#329](https://github.com/AlphaJack/rusticlone/pull/329))
+- Catch a stop signal before the server says it is ready ([#245](https://github.com/AlphaJack/rusticlone/pull/245))
+
+### Translated
+
+- Translate the tray's Open item and an update error ([#118](https://github.com/AlphaJack/rusticlone/pull/118))
+
 ## [2.0.4](https://github.com/AlphaJack/rusticlone/compare/v2.0.3...v2.0.4) - 2026-11-02
 
 ### Fixed
