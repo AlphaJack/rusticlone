@@ -102,8 +102,34 @@ fn property_list(dict: &str) -> String {
 fn write_app(app: &Path, exe: &Path, version: &str) -> Result<PathBuf> {
     let bundled = bundle(app, exe, version)?;
     // Finder and the Dock keep showing the icon they cached until the app is registered again.
-    register(app)?;
+    if registers() {
+        register(app)?;
+    }
     Ok(bundled)
+}
+
+/// Whether the app goes to Launch Services: as root, or with `HOME` at the user's own home. The tests point
+/// `HOME` at a sandbox, whose apps share the real app's bundle ID and would confuse macOS about it.
+fn registers() -> bool {
+    sys::is_root() || own_home().is_some_and(|own| etcetera::home_dir().is_ok_and(|home| home == own))
+}
+
+/// The user's home in the user database, which ignores `HOME`.
+#[expect(unsafe_code, reason = "getpwuid_r fills a C struct")]
+fn own_home() -> Option<PathBuf> {
+    use std::os::unix::ffi::OsStrExt;
+    /// Enough for a user's entry, whose size macOS does not say.
+    const ENTRY: usize = 4096;
+    let mut buffer: Vec<libc::c_char> = vec![0; ENTRY];
+    // SAFETY: a zeroed passwd is valid. getpwuid_r points `found` at it once it filled it from the buffer, and
+    // leaves `found` null when it fails. Both outlive the reads.
+    unsafe {
+        let mut entry: libc::passwd = std::mem::zeroed();
+        let mut found = std::ptr::null_mut();
+        libc::getpwuid_r(libc::getuid(), &raw mut entry, buffer.as_mut_ptr(), buffer.len(), &raw mut found);
+        let entry: &libc::passwd = found.as_ref()?;
+        Some(PathBuf::from(std::ffi::OsStr::from_bytes(std::ffi::CStr::from_ptr(entry.pw_dir).to_bytes())))
+    }
 }
 
 /// Registers `app` with Launch Services again, as `lsregister -f` does.
@@ -342,7 +368,9 @@ pub(super) fn uninstall() -> Result<Option<Removed>> {
     std::fs::remove_file(&file)?;
     let app = app()?;
     // Else Launch Services keeps the app, which Spotlight and Launchpad show without its icon.
-    _ = run(LSREGISTER, &["-u", &app.to_string_lossy()]);
+    if registers() {
+        _ = run(LSREGISTER, &["-u", &app.to_string_lossy()]);
+    }
     _ = std::fs::remove_dir_all(app);
     Ok(Some(Removed { file: file.display().to_string(), running: false }))
 }
@@ -371,6 +399,12 @@ pub(super) fn headless() -> bool {
 
 #[cfg(test)]
 mod tests {
+    /// The tests run with the user's own `HOME`, so the app they would install goes to Launch Services.
+    #[test]
+    fn the_users_own_home_registers_the_app() {
+        assert!(super::registers());
+    }
+
     #[test]
     fn the_keywords_fit_a_short_property_list() {
         let keywords: Vec<&str> = env!("KEYWORDS").split(';').collect();
