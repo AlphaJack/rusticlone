@@ -40,7 +40,7 @@ services.rusticlone = {
 ```
 
 To [restore](restore.md), run `sudo rusticlone restore` with the flags you need or use the web UI.
-After a disaster, reistall NixOS and run `sudo rusticlone restore --all` to bring back the files.
+After a disaster, reinstall NixOS and run `sudo rusticlone restore --all` to bring back the files.
 
 ## Home Manager
 
