@@ -140,8 +140,8 @@ fn install_keeps_a_packaged_unit() {
     assert_eq!(leftovers(&dir), Vec::<String>::new());
 }
 
-/// `install` writes a login agent that runs the app it writes, signed, and loads it; `uninstall` unloads it
-/// and leaves nothing of either, not even in Launch Services.
+/// `install` writes a login agent that runs the app it writes, signed, and loads it, but keeps the sandbox's
+/// app out of Launch Services; `uninstall` unloads it and leaves nothing of either.
 #[cfg(target_vendor = "apple")]
 #[test]
 fn install_loads_a_login_agent() {
@@ -158,6 +158,8 @@ fn install_loads_a_login_agent() {
     assert!(plist.contains("<string>serve</string>") && plist.contains(&fake.path), "{plist}");
     assert!(plist.contains(&format!("<string>{}</string>", exe.display())), "{plist}");
     let app = exe.ancestors().nth(3).unwrap();
+    let registered = std::process::Command::new(LSREGISTER).arg("-dump").output().unwrap();
+    assert!(!String::from_utf8_lossy(&registered.stdout).contains(&app.display().to_string()), "registered");
     let status = |program: &str, args: &[&str]| std::process::Command::new(program).args(args).arg(app).output();
     assert!(status("codesign", &["--verify"]).unwrap().status.success());
     assert!(status("xattr", &["-p", "com.apple.metadata:kMDItemKeywords"]).unwrap().status.success());
@@ -165,8 +167,6 @@ fn install_loads_a_login_agent() {
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0);
     assert_eq!(leftovers(&dir), Vec::<String>::new());
     assert_eq!(leftovers(&apps), Vec::<String>::new());
-    let registered = std::process::Command::new(LSREGISTER).arg("-dump").output().unwrap();
-    assert!(!String::from_utf8_lossy(&registered.stdout).contains(&app.display().to_string()), "still registered");
     assert!(fs::read_to_string(&log).unwrap().contains("bootout gui/"));
     sb.run_with(&["uninstall"], &fake.env()).assert_exit(0).assert_result("not-installed", json!({}));
 }
