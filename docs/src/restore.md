@@ -42,7 +42,7 @@ If the primary repository is lost too, a plain `rusticlone restore --all` or `ru
 
 The reason is the chunker: a fresh repository created by a backup gets a random chunker polynomial, incompatible with the existing copy targets.
 Snapshots would succeed, but copies to the targets would fail with a chunker polynomial mismatch.
-[At the moment](https://github.com/rustic-rs/rustic/pull/1954) a rustic profile cannot set the chunker polynomial.
+A rustic profile cannot set the chunker polynomial ([source](https://github.com/rustic-rs/rustic/pull/1954#issuecomment-6540038388)).
 
 To re-create a compatible primary repository from an existing copy target (or vice-versa) by hand, run:
 
