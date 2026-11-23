@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.1](https://github.com/AlphaJack/rusticlone/compare/v2.1.0...v2.1.1) - 2026-11-23
+
+### Fixed
+
+#### Install
+
+- Unregister the macOS app on uninstall ([#414](https://github.com/AlphaJack/rusticlone/pull/414))
+
 ## [2.1.0](https://github.com/AlphaJack/rusticlone/compare/v2.0.4...v2.1.0) - 2026-11-22
 
 ### Added
